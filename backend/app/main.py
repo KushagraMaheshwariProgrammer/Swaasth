@@ -16,7 +16,7 @@ from PIL import Image
 
 load_dotenv()
 
-TESSERACT_PATH = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+TESSERACT_PATH = "/opt/homebrew/bin/tesseract"
 pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
 
 app = FastAPI(title="MedBill Backend")
