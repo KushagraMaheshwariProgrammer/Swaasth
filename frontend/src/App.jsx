@@ -10,8 +10,20 @@ import {
   useNavigate,
 } from "react-router-dom";
 
-const API_URL = "http://127.0.0.1:8000/upload-bill";
+const API_BASE = "http://127.0.0.1:8000";
 const ALLOWED_EXTENSIONS = ["pdf", "jpg", "jpeg", "png"];
+
+const TIER_OPTIONS = [
+  { id: "tier_1", label: "Tier I city (e.g. metros)" },
+  { id: "tier_2", label: "Tier II city" },
+  { id: "tier_3", label: "Tier III city" },
+];
+
+const RATE_TYPE_OPTIONS = [
+  { id: "nabh", label: "NABH accredited hospital" },
+  { id: "non_nabh", label: "Non-NABH hospital" },
+  { id: "super_speciality", label: "Super speciality rate" },
+];
 const LOADING_MESSAGES = [
   "Reading your bill...",
   "Extracting line items...",
@@ -241,7 +253,7 @@ function LandingPage() {
         </section>
 
         <section className="trust-bar-dark">
-          Comparing against 200+ CGHS benchmark rates · Used by patients across
+          Comparing against 5,900+ official CGHS 2025 rates · Used by patients across
           India · No data stored · Built with ❤️ for India
         </section>
       </main>
@@ -266,6 +278,8 @@ function LandingPage() {
 function CheckPage() {
   const inputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [tier, setTier] = useState("tier_1");
+  const [rateType, setRateType] = useState("nabh");
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -339,7 +353,11 @@ function CheckPage() {
     formData.append("file", selectedFile);
 
     try {
-      const response = await fetch(API_URL, { method: "POST", body: formData });
+      const params = new URLSearchParams({ tier, rate_type: rateType });
+      const response = await fetch(`${API_BASE}/upload-bill?${params}`, {
+        method: "POST",
+        body: formData,
+      });
       const payload = await response.json();
       if (!response.ok) {
         throw new Error(payload?.detail || "Unable to analyze this bill.");
@@ -408,6 +426,43 @@ function CheckPage() {
                   event.target.value = "";
                 }}
               />
+
+              <div className="comparison-settings">
+                <p className="comparison-settings-title">CGHS comparison settings</p>
+                <div className="comparison-settings-grid">
+                  <label className="setting-field">
+                    <span>City tier</span>
+                    <select
+                      value={tier}
+                      onChange={(event) => setTier(event.target.value)}
+                    >
+                      {TIER_OPTIONS.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="setting-field">
+                    <span>Hospital rate type</span>
+                    <select
+                      value={rateType}
+                      onChange={(event) => setRateType(event.target.value)}
+                    >
+                      {RATE_TYPE_OPTIONS.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <p className="comparison-settings-hint">
+                  Bills are matched against official CGHS 2025 rates for your city
+                  tier, including NABH and non-NABH columns.
+                </p>
+              </div>
+
               <button type="button" className="analyze-btn" onClick={handleAnalyze}>
                 Analyze Bill
               </button>
@@ -441,6 +496,18 @@ function CheckPage() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
             >
+              {result?.comparison_settings && (
+                <p className="comparison-context">
+                  Compared using{" "}
+                  <strong>{result.comparison_settings.tier}</strong> ·{" "}
+                  <strong>
+                    {RATE_TYPE_OPTIONS.find(
+                      (o) => o.id === result.comparison_settings.rate_type
+                    )?.label || result.comparison_settings.rate_type}
+                  </strong>
+                </p>
+              )}
+
               <article className="summary-banner">
                 <div className="summary-stat">
                   <p>Total Charged</p>
@@ -474,6 +541,13 @@ function CheckPage() {
                         <h4>{item.item_name || "--"}</h4>
                         <span className={meta.badgeClass}>{meta.badgeLabel}</span>
                       </div>
+                      {item.matched_reference_item && (
+                        <p className="matched-reference">
+                          Matched: {item.matched_reference_item}
+                          {item.cghs_code ? ` (${item.cghs_code})` : ""}
+                          {item.approximate_match ? " · approximate" : ""}
+                        </p>
+                      )}
                       <div className="result-metrics">
                         <div>
                           <p>Charged</p>
@@ -488,6 +562,13 @@ function CheckPage() {
                           <h5>{formatCurrency(item.price_difference)}</h5>
                         </div>
                       </div>
+                      {(item.non_nabh_rate != null || item.nabh_rate != null) && (
+                        <p className="rate-breakdown">
+                          Non-NABH {formatCurrency(item.non_nabh_rate)} · NABH{" "}
+                          {formatCurrency(item.nabh_rate)} · Super speciality{" "}
+                          {formatCurrency(item.super_speciality_rate)}
+                        </p>
+                      )}
                     </article>
                   );
                 })}

@@ -561,6 +561,65 @@ body {
   display: none;
 }
 
+.comparison-settings {
+  margin-top: 1rem;
+  padding: 0.9rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.comparison-settings-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.comparison-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.setting-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.setting-field select {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.9rem;
+  color: #0f172a;
+  background: #fff;
+}
+
+.comparison-settings-hint {
+  margin: 0.65rem 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.comparison-context {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+  color: #475569;
+}
+
+.matched-reference,
+.rate-breakdown {
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
 .analyze-btn {
   margin-top: 0.8rem;
   width: 100%;
@@ -576,6 +635,12 @@ body {
 
 .analyze-btn:hover {
   filter: brightness(1.05);
+}
+
+@media (max-width: 640px) {
+  .comparison-settings-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .error-text {
