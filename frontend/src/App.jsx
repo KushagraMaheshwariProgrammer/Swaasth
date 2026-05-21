@@ -13,12 +13,6 @@ import {
 const API_BASE = "http://127.0.0.1:8000";
 const ALLOWED_EXTENSIONS = ["pdf", "jpg", "jpeg", "png"];
 
-const TIER_OPTIONS = [
-  { id: "tier_1", label: "Tier I city (e.g. metros)" },
-  { id: "tier_2", label: "Tier II city" },
-  { id: "tier_3", label: "Tier III city" },
-];
-
 const RATE_TYPE_OPTIONS = [
   { id: "nabh", label: "NABH accredited hospital" },
   { id: "non_nabh", label: "Non-NABH hospital" },
@@ -278,14 +272,80 @@ function LandingPage() {
 function CheckPage() {
   const inputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [tier, setTier] = useState("tier_1");
+  const [states, setStates] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [stateCode, setStateCode] = useState("");
+  const [city, setCity] = useState("");
+  const [resolvedTier, setResolvedTier] = useState(null);
   const [rateType, setRateType] = useState("nabh");
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingCities, setIsLoadingCities] = useState(false);
+  const [locationError, setLocationError] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(8);
+
+  useEffect(() => {
+    const loadStates = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/locations/states`);
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.detail || "Unable to load states.");
+        }
+        setStates(payload.states ?? []);
+      } catch (err) {
+        setLocationError(err.message || "Unable to load state list.");
+      }
+    };
+    loadStates();
+  }, []);
+
+  useEffect(() => {
+    if (!stateCode) {
+      setCities([]);
+      setCity("");
+      setResolvedTier(null);
+      return undefined;
+    }
+
+    const loadCities = async () => {
+      setIsLoadingCities(true);
+      setLocationError("");
+      setCity("");
+      setResolvedTier(null);
+      try {
+        const response = await fetch(
+          `${API_BASE}/locations/cities?state_code=${encodeURIComponent(stateCode)}`
+        );
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.detail || "Unable to load cities.");
+        }
+        setCities(payload.cities ?? []);
+      } catch (err) {
+        setCities([]);
+        setLocationError(err.message || "Unable to load cities for this state.");
+      } finally {
+        setIsLoadingCities(false);
+      }
+    };
+
+    loadCities();
+  }, [stateCode]);
+
+  useEffect(() => {
+    if (!city) {
+      setResolvedTier(null);
+      return undefined;
+    }
+    const selected = cities.find((entry) => entry.name === city);
+    if (selected) {
+      setResolvedTier(selected);
+    }
+  }, [city, cities]);
 
   const summary = useMemo(() => {
     const lineItems = result?.line_items ?? [];
@@ -346,6 +406,10 @@ function CheckPage() {
       setError("Please select your hospital bill first.");
       return;
     }
+    if (!stateCode || !city) {
+      setError("Please select the state and city where the hospital is located.");
+      return;
+    }
     setError("");
     setIsLoading(true);
     setResult(null);
@@ -353,7 +417,11 @@ function CheckPage() {
     formData.append("file", selectedFile);
 
     try {
-      const params = new URLSearchParams({ tier, rate_type: rateType });
+      const params = new URLSearchParams({
+        state_code: stateCode,
+        city,
+        rate_type: rateType,
+      });
       const response = await fetch(`${API_BASE}/upload-bill?${params}`, {
         method: "POST",
         body: formData,
@@ -428,39 +496,73 @@ function CheckPage() {
               />
 
               <div className="comparison-settings">
-                <p className="comparison-settings-title">CGHS comparison settings</p>
+                <p className="comparison-settings-title">Hospital location</p>
                 <div className="comparison-settings-grid">
                   <label className="setting-field">
-                    <span>City tier</span>
+                    <span>State</span>
                     <select
-                      value={tier}
-                      onChange={(event) => setTier(event.target.value)}
+                      value={stateCode}
+                      onChange={(event) => setStateCode(event.target.value)}
                     >
-                      {TIER_OPTIONS.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
+                      <option value="">Select state</option>
+                      {states.map((state) => (
+                        <option key={state.code} value={state.code}>
+                          {state.name}
                         </option>
                       ))}
                     </select>
                   </label>
                   <label className="setting-field">
-                    <span>Hospital rate type</span>
+                    <span>City</span>
                     <select
-                      value={rateType}
-                      onChange={(event) => setRateType(event.target.value)}
+                      value={city}
+                      disabled={!stateCode || isLoadingCities}
+                      onChange={(event) => setCity(event.target.value)}
                     >
-                      {RATE_TYPE_OPTIONS.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
+                      <option value="">
+                        {isLoadingCities
+                          ? "Loading cities..."
+                          : stateCode
+                          ? "Select city"
+                          : "Select state first"}
+                      </option>
+                      {cities.map((entry) => (
+                        <option key={entry.name} value={entry.name}>
+                          {entry.name}
                         </option>
                       ))}
                     </select>
                   </label>
                 </div>
+                <label className="setting-field setting-field-full">
+                  <span>Hospital rate type</span>
+                  <select
+                    value={rateType}
+                    onChange={(event) => setRateType(event.target.value)}
+                  >
+                    {RATE_TYPE_OPTIONS.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {resolvedTier && (
+                  <p className="tier-detected">
+                    CGHS tier for this city:{" "}
+                    <strong>{resolvedTier.tier_label}</strong>
+                    {resolvedTier.tier_source === "default_tier_3"
+                      ? " (not in CGHS city list — Tier III applied)"
+                      : ""}
+                  </p>
+                )}
                 <p className="comparison-settings-hint">
-                  Bills are matched against official CGHS 2025 rates for your city
-                  tier, including NABH and non-NABH columns.
+                  City tier is detected automatically from official CGHS city
+                  classification. Unlisted cities use Tier III rates.
                 </p>
+                {locationError && (
+                  <p className="error-text">{locationError}</p>
+                )}
               </div>
 
               <button type="button" className="analyze-btn" onClick={handleAnalyze}>
@@ -498,8 +600,23 @@ function CheckPage() {
             >
               {result?.comparison_settings && (
                 <p className="comparison-context">
-                  Compared using{" "}
-                  <strong>{result.comparison_settings.tier}</strong> ·{" "}
+                  {result.comparison_settings.state_name &&
+                    result.comparison_settings.city && (
+                      <>
+                        Hospital location:{" "}
+                        <strong>
+                          {result.comparison_settings.city},{" "}
+                          {result.comparison_settings.state_name}
+                        </strong>
+                        {" · "}
+                      </>
+                    )}
+                  Tier:{" "}
+                  <strong>
+                    {result.comparison_settings.tier_label ||
+                      result.comparison_settings.tier}
+                  </strong>
+                  {" · "}
                   <strong>
                     {RATE_TYPE_OPTIONS.find(
                       (o) => o.id === result.comparison_settings.rate_type

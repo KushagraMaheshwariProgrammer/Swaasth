@@ -1,0 +1,97 @@
+Sl_No,State_UT,City,Tier,Designation,Notes
+2,Andhra Pradesh/Telangana,Hyderabad,Tier I (X City),X (Tier I),UA
+2,Andhra Pradesh/Telangana,Vijayawada,Tier II (Y City),Y (Tier II),UA
+2,Andhra Pradesh/Telangana,Warangal,Tier II (Y City),Y (Tier II),UA
+2,Andhra Pradesh/Telangana,Greater Visakhapatnam,Tier II (Y City),Y (Tier II),M.Corpn.
+2,Andhra Pradesh/Telangana,Guntur,Tier II (Y City),Y (Tier II),UA
+2,Andhra Pradesh/Telangana,Nellore,Tier II (Y City),Y (Tier II),UA
+4,Assam,Guwahati,Tier II (Y City),Y (Tier II),UA
+5,Bihar,Patna,Tier II (Y City),Y (Tier II),UA
+6,Chandigarh,Chandigarh,Tier II (Y City),Y (Tier II),UA
+7,Chhattisgarh,Durg-Bhilai Nagar,Tier II (Y City),Y (Tier II),UA
+7,Chhattisgarh,Raipur,Tier II (Y City),Y (Tier II),UA
+10,Delhi,Delhi,Tier I (X City),X (Tier I),UA
+12,Gujarat,Ahmadabad,Tier I (X City),X (Tier I),UA
+12,Gujarat,Rajkot,Tier II (Y City),Y (Tier II),UA
+12,Gujarat,Jamnagar,Tier II (Y City),Y (Tier II),UA
+12,Gujarat,Bhavnagar,Tier II (Y City),Y (Tier II),UA
+12,Gujarat,Vadodara,Tier II (Y City),Y (Tier II),UA
+12,Gujarat,Surat,Tier II (Y City),Y (Tier II),UA
+13,Haryana,Faridabad,Tier II (Y City),Y (Tier II),M.Corpn. *HRA dependency basis only
+13,Haryana,Gurgaon,Tier II (Y City),Y (Tier II),UA *HRA dependency basis only
+15,Jammu & Kashmir,Srinagar,Tier II (Y City),Y (Tier II),UA
+15,Jammu & Kashmir,Jammu,Tier II (Y City),Y (Tier II),UA
+16,Jharkhand,Jamshedpur,Tier II (Y City),Y (Tier II),UA
+16,Jharkhand,Dhanbad,Tier II (Y City),Y (Tier II),UA
+16,Jharkhand,Ranchi,Tier II (Y City),Y (Tier II),UA
+16,Jharkhand,Bokaro Steel City,Tier II (Y City),Y (Tier II),UA
+17,Karnataka,Bengaluru,Tier I (X City),X (Tier I),UA
+17,Karnataka,Belgaum,Tier II (Y City),Y (Tier II),UA
+17,Karnataka,Hubli-Dharwad,Tier II (Y City),Y (Tier II),M.Corpn.
+17,Karnataka,Mangalore,Tier II (Y City),Y (Tier II),UA
+17,Karnataka,Mysore,Tier II (Y City),Y (Tier II),UA
+17,Karnataka,Gulbarga,Tier II (Y City),Y (Tier II),UA
+18,Kerala,Kozhikode,Tier II (Y City),Y (Tier II),UA
+18,Kerala,Kochi,Tier II (Y City),Y (Tier II),UA
+18,Kerala,Thiruvananthapuram,Tier II (Y City),Y (Tier II),UA
+18,Kerala,Thrissur,Tier II (Y City),Y (Tier II),UA
+18,Kerala,Malappuram,Tier II (Y City),Y (Tier II),UA
+18,Kerala,Kannur,Tier II (Y City),Y (Tier II),UA
+18,Kerala,Kollam,Tier II (Y City),Y (Tier II),UA
+20,Madhya Pradesh,Gwalior,Tier II (Y City),Y (Tier II),UA
+20,Madhya Pradesh,Indore,Tier II (Y City),Y (Tier II),UA
+20,Madhya Pradesh,Bhopal,Tier II (Y City),Y (Tier II),UA
+20,Madhya Pradesh,Jabalpur,Tier II (Y City),Y (Tier II),UA
+20,Madhya Pradesh,Ujjain,Tier II (Y City),Y (Tier II),M.Corpn.
+21,Maharashtra,Greater Mumbai,Tier I (X City),X (Tier I),UA
+21,Maharashtra,Pune,Tier I (X City),X (Tier I),UA
+21,Maharashtra,Amravati,Tier II (Y City),Y (Tier II),M.Corpn.
+21,Maharashtra,Nagpur,Tier II (Y City),Y (Tier II),UA
+21,Maharashtra,Aurangabad,Tier II (Y City),Y (Tier II),UA
+21,Maharashtra,Nashik,Tier II (Y City),Y (Tier II),UA
+21,Maharashtra,Bhiwandi,Tier II (Y City),Y (Tier II),UA
+21,Maharashtra,Solapur,Tier II (Y City),Y (Tier II),M.Corpn.
+21,Maharashtra,Kolhapur,Tier II (Y City),Y (Tier II),UA
+21,Maharashtra,Vasai-Virar City,Tier II (Y City),Y (Tier II),M.Corpn.
+21,Maharashtra,Malegaon,Tier II (Y City),Y (Tier II),UA
+21,Maharashtra,Nanded-Waghala,Tier II (Y City),Y (Tier II),M.Corpn.
+21,Maharashtra,Sangli,Tier II (Y City),Y (Tier II),UA
+26,Odisha,Cuttack,Tier II (Y City),Y (Tier II),UA
+26,Odisha,Bhubaneswar,Tier II (Y City),Y (Tier II),UA
+26,Odisha,Raurkela,Tier II (Y City),Y (Tier II),UA
+27,Puducherry (Pondicherry),Puducherry/Pondicherry,Tier II (Y City),Y (Tier II),UA
+28,Punjab,Amritsar,Tier II (Y City),Y (Tier II),UA
+28,Punjab,Jalandhar,Tier II (Y City),Y (Tier II),UA
+28,Punjab,Ludhiana,Tier II (Y City),Y (Tier II),M.Corpn.
+29,Rajasthan,Bikaner,Tier II (Y City),Y (Tier II),M.Corpn.
+29,Rajasthan,Jaipur,Tier II (Y City),Y (Tier II),M.Corpn.
+29,Rajasthan,Jodhpur,Tier II (Y City),Y (Tier II),UA
+29,Rajasthan,Kota,Tier II (Y City),Y (Tier II),M.Corpn.
+29,Rajasthan,Ajmer,Tier II (Y City),Y (Tier II),UA
+31,Tamil Nadu,Chennai,Tier I (X City),X (Tier I),UA
+31,Tamil Nadu,Salem,Tier II (Y City),Y (Tier II),UA
+31,Tamil Nadu,Tiruppur,Tier II (Y City),Y (Tier II),UA
+31,Tamil Nadu,Coimbatore,Tier II (Y City),Y (Tier II),UA
+31,Tamil Nadu,Tiruchirappalli,Tier II (Y City),Y (Tier II),UA
+31,Tamil Nadu,Madurai,Tier II (Y City),Y (Tier II),UA
+31,Tamil Nadu,Erode,Tier II (Y City),Y (Tier II),UA
+33,Uttar Pradesh,Moradabad,Tier II (Y City),Y (Tier II),M.Corpn.
+33,Uttar Pradesh,Meerut,Tier II (Y City),Y (Tier II),UA
+33,Uttar Pradesh,Ghaziabad,Tier II (Y City),Y (Tier II),UA *HRA dependency basis only
+33,Uttar Pradesh,Aligarh,Tier II (Y City),Y (Tier II),UA
+33,Uttar Pradesh,Agra,Tier II (Y City),Y (Tier II),UA
+33,Uttar Pradesh,Bareilly,Tier II (Y City),Y (Tier II),UA
+33,Uttar Pradesh,Lucknow,Tier II (Y City),Y (Tier II),UA
+33,Uttar Pradesh,Kanpur,Tier II (Y City),Y (Tier II),UA
+33,Uttar Pradesh,Allahabad,Tier II (Y City),Y (Tier II),UA
+33,Uttar Pradesh,Gorakhpur,Tier II (Y City),Y (Tier II),UA
+33,Uttar Pradesh,Varanasi,Tier II (Y City),Y (Tier II),UA
+33,Uttar Pradesh,Saharanpur,Tier II (Y City),Y (Tier II),M.Corpn.
+33,Uttar Pradesh,Noida,Tier II (Y City),Y (Tier II),CT *HRA dependency basis only
+33,Uttar Pradesh,Firozabad,Tier II (Y City),Y (Tier II),NPP
+33,Uttar Pradesh,Jhansi,Tier II (Y City),Y (Tier II),UA
+34,Uttarakhand,Dehradun,Tier II (Y City),Y (Tier II),UA
+35,West Bengal,Kolkata,Tier I (X City),X (Tier I),UA
+35,West Bengal,Asansol,Tier II (Y City),Y (Tier II),UA
+35,West Bengal,Siliguri,Tier II (Y City),Y (Tier II),UA
+35,West Bengal,Durgapur,Tier II (Y City),Y (Tier II),UA

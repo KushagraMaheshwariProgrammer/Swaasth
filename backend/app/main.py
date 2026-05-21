@@ -17,6 +17,7 @@ from app.cghs_rates import (
     resolve_rate_type,
     resolve_tier,
 )
+from app.locations import get_location_store
 
 
 load_dotenv()
@@ -39,7 +40,7 @@ app.add_middleware(
 
 
 @app.on_event("startup")
-def load_cghs_rates() -> None:
+def load_reference_data() -> None:
     try:
         store = get_cghs_store()
         print(
@@ -48,6 +49,16 @@ def load_cghs_rates() -> None:
         )
     except Exception as exc:
         print(f"WARNING: CGHS rates CSV failed to load: {exc}")
+
+    try:
+        locations = get_location_store()
+        city_count = sum(len(cities) for cities in locations.cities_by_state.values())
+        print(
+            f"Loaded {len(locations.states)} states and {city_count} cities "
+            f"from location directories"
+        )
+    except Exception as exc:
+        print(f"WARNING: Location directories failed to load: {exc}")
 
 
 @app.get("/health")
@@ -79,6 +90,93 @@ def cghs_options() -> dict[str, Any]:
         "total_procedures": len(store.rows),
         "csv_source": str(store.csv_path),
     }
+
+
+@app.get("/locations/states")
+def list_states() -> dict[str, Any]:
+    try:
+        store = get_location_store()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Location data is unavailable: {exc}",
+        ) from exc
+    return {"states": store.get_states()}
+
+
+@app.get("/locations/cities")
+def list_cities(
+    state_code: str = Query(..., description="State code from /locations/states"),
+) -> dict[str, Any]:
+    try:
+        store = get_location_store()
+        cities = store.get_cities(state_code)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Location data is unavailable: {exc}",
+        ) from exc
+
+    if not cities:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No cities found for state_code '{state_code}'.",
+        )
+
+    state_name = next(
+        (state["name"] for state in store.get_states() if state["code"] == state_code),
+        "",
+    )
+    return {"state_code": state_code, "state_name": state_name, "cities": cities}
+
+
+@app.get("/locations/tier")
+def resolve_city_tier(
+    state_code: str = Query(...),
+    city: str = Query(..., description="City name from /locations/cities"),
+) -> dict[str, str]:
+    try:
+        return get_location_store().resolve_tier(state_code, city)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Location data is unavailable: {exc}",
+        ) from exc
+
+
+def _resolve_comparison_tier(
+    *,
+    tier: str | None,
+    state_code: str | None,
+    city: str | None,
+) -> tuple[str, dict[str, Any]]:
+    location_meta: dict[str, Any] = {}
+
+    if state_code and city:
+        try:
+            resolved = get_location_store().resolve_tier(state_code, city)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        location_meta = {
+            "state_code": resolved["state_code"],
+            "state_name": resolved["state_name"],
+            "city": resolved["city_name"],
+            "tier_id": resolved["tier_id"],
+            "tier_label": resolved["tier_label"],
+            "tier_source": resolved["tier_source"],
+        }
+        return resolve_tier(resolved["tier_id"]), location_meta
+
+    if tier:
+        return resolve_tier(tier), location_meta
+
+    raise HTTPException(
+        status_code=400,
+        detail="Provide state_code and city, or an explicit tier.",
+    )
 
 
 def _extract_text_from_pdf(file_bytes: bytes) -> str:
@@ -266,13 +364,21 @@ def _add_cghs_comparison(
 @app.post("/upload-bill")
 async def upload_bill(
     file: UploadFile = File(...),
-    tier: str = Query(
-        default="tier_1",
-        description="City tier: tier_1, tier_2, or tier_3",
+    state_code: str = Query(
+        ...,
+        description="State code where the hospital is located",
+    ),
+    city: str = Query(
+        ...,
+        description="City where the hospital is located",
     ),
     rate_type: str = Query(
         default="nabh",
         description="Rate column: non_nabh, nabh, or super_speciality",
+    ),
+    tier: str | None = Query(
+        default=None,
+        description="Optional manual tier override (tier_1, tier_2, tier_3)",
     ),
 ) -> dict[str, Any]:
     allowed_types = {
@@ -288,7 +394,11 @@ async def upload_bill(
         )
 
     try:
-        canonical_tier = resolve_tier(tier)
+        canonical_tier, location_meta = _resolve_comparison_tier(
+            tier=tier,
+            state_code=state_code,
+            city=city,
+        )
         canonical_rate_type = resolve_rate_type(rate_type)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -336,7 +446,12 @@ async def upload_bill(
         "message": "File received successfully",
         "comparison_settings": {
             "tier": canonical_tier,
-            "tier_id": tier,
+            "tier_id": location_meta.get("tier_id", tier),
+            "tier_label": location_meta.get("tier_label"),
+            "tier_source": location_meta.get("tier_source"),
+            "state_code": location_meta.get("state_code", state_code),
+            "state_name": location_meta.get("state_name"),
+            "city": location_meta.get("city", city),
             "rate_type": canonical_rate_type,
         },
         "rates_source": {
