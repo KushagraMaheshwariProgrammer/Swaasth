@@ -14,10 +14,13 @@ from PIL import Image
 
 from app.cghs_rates import (
     get_cghs_store,
+    resolve_hospital_type,
     resolve_rate_type,
+    resolve_rate_type_for_hospital,
     resolve_tier,
 )
 from app.locations import get_location_store
+from app.nabh_registry import get_nabh_registry
 
 
 load_dotenv()
@@ -60,6 +63,12 @@ def load_reference_data() -> None:
     except Exception as exc:
         print(f"WARNING: Location directories failed to load: {exc}")
 
+    try:
+        nabh = get_nabh_registry()
+        print(f"Loaded {len(nabh.records)} NABH registry hospitals from {nabh.csv_path}")
+    except Exception as exc:
+        print(f"WARNING: NABH registry failed to load: {exc}")
+
 
 @app.get("/health")
 def health_check() -> str:
@@ -82,10 +91,9 @@ def cghs_options() -> dict[str, Any]:
             {"id": "tier_2", "label": "Tier II (Y City)", "value": store.tiers[1] if len(store.tiers) > 1 else ""},
             {"id": "tier_3", "label": "Tier III (Z City)", "value": store.tiers[2] if len(store.tiers) > 2 else ""},
         ],
-        "rate_types": [
-            {"id": "non_nabh", "label": "Non-NABH hospital"},
-            {"id": "nabh", "label": "NABH accredited hospital"},
-            {"id": "super_speciality", "label": "Super speciality rate"},
+        "hospital_types": [
+            {"id": "general", "label": "General hospital"},
+            {"id": "speciality", "label": "Speciality hospital"},
         ],
         "total_procedures": len(store.rows),
         "csv_source": str(store.csv_path),
@@ -254,6 +262,7 @@ Return ONLY valid JSON with this exact shape:
 {{
   "is_medical_bill": true or false,
   "error": null or "reason text",
+  "hospital_name": null or "string",
   "line_items": [
     {{
       "item_name": "string",
@@ -266,6 +275,7 @@ Return ONLY valid JSON with this exact shape:
 }}
 
 Rules:
+- Extract the hospital or healthcare provider name from the bill header if present.
 - If unsure quantity/unit_price, infer reasonably from bill text.
 - Keep numeric fields as numbers (not strings).
 - category must be one of: medicine, test, procedure, other.
@@ -294,6 +304,15 @@ Bill text:
 
     parsed = _extract_json_from_text(response_text)
     return parsed
+
+
+def _rate_type_label(rate_type: str) -> str:
+    labels = {
+        "nabh": "NABH rate (accredited)",
+        "non_nabh": "Non-NABH rate (not accredited)",
+        "super_speciality": "Super speciality rate",
+    }
+    return labels.get(rate_type, rate_type)
 
 
 def _to_float(value: Any) -> float:
@@ -361,6 +380,38 @@ def _add_cghs_comparison(
     return compared_items
 
 
+def _resolve_nabh_and_rate_type(
+    hospital_name: str | None,
+    hospital_type: str,
+) -> tuple[str, dict[str, Any]]:
+    canonical_hospital_type = resolve_hospital_type(hospital_type)
+    nabh_lookup: dict[str, Any] = {
+        "hospital_name": hospital_name or "",
+        "is_accredited": False,
+        "accreditation_status": None,
+        "matched_registry_name": None,
+        "accreditation_number": None,
+        "approximate_match": False,
+        "match_score": 0.0,
+    }
+
+    if hospital_name and hospital_name.strip():
+        try:
+            nabh_lookup = get_nabh_registry().lookup(hospital_name)
+        except Exception:
+            pass
+
+    rate_type = resolve_rate_type_for_hospital(
+        canonical_hospital_type,
+        nabh_accredited=bool(nabh_lookup.get("is_accredited")),
+    )
+    return rate_type, {
+        "hospital_type": canonical_hospital_type,
+        "rate_type": rate_type,
+        "nabh": nabh_lookup,
+    }
+
+
 @app.post("/upload-bill")
 async def upload_bill(
     file: UploadFile = File(...),
@@ -372,9 +423,9 @@ async def upload_bill(
         ...,
         description="City where the hospital is located",
     ),
-    rate_type: str = Query(
-        default="nabh",
-        description="Rate column: non_nabh, nabh, or super_speciality",
+    hospital_type: str = Query(
+        ...,
+        description="Hospital type: general or speciality",
     ),
     tier: str | None = Query(
         default=None,
@@ -399,7 +450,7 @@ async def upload_bill(
             state_code=state_code,
             city=city,
         )
-        canonical_rate_type = resolve_rate_type(rate_type)
+        resolve_hospital_type(hospital_type)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -434,6 +485,14 @@ async def upload_bill(
     if not isinstance(line_items, list):
         line_items = []
 
+    hospital_name = ai_result.get("hospital_name")
+    if hospital_name is not None:
+        hospital_name = str(hospital_name).strip() or None
+
+    canonical_rate_type, hospital_meta = _resolve_nabh_and_rate_type(
+        hospital_name, hospital_type
+    )
+
     compared_line_items = _add_cghs_comparison(
         line_items, tier=canonical_tier, rate_type=canonical_rate_type
     )
@@ -444,6 +503,10 @@ async def upload_bill(
         "filename": file.filename or "unknown",
         "file_type": file_type,
         "message": "File received successfully",
+        "hospital": {
+            "name_from_bill": hospital_name,
+            **hospital_meta["nabh"],
+        },
         "comparison_settings": {
             "tier": canonical_tier,
             "tier_id": location_meta.get("tier_id", tier),
@@ -452,7 +515,9 @@ async def upload_bill(
             "state_code": location_meta.get("state_code", state_code),
             "state_name": location_meta.get("state_name"),
             "city": location_meta.get("city", city),
+            "hospital_type": hospital_meta["hospital_type"],
             "rate_type": canonical_rate_type,
+            "rate_type_label": _rate_type_label(canonical_rate_type),
         },
         "rates_source": {
             "file": str(store.csv_path.name),

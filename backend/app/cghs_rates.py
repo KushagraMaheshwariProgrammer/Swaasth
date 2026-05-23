@@ -57,6 +57,15 @@ RATE_TYPE_KEYS: dict[str, str] = {
     "super_specialty": "super_speciality",
 }
 
+HOSPITAL_TYPE_KEYS: dict[str, str] = {
+    "general": "general",
+    "general_hospital": "general",
+    "speciality": "speciality",
+    "specialty": "speciality",
+    "speciality_hospital": "speciality",
+    "specialty_hospital": "speciality",
+}
+
 
 @dataclass(frozen=True)
 class CghsRateRow:
@@ -126,6 +135,29 @@ def resolve_rate_type(rate_type: str | None) -> str:
         f"Invalid rate_type '{rate_type}'. "
         "Use non_nabh, nabh, or super_speciality."
     )
+
+
+def resolve_hospital_type(hospital_type: str | None) -> str:
+    if not hospital_type:
+        raise ValueError("hospital_type is required.")
+    key = hospital_type.strip().lower().replace(" ", "_")
+    if key in HOSPITAL_TYPE_KEYS:
+        return HOSPITAL_TYPE_KEYS[key]
+    raise ValueError(
+        f"Invalid hospital_type '{hospital_type}'. "
+        "Use general or speciality."
+    )
+
+
+def resolve_rate_type_for_hospital(
+    hospital_type: str,
+    *,
+    nabh_accredited: bool,
+) -> str:
+    canonical_hospital_type = resolve_hospital_type(hospital_type)
+    if canonical_hospital_type == "speciality":
+        return "super_speciality"
+    return "nabh" if nabh_accredited else "non_nabh"
 
 
 def _default_csv_path() -> Path:

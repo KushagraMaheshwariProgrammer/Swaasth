@@ -13,10 +13,9 @@ import {
 const API_BASE = "http://127.0.0.1:8000";
 const ALLOWED_EXTENSIONS = ["pdf", "jpg", "jpeg", "png"];
 
-const RATE_TYPE_OPTIONS = [
-  { id: "nabh", label: "NABH accredited hospital" },
-  { id: "non_nabh", label: "Non-NABH hospital" },
-  { id: "super_speciality", label: "Super speciality rate" },
+const HOSPITAL_TYPE_OPTIONS = [
+  { id: "general", label: "General hospital" },
+  { id: "speciality", label: "Speciality hospital" },
 ];
 const LOADING_MESSAGES = [
   "Reading your bill...",
@@ -277,7 +276,7 @@ function CheckPage() {
   const [stateCode, setStateCode] = useState("");
   const [city, setCity] = useState("");
   const [resolvedTier, setResolvedTier] = useState(null);
-  const [rateType, setRateType] = useState("nabh");
+  const [hospitalType, setHospitalType] = useState("general");
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCities, setIsLoadingCities] = useState(false);
@@ -420,7 +419,7 @@ function CheckPage() {
       const params = new URLSearchParams({
         state_code: stateCode,
         city,
-        rate_type: rateType,
+        hospital_type: hospitalType,
       });
       const response = await fetch(`${API_BASE}/upload-bill?${params}`, {
         method: "POST",
@@ -535,18 +534,23 @@ function CheckPage() {
                   </label>
                 </div>
                 <label className="setting-field setting-field-full">
-                  <span>Hospital rate type</span>
+                  <span>Hospital type</span>
                   <select
-                    value={rateType}
-                    onChange={(event) => setRateType(event.target.value)}
+                    value={hospitalType}
+                    onChange={(event) => setHospitalType(event.target.value)}
                   >
-                    {RATE_TYPE_OPTIONS.map((option) => (
+                    {HOSPITAL_TYPE_OPTIONS.map((option) => (
                       <option key={option.id} value={option.id}>
                         {option.label}
                       </option>
                     ))}
                   </select>
                 </label>
+                <p className="comparison-settings-hint nabh-hint">
+                  For general hospitals, NABH vs non-NABH rates are chosen
+                  automatically by matching the hospital name from your bill
+                  against the official NABH registry.
+                </p>
                 {resolvedTier && (
                   <p className="tier-detected">
                     CGHS tier for this city:{" "}
@@ -598,12 +602,33 @@ function CheckPage() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
             >
+              {result?.hospital?.name_from_bill && (
+                <p className="comparison-context">
+                  Hospital on bill: <strong>{result.hospital.name_from_bill}</strong>
+                  {result.hospital.is_accredited != null && (
+                    <>
+                      {" · "}
+                      NABH:{" "}
+                      <strong>
+                        {result.hospital.is_accredited
+                          ? `Accredited (${result.hospital.accreditation_status})`
+                          : "Not found in NABH registry"}
+                      </strong>
+                      {result.hospital.matched_registry_name &&
+                        result.hospital.approximate_match && (
+                          <> · matched as {result.hospital.matched_registry_name}</>
+                        )}
+                    </>
+                  )}
+                </p>
+              )}
+
               {result?.comparison_settings && (
                 <p className="comparison-context">
                   {result.comparison_settings.state_name &&
                     result.comparison_settings.city && (
                       <>
-                        Hospital location:{" "}
+                        Location:{" "}
                         <strong>
                           {result.comparison_settings.city},{" "}
                           {result.comparison_settings.state_name}
@@ -618,9 +643,14 @@ function CheckPage() {
                   </strong>
                   {" · "}
                   <strong>
-                    {RATE_TYPE_OPTIONS.find(
-                      (o) => o.id === result.comparison_settings.rate_type
-                    )?.label || result.comparison_settings.rate_type}
+                    {HOSPITAL_TYPE_OPTIONS.find(
+                      (o) => o.id === result.comparison_settings.hospital_type
+                    )?.label || result.comparison_settings.hospital_type}
+                  </strong>
+                  {" · "}
+                  <strong>
+                    {result.comparison_settings.rate_type_label ||
+                      result.comparison_settings.rate_type}
                   </strong>
                 </p>
               )}

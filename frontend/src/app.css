@@ -592,6 +592,10 @@ body {
   color: #1e3a8a;
 }
 
+.nabh-hint {
+  margin-top: 0.5rem;
+}
+
 .setting-field {
   display: flex;
   flex-direction: column;
