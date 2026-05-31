@@ -11,6 +11,7 @@ from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
 from PIL import Image
+from pydantic import BaseModel, Field
 
 from app.cghs_rates import (
     get_cghs_store,
@@ -340,7 +341,8 @@ def _add_cghs_comparison(
 
     compared_items: list[dict[str, Any]] = []
 
-    for item in line_items:
+    for raw_item in line_items:
+        item = dict(raw_item)
         item_name = str(item.get("item_name", "")).strip()
         total_price = _to_float(item.get("total_price"))
         match = store.find_match(
@@ -411,6 +413,139 @@ def _resolve_nabh_and_rate_type(
         "rate_type": rate_type,
         "nabh": nabh_lookup,
     }
+
+
+class BillLineItemInput(BaseModel):
+    item_name: str = ""
+    quantity: float = Field(default=1, ge=0)
+    unit_price: float = Field(default=0, ge=0)
+    total_price: float = Field(default=0, ge=0)
+    category: str = "other"
+
+
+class CompareBillRequest(BaseModel):
+    line_items: list[BillLineItemInput]
+    state_code: str
+    city: str
+    hospital_type: str = "general"
+    hospital_name: str | None = None
+    tier: str | None = None
+    filename: str | None = None
+    file_type: str | None = None
+
+
+def _normalize_line_items(line_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    allowed_categories = {"medicine", "test", "procedure", "other"}
+    normalized: list[dict[str, Any]] = []
+
+    for item in line_items:
+        category = str(item.get("category", "other")).strip().lower()
+        if category not in allowed_categories:
+            category = "other"
+
+        quantity = max(_to_float(item.get("quantity")), 0.0)
+        unit_price = max(_to_float(item.get("unit_price")), 0.0)
+        total_price = _to_float(item.get("total_price"))
+        if total_price <= 0 and quantity > 0 and unit_price > 0:
+            total_price = round(quantity * unit_price, 2)
+
+        normalized.append(
+            {
+                "item_name": str(item.get("item_name", "")).strip(),
+                "quantity": quantity,
+                "unit_price": unit_price,
+                "total_price": total_price,
+                "category": category,
+            }
+        )
+
+    return normalized
+
+
+def _build_comparison_response(
+    *,
+    line_items: list[dict[str, Any]],
+    state_code: str,
+    city: str,
+    hospital_type: str,
+    hospital_name: str | None,
+    tier: str | None = None,
+    filename: str = "edited-bill",
+    file_type: str = "manual",
+) -> dict[str, Any]:
+    if not line_items:
+        raise HTTPException(status_code=400, detail="Add at least one line item.")
+
+    canonical_tier, location_meta = _resolve_comparison_tier(
+        tier=tier,
+        state_code=state_code,
+        city=city,
+    )
+    canonical_rate_type, hospital_meta = _resolve_nabh_and_rate_type(
+        hospital_name, hospital_type
+    )
+
+    normalized_items = _normalize_line_items(line_items)
+    compared_line_items = _add_cghs_comparison(
+        normalized_items,
+        tier=canonical_tier,
+        rate_type=canonical_rate_type,
+    )
+
+    audit_flags = analyze_claim_items(
+        compared_line_items,
+        city=location_meta.get("city", city),
+    )
+
+    store = get_cghs_store()
+
+    return {
+        "filename": filename,
+        "file_type": file_type,
+        "message": "Comparison completed",
+        "hospital": {
+            "name_from_bill": hospital_name,
+            **hospital_meta["nabh"],
+        },
+        "comparison_settings": {
+            "tier": canonical_tier,
+            "tier_id": location_meta.get("tier_id", tier),
+            "tier_label": location_meta.get("tier_label"),
+            "tier_source": location_meta.get("tier_source"),
+            "state_code": location_meta.get("state_code", state_code),
+            "state_name": location_meta.get("state_name"),
+            "city": location_meta.get("city", city),
+            "hospital_type": hospital_meta["hospital_type"],
+            "rate_type": canonical_rate_type,
+            "rate_type_label": _rate_type_label(canonical_rate_type),
+        },
+        "rates_source": {
+            "file": str(store.csv_path.name),
+            "total_procedures_loaded": len(store.rows),
+        },
+        "line_items": compared_line_items,
+        "audit_flags": audit_flags,
+    }
+
+
+@app.post("/compare-bill")
+def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
+    try:
+        resolve_hospital_type(body.hospital_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    line_items = [item.model_dump() for item in body.line_items]
+    return _build_comparison_response(
+        line_items=line_items,
+        state_code=body.state_code,
+        city=body.city,
+        hospital_type=body.hospital_type,
+        hospital_name=body.hospital_name,
+        tier=body.tier,
+        filename=body.filename or "edited-bill",
+        file_type=body.file_type or "manual",
+    )
 
 
 @app.post("/upload-bill")
@@ -490,25 +625,14 @@ async def upload_bill(
     if hospital_name is not None:
         hospital_name = str(hospital_name).strip() or None
 
-    canonical_rate_type, hospital_meta = _resolve_nabh_and_rate_type(
-        hospital_name, hospital_type
-    )
+    _, hospital_meta = _resolve_nabh_and_rate_type(hospital_name, hospital_type)
 
-    compared_line_items = _add_cghs_comparison(
-        line_items, tier=canonical_tier, rate_type=canonical_rate_type
-    )
-
-    audit_flags = analyze_claim_items(
-        compared_line_items,
-        city=location_meta.get("city", city),
-    )
-
-    store = get_cghs_store()
+    normalized_items = _normalize_line_items(line_items)
 
     return {
         "filename": file.filename or "unknown",
         "file_type": file_type,
-        "message": "File received successfully",
+        "message": "Bill extracted successfully",
         "hospital": {
             "name_from_bill": hospital_name,
             **hospital_meta["nabh"],
@@ -522,13 +646,6 @@ async def upload_bill(
             "state_name": location_meta.get("state_name"),
             "city": location_meta.get("city", city),
             "hospital_type": hospital_meta["hospital_type"],
-            "rate_type": canonical_rate_type,
-            "rate_type_label": _rate_type_label(canonical_rate_type),
         },
-        "rates_source": {
-            "file": str(store.csv_path.name),
-            "total_procedures_loaded": len(store.rows),
-        },
-        "line_items": compared_line_items,
-        "audit_flags": audit_flags,
+        "line_items": normalized_items,
     }

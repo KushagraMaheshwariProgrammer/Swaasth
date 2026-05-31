@@ -17,6 +17,49 @@ const HOSPITAL_TYPE_OPTIONS = [
   { id: "general", label: "General hospital" },
   { id: "speciality", label: "Speciality hospital" },
 ];
+
+const CATEGORY_OPTIONS = [
+  { id: "medicine", label: "Medicine" },
+  { id: "test", label: "Test" },
+  { id: "procedure", label: "Procedure" },
+  { id: "other", label: "Other" },
+];
+
+const createEmptyLineItem = () => ({
+  item_name: "",
+  quantity: 1,
+  unit_price: 0,
+  total_price: 0,
+  category: "other",
+});
+
+const normalizeLineItem = (item) => {
+  const category = CATEGORY_OPTIONS.some((c) => c.id === item?.category)
+    ? item.category
+    : "other";
+  const quantity = Math.max(Number(item?.quantity) || 0, 0);
+  const unitPrice = Math.max(Number(item?.unit_price) || 0, 0);
+  let totalPrice = Math.max(Number(item?.total_price) || 0, 0);
+  if (totalPrice <= 0 && quantity > 0 && unitPrice > 0) {
+    totalPrice = Math.round(quantity * unitPrice * 100) / 100;
+  }
+  return {
+    item_name: String(item?.item_name ?? "").trim(),
+    quantity,
+    unit_price: unitPrice,
+    total_price: totalPrice,
+    category,
+  };
+};
+
+const withRecalculatedTotal = (item) => {
+  const quantity = Math.max(Number(item.quantity) || 0, 0);
+  const unitPrice = Math.max(Number(item.unit_price) || 0, 0);
+  return {
+    ...item,
+    total_price: Math.round(quantity * unitPrice * 100) / 100,
+  };
+};
 const LOADING_MESSAGES = [
   "Reading your bill...",
   "Extracting line items...",
@@ -315,6 +358,10 @@ function CheckPage() {
   const [locationError, setLocationError] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
+  const [scanMeta, setScanMeta] = useState(null);
+  const [editableItems, setEditableItems] = useState([]);
+  const [hospitalNameEdit, setHospitalNameEdit] = useState("");
+  const [isComparing, setIsComparing] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(8);
 
@@ -414,8 +461,12 @@ function CheckPage() {
 
   const uiState = isLoading
     ? "loading"
+    : isComparing
+    ? "comparing"
     : result?.line_items?.length
     ? "results"
+    : editableItems.length
+    ? "edit"
     : "upload";
 
   const handleFileSelection = (file) => {
@@ -429,7 +480,89 @@ function CheckPage() {
     }
     setError("");
     setResult(null);
+    setScanMeta(null);
+    setEditableItems([]);
+    setHospitalNameEdit("");
     setSelectedFile(file);
+  };
+
+  const resetToUpload = () => {
+    setResult(null);
+    setScanMeta(null);
+    setEditableItems([]);
+    setHospitalNameEdit("");
+    setError("");
+  };
+
+  const updateLineItem = (index, field, value) => {
+    setEditableItems((prev) =>
+      prev.map((item, itemIndex) => {
+        if (itemIndex !== index) {
+          return item;
+        }
+        const next = { ...item, [field]: value };
+        if (field === "quantity" || field === "unit_price") {
+          return withRecalculatedTotal(next);
+        }
+        return next;
+      })
+    );
+  };
+
+  const removeLineItem = (index) => {
+    setEditableItems((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const addLineItem = () => {
+    setEditableItems((prev) => [...prev, createEmptyLineItem()]);
+  };
+
+  const handleCompare = async () => {
+    const validItems = editableItems
+      .map(normalizeLineItem)
+      .filter((item) => item.item_name.trim());
+
+    if (!validItems.length) {
+      setError("Add at least one line item with a name.");
+      return;
+    }
+
+    if (!stateCode || !city) {
+      setError("Location settings are missing. Please upload the bill again.");
+      return;
+    }
+
+    setError("");
+    setIsComparing(true);
+
+    try {
+      const response = await fetch(`${API_BASE}/compare-bill`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          line_items: validItems,
+          state_code: stateCode,
+          city,
+          hospital_type: hospitalType,
+          hospital_name: hospitalNameEdit.trim() || null,
+          filename: scanMeta?.filename,
+          file_type: scanMeta?.file_type,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        const detail = payload?.detail;
+        const message = Array.isArray(detail)
+          ? detail.map((entry) => entry.msg).join(", ")
+          : detail;
+        throw new Error(message || "Unable to compare this bill.");
+      }
+      setResult(payload);
+    } catch (err) {
+      setError(err.message || "Something went wrong during comparison.");
+    } finally {
+      setIsComparing(false);
+    }
   };
 
   const handleAnalyze = async () => {
@@ -444,6 +577,8 @@ function CheckPage() {
     setError("");
     setIsLoading(true);
     setResult(null);
+    setScanMeta(null);
+    setEditableItems([]);
     const formData = new FormData();
     formData.append("file", selectedFile);
 
@@ -462,7 +597,18 @@ function CheckPage() {
         throw new Error(payload?.detail || "Unable to analyze this bill.");
       }
       setLoadingProgress(100);
-      setResult(payload);
+      const items = (payload.line_items ?? []).map(normalizeLineItem);
+      if (!items.length) {
+        throw new Error("No line items were found on this bill.");
+      }
+      setScanMeta({
+        filename: payload.filename,
+        file_type: payload.file_type,
+        hospital: payload.hospital,
+        comparison_settings: payload.comparison_settings,
+      });
+      setHospitalNameEdit(payload.hospital?.name_from_bill ?? "");
+      setEditableItems(items);
     } catch (err) {
       setError(err.message || "Something went wrong during analysis.");
     } finally {
@@ -608,9 +754,9 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {uiState === "loading" && (
+          {(uiState === "loading" || uiState === "comparing") && (
             <motion.section
-              key="loading"
+              key={uiState === "comparing" ? "comparing" : "loading"}
               className="loading-card"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -618,10 +764,168 @@ function CheckPage() {
               transition={{ duration: 0.25 }}
             >
               <div className="spinner-conic" aria-hidden="true" />
-              <p className="loading-message">{LOADING_MESSAGES[loadingMessageIndex]}</p>
+              <p className="loading-message">
+                {uiState === "comparing"
+                  ? "Comparing with CGHS rates..."
+                  : LOADING_MESSAGES[loadingMessageIndex]}
+              </p>
               <div className="loading-bar">
                 <div className="loading-bar-fill" style={{ width: `${loadingProgress}%` }} />
               </div>
+            </motion.section>
+          )}
+
+          {uiState === "edit" && (
+            <motion.section
+              key="edit"
+              className="bill-editor-shell"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25 }}
+            >
+              <header className="bill-editor-header">
+                <div>
+                  <h2>Review scanned items</h2>
+                  <p>
+                    Correct anything the scan missed, then compare against CGHS
+                    rates.
+                  </p>
+                </div>
+                <span className="bill-editor-count">
+                  {editableItems.length} item{editableItems.length === 1 ? "" : "s"}
+                </span>
+              </header>
+
+              <label className="setting-field setting-field-full bill-editor-hospital">
+                <span>Hospital name (optional)</span>
+                <input
+                  type="text"
+                  value={hospitalNameEdit}
+                  placeholder="As shown on the bill"
+                  onChange={(event) => setHospitalNameEdit(event.target.value)}
+                />
+              </label>
+
+              <ul className="bill-editor-list">
+                {editableItems.map((item, index) => (
+                  <li key={`line-item-${index}`} className="bill-editor-row">
+                    <div className="bill-editor-row-top">
+                      <label className="bill-editor-field bill-editor-field-grow">
+                        <span>Item</span>
+                        <input
+                          type="text"
+                          value={item.item_name}
+                          placeholder="e.g. CBC Test, Room rent"
+                          onChange={(event) =>
+                            updateLineItem(index, "item_name", event.target.value)
+                          }
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="bill-editor-remove"
+                        onClick={() => removeLineItem(index)}
+                        aria-label={`Remove item ${index + 1}`}
+                        title="Remove item"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="bill-editor-row-grid">
+                      <label className="bill-editor-field">
+                        <span>Qty</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={item.quantity}
+                          onChange={(event) =>
+                            updateLineItem(
+                              index,
+                              "quantity",
+                              Number(event.target.value)
+                            )
+                          }
+                        />
+                      </label>
+                      <label className="bill-editor-field">
+                        <span>Unit price (₹)</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.unit_price}
+                          onChange={(event) =>
+                            updateLineItem(
+                              index,
+                              "unit_price",
+                              Number(event.target.value)
+                            )
+                          }
+                        />
+                      </label>
+                      <label className="bill-editor-field">
+                        <span>Total (₹)</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.total_price}
+                          onChange={(event) =>
+                            updateLineItem(
+                              index,
+                              "total_price",
+                              Number(event.target.value)
+                            )
+                          }
+                        />
+                      </label>
+                      <label className="bill-editor-field">
+                        <span>Category</span>
+                        <select
+                          value={item.category}
+                          onChange={(event) =>
+                            updateLineItem(index, "category", event.target.value)
+                          }
+                        >
+                          {CATEGORY_OPTIONS.map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              <button
+                type="button"
+                className="bill-editor-add"
+                onClick={addLineItem}
+              >
+                + Add line item
+              </button>
+
+              <div className="bill-editor-actions">
+                <button
+                  type="button"
+                  className="bill-editor-secondary"
+                  onClick={resetToUpload}
+                >
+                  Upload different bill
+                </button>
+                <button
+                  type="button"
+                  className="analyze-btn bill-editor-primary"
+                  onClick={handleCompare}
+                >
+                  Compare with CGHS →
+                </button>
+              </div>
+              {error && <p className="error-text">{error}</p>}
             </motion.section>
           )}
 
@@ -686,6 +990,22 @@ function CheckPage() {
                   </strong>
                 </p>
               )}
+
+              <div className="results-toolbar">
+                <button
+                  type="button"
+                  className="bill-editor-secondary"
+                  onClick={() => {
+                    if (result?.line_items?.length) {
+                      setEditableItems(result.line_items.map(normalizeLineItem));
+                    }
+                    setResult(null);
+                    setError("");
+                  }}
+                >
+                  ← Edit bill items
+                </button>
+              </div>
 
               <article className="summary-banner">
                 <div className="summary-stat">
