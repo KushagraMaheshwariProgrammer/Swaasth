@@ -21,6 +21,7 @@ from app.cghs_rates import (
 )
 from app.locations import get_location_store
 from app.nabh_registry import get_nabh_registry
+from app.services.claim_audit import analyze_claim_items
 
 
 load_dotenv()
@@ -497,6 +498,11 @@ async def upload_bill(
         line_items, tier=canonical_tier, rate_type=canonical_rate_type
     )
 
+    audit_flags = analyze_claim_items(
+        compared_line_items,
+        city=location_meta.get("city", city),
+    )
+
     store = get_cghs_store()
 
     return {
@@ -524,4 +530,5 @@ async def upload_bill(
             "total_procedures_loaded": len(store.rows),
         },
         "line_items": compared_line_items,
+        "audit_flags": audit_flags,
     }

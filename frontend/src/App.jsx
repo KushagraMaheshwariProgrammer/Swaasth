@@ -69,6 +69,38 @@ const getFlagMeta = (flag) => {
   };
 };
 
+const getAuditSeverityMeta = (severity) => {
+  if (severity === "HIGH") {
+    return {
+      badgeLabel: "High",
+      badgeClass: "status-pill status-red",
+      cardClass: "audit-flag-card audit-flag-high",
+    };
+  }
+  if (severity === "MEDIUM") {
+    return {
+      badgeLabel: "Medium",
+      badgeClass: "status-pill status-amber",
+      cardClass: "audit-flag-card audit-flag-medium",
+    };
+  }
+  return {
+    badgeLabel: "Low",
+    badgeClass: "status-pill status-neutral",
+    cardClass: "audit-flag-card audit-flag-low",
+  };
+};
+
+const getAuditRiskMeta = (riskLevel) => {
+  if (riskLevel === "HIGH") {
+    return { label: "High Risk", className: "audit-risk audit-risk-high" };
+  }
+  if (riskLevel === "MEDIUM") {
+    return { label: "Medium Risk", className: "audit-risk audit-risk-medium" };
+  }
+  return { label: "Low Risk", className: "audit-risk audit-risk-low" };
+};
+
 function CountUp({ value, isCurrency = false, duration = 1200 }) {
   const [displayValue, setDisplayValue] = useState(0);
 
@@ -720,6 +752,51 @@ function CheckPage() {
                   );
                 })}
               </div>
+
+              <section className="audit-section">
+                <div className="audit-section-header">
+                  <h3>Suspicious / Unnecessary Charges</h3>
+                  {result?.audit_flags && (
+                    <div className="audit-summary-badges">
+                      <span className={getAuditRiskMeta(result.audit_flags.risk_level).className}>
+                        {getAuditRiskMeta(result.audit_flags.risk_level).label}
+                      </span>
+                      <span className="audit-flag-count">
+                        {result.audit_flags.flags_count ?? 0} flag
+                        {(result.audit_flags.flags_count ?? 0) === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {result?.audit_flags?.flags?.length ? (
+                  <div className="audit-flags-grid">
+                    {result.audit_flags.flags.map((flag, index) => {
+                      const meta = getAuditSeverityMeta(flag.severity);
+                      return (
+                        <article
+                          key={`${flag.type || "flag"}-${flag.item || "item"}-${index}`}
+                          className={meta.cardClass}
+                        >
+                          <div className="result-top">
+                            <h4>{flag.item || "--"}</h4>
+                            <span className={meta.badgeClass}>{meta.badgeLabel}</span>
+                          </div>
+                          <p className="audit-flag-type">{flag.type?.replaceAll("_", " ") || "--"}</p>
+                          <p className="audit-flag-reason">{flag.reason}</p>
+                          <p className="audit-flag-recommendation">
+                            <strong>Recommendation:</strong> {flag.recommendation}
+                          </p>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="audit-empty-state">
+                    No suspicious repetitions or unnecessary package-component charges detected.
+                  </p>
+                )}
+              </section>
             </motion.section>
           )}
         </AnimatePresence>

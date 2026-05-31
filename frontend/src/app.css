@@ -810,6 +810,122 @@ body {
   background: #94a3b8;
 }
 
+.status-amber {
+  background: #f59e0b;
+}
+
+.audit-section {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.audit-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.audit-section-header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.audit-summary-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.audit-risk {
+  border-radius: 999px;
+  padding: 0.28rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.audit-risk-high {
+  background: var(--danger);
+}
+
+.audit-risk-medium {
+  background: #f59e0b;
+}
+
+.audit-risk-low {
+  background: var(--success);
+}
+
+.audit-flag-count {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.audit-flags-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.audit-flag-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  border-left: 3px solid #9ca3af;
+  padding: 1rem;
+}
+
+.audit-flag-high {
+  border-left-color: var(--danger);
+  background: #fff8f8;
+}
+
+.audit-flag-medium {
+  border-left-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.audit-flag-low {
+  border-left-color: #94a3b8;
+}
+
+.audit-flag-type {
+  margin: 0.55rem 0 0;
+  color: #2563eb;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.audit-flag-reason {
+  margin: 0.55rem 0 0;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  font-size: 0.92rem;
+}
+
+.audit-flag-recommendation {
+  margin: 0.65rem 0 0;
+  color: #0f172a;
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
+.audit-empty-state {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: var(--text-secondary);
+  border: 1px solid #e2e8f0;
+}
+
 .result-metrics {
   margin-top: 0.85rem;
   display: grid;
@@ -871,7 +987,8 @@ body {
 
   .how-grid,
   .summary-banner,
-  .results-grid {
+  .results-grid,
+  .audit-flags-grid {
     grid-template-columns: 1fr;
   }
 
