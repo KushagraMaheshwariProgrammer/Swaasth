@@ -6,7 +6,7 @@ frontend/.env
 backend/firebase-service-account.json
 node_modules/
 frontend/node_modules/
-.venv/
 backend/.venv/
+.venv/
 __pycache__/
 *.pyc
