@@ -1,0 +1,12 @@
+.DS_Store
+.env
+.env.local
+backend/.env
+frontend/.env
+backend/firebase-service-account.json
+node_modules/
+frontend/node_modules/
+.venv/
+backend/.venv/
+__pycache__/
+*.pyc
