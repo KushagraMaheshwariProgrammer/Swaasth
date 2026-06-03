@@ -293,7 +293,7 @@ function LandingPage() {
               {
                 icon: "🤖",
                 step: "Step 2",
-                title: "AI reads everything",
+                title: "Optical character recognition",
                 desc: "Our system extracts every line item - medicines, tests, room charges, fees",
               },
               {

@@ -2,6 +2,7 @@ import json
 import os
 import re
 from io import BytesIO
+from pathlib import Path
 from typing import Any
 
 import fitz
@@ -25,7 +26,8 @@ from app.nabh_registry import get_nabh_registry
 from app.services.claim_audit import analyze_claim_items
 
 
-load_dotenv()
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(_BACKEND_ROOT / ".env")
 
 TESSERACT_PATH = "/opt/homebrew/bin/tesseract"
 pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
