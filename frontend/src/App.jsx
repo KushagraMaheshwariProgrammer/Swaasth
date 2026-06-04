@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BrowserRouter,
   Link,
@@ -14,7 +14,11 @@ import { HOSPITAL_TYPE_OPTIONS } from "./billUtils";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import HistoryPage from "./pages/HistoryPage";
+import PatientsPage from "./pages/PatientsPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
+import PatientForm, { emptyPatientForm } from "./components/PatientForm";
+import PatientList from "./components/PatientList";
+import { createPatient, getPatients, getPatientsLocalSnapshot } from "./services/patients";
 import { markLocalBillSynced, persistLocalBill, saveBill } from "./services/bills";
 
 const API_BASE = "http://127.0.0.1:8000";
@@ -100,6 +104,9 @@ function UserNav({ className = "" }) {
 
   return (
     <div className={`user-nav ${className}`.trim()}>
+      <Link to="/patients" className="user-nav-link">
+        Patients
+      </Link>
       <Link to="/history" className="user-nav-link">
         Past bills
       </Link>
@@ -327,6 +334,7 @@ function LandingPage() {
 
 function CheckPage() {
   const { user } = useAuth();
+  const location = useLocation();
   const inputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [states, setStates] = useState([]);
@@ -348,6 +356,125 @@ function CheckPage() {
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(8);
   const [saveMessage, setSaveMessage] = useState("");
+  const [patients, setPatients] = useState([]);
+  const [selectedPatientId, setSelectedPatientId] = useState("");
+  const [patientsLoading, setPatientsLoading] = useState(false);
+  const [billStep, setBillStep] = useState("patient");
+  const [showNewPatientForm, setShowNewPatientForm] = useState(false);
+  const [patientForm, setPatientForm] = useState(emptyPatientForm);
+  const [patientSaving, setPatientSaving] = useState(false);
+  const [patientInfo, setPatientInfo] = useState("");
+
+  const reloadPatients = useCallback(async () => {
+    if (!user) {
+      return [];
+    }
+    const list = await getPatients(user.uid);
+    setPatients(list);
+    return list;
+  }, [user]);
+
+  useEffect(() => {
+    const preselected = location.state?.patientId;
+    if (preselected) {
+      setSelectedPatientId(preselected);
+    }
+  }, [location.state?.patientId]);
+
+  useEffect(() => {
+    if (selectedPatientId && patients.some((p) => p.id === selectedPatientId)) {
+      if (location.state?.patientId === selectedPatientId) {
+        setBillStep("bill");
+      }
+    }
+  }, [selectedPatientId, patients, location.state?.patientId]);
+
+  useEffect(() => {
+    if (!user) {
+      setPatients([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const loadPatients = async () => {
+      const localSnapshot = getPatientsLocalSnapshot(user.uid);
+      if (!cancelled && localSnapshot.length) {
+        setPatients(localSnapshot);
+        setPatientsLoading(false);
+      } else if (!cancelled) {
+        setPatientsLoading(true);
+      }
+      setError("");
+      try {
+        await reloadPatients();
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err.message ||
+              "Could not load patients. Saved profiles on this device may still appear after refresh."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setPatientsLoading(false);
+        }
+      }
+    };
+    loadPatients();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, reloadPatients]);
+
+  const selectedPatient = patients.find((p) => p.id === selectedPatientId);
+
+  const handleSaveNewPatient = async (event) => {
+    event.preventDefault();
+    if (!user?.uid) {
+      setError("You must be signed in to save a patient.");
+      return;
+    }
+    setPatientSaving(true);
+    setError("");
+    setPatientInfo("");
+    try {
+      const result = await createPatient(user.uid, patientForm);
+      const list = await reloadPatients();
+      const saved =
+        list.find((p) => p.id === result.id) ||
+        list.find((p) => p.localId === result.localId) ||
+        result.patient;
+      const patientId = saved?.id || result.id;
+      setSelectedPatientId(patientId);
+      setShowNewPatientForm(false);
+      setPatientForm(emptyPatientForm());
+      setBillStep("bill");
+      setPatientInfo(
+        `Patient "${saved?.name || patientForm.name}" saved. You can upload the bill now.`
+      );
+    } catch (err) {
+      setError(err.message || "Unable to save patient.");
+    } finally {
+      setPatientSaving(false);
+    }
+  };
+
+  const handleContinueWithPatient = () => {
+    if (!selectedPatientId || !selectedPatient) {
+      setError("Select or add a patient before uploading a bill.");
+      return;
+    }
+    setError("");
+    setBillStep("bill");
+  };
+
+  const handleChangePatient = () => {
+    setBillStep("patient");
+    setSelectedFile(null);
+    setError("");
+    setResult(null);
+    setScanMeta(null);
+    setEditableItems([]);
+  };
 
   useEffect(() => {
     const loadStates = async () => {
@@ -520,6 +647,11 @@ function CheckPage() {
           hospital_name: hospitalNameEdit.trim() || null,
           filename: scanMeta?.filename,
           file_type: scanMeta?.file_type,
+          pmjay_eligible: Boolean(selectedPatient?.ayushmanEligible),
+          patient_id: selectedPatient?.id || null,
+          patient_name: selectedPatient?.name || null,
+          patient_age: selectedPatient?.age ?? null,
+          patient_gender: selectedPatient?.gender || null,
         }),
       });
       const payload = await response.json();
@@ -535,7 +667,10 @@ function CheckPage() {
 
       if (user) {
         const localId = persistLocalBill(user.uid, payload);
-        saveBill(user.uid, payload, { localId })
+        saveBill(user.uid, payload, {
+          localId,
+          patientId: selectedPatient?.id || null,
+        })
           .then((firestoreId) => {
             markLocalBillSynced(user.uid, localId, firestoreId);
             setSaveMessage("Bill saved to your account.");
@@ -554,6 +689,11 @@ function CheckPage() {
   };
 
   const handleAnalyze = async () => {
+    if (!selectedPatient) {
+      setError("Save a patient profile before uploading a bill.");
+      setBillStep("patient");
+      return;
+    }
     if (!selectedFile) {
       setError("Please select your hospital bill first.");
       return;
@@ -615,12 +755,133 @@ function CheckPage() {
         </div>
 
         <header className="check-header">
-          <h1>Upload your hospital bill</h1>
-          <p>We&apos;ll analyze it in seconds.</p>
+          <h1>
+            {billStep === "patient"
+              ? "Set up patient"
+              : "Upload your hospital bill"}
+          </h1>
+          <p>
+            {billStep === "patient"
+              ? "Add or select a patient before uploading a medical bill."
+              : selectedPatient
+              ? `Checking bill for ${selectedPatient.name}.`
+              : "We'll analyze it in seconds."}
+          </p>
         </header>
 
         <AnimatePresence mode="wait">
-          {uiState === "upload" && (
+          {uiState === "upload" && billStep === "patient" && (
+            <motion.section
+              key="patient-step"
+              className="upload-card patient-step-card"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25 }}
+            >
+              <p className="comparison-settings-title">Step 1 — Patient profile</p>
+
+              {patientsLoading && (
+                <p className="auth-info">Loading patients...</p>
+              )}
+
+              {patients.length > 0 && !showNewPatientForm && (
+                <PatientList
+                  patients={patients}
+                  selectedId={selectedPatientId}
+                  mode="select"
+                  onSelect={(patientId) => {
+                    setSelectedPatientId(patientId);
+                    setError("");
+                  }}
+                />
+              )}
+
+              {selectedPatient && !showNewPatientForm && (
+                <div className="patient-selected-banner">
+                  <p>
+                    <strong>{selectedPatient.name}</strong> · {selectedPatient.age}{" "}
+                    yrs · {selectedPatient.gender}
+                    {selectedPatient.ayushmanEligible && " · PM-JAY eligible"}
+                  </p>
+                  <button
+                    type="button"
+                    className="analyze-btn"
+                    onClick={handleContinueWithPatient}
+                  >
+                    Continue to upload bill →
+                  </button>
+                </div>
+              )}
+
+              {!showNewPatientForm && (
+                <button
+                  type="button"
+                  className="bill-editor-add patients-add-inline"
+                  onClick={() => {
+                    setShowNewPatientForm(true);
+                    setPatientForm(emptyPatientForm());
+                    setSelectedPatientId("");
+                    setError("");
+                  }}
+                >
+                  + Add new patient
+                </button>
+              )}
+
+              {!showNewPatientForm && patients.length > 0 && (
+                <Link to="/patients" className="patients-manage-link">
+                  Manage patients
+                </Link>
+              )}
+
+              {showNewPatientForm && (
+                <section className="patient-card-shell">
+                  <h2>New patient</h2>
+                  <PatientForm
+                    form={patientForm}
+                    setForm={setPatientForm}
+                    onSubmit={handleSaveNewPatient}
+                    onCancel={() => {
+                      setShowNewPatientForm(false);
+                      setPatientForm(emptyPatientForm());
+                    }}
+                    submitLabel="Save patient & continue"
+                    saving={patientSaving}
+                    error={error}
+                    info={patientInfo}
+                  />
+                </section>
+              )}
+
+              {!showNewPatientForm && patients.length === 0 && !patientsLoading && (
+                <section className="patient-card-shell">
+                  <h2>Add your first patient</h2>
+                  <p className="comparison-settings-hint">
+                    You need a saved patient profile before uploading a bill.
+                  </p>
+                  <PatientForm
+                    form={patientForm}
+                    setForm={setPatientForm}
+                    onSubmit={handleSaveNewPatient}
+                    submitLabel="Save patient & continue"
+                    saving={patientSaving}
+                    error={error}
+                    info={patientInfo}
+                  />
+                </section>
+              )}
+
+              {patientInfo && !showNewPatientForm && patients.length > 0 && (
+                <p className="auth-info">{patientInfo}</p>
+              )}
+              {error && !showNewPatientForm && (
+                <p className="error-text">{error}</p>
+              )}
+            </motion.section>
+          )}
+
+          {uiState === "upload" && billStep === "bill" && (
             <motion.section
               key="upload"
               className="upload-card"
@@ -629,6 +890,25 @@ function CheckPage() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.25 }}
             >
+              {selectedPatient && (
+                <div className="patient-selected-banner patient-selected-banner-compact">
+                  <p>
+                    Patient: <strong>{selectedPatient.name}</strong> ·{" "}
+                    {selectedPatient.age} yrs
+                    {selectedPatient.ayushmanEligible && " · PM-JAY eligible"}
+                  </p>
+                  <button
+                    type="button"
+                    className="bill-editor-secondary patient-change-btn"
+                    onClick={handleChangePatient}
+                  >
+                    Change patient
+                  </button>
+                </div>
+              )}
+
+              <p className="comparison-settings-title">Step 2 — Upload bill</p>
+
               <button
                 type="button"
                 className={`upload-zone ${isDragging ? "upload-zone-dragging" : ""}`}
@@ -662,6 +942,13 @@ function CheckPage() {
                   event.target.value = "";
                 }}
               />
+
+              {selectedPatient?.ayushmanEligible && (
+                <p className="comparison-settings-hint pmjay-hint">
+                  Procedures and tests will be compared against Ayushman Bharat HBP
+                  2022 rates (medicines use market MRP).
+                </p>
+              )}
 
               <div className="comparison-settings">
                 <p className="comparison-settings-title">Hospital location</p>
@@ -757,7 +1044,9 @@ function CheckPage() {
               <div className="spinner-conic" aria-hidden="true" />
               <p className="loading-message">
                 {uiState === "comparing"
-                  ? "Comparing with CGHS rates..."
+                  ? selectedPatient?.ayushmanEligible
+                    ? "Comparing with Ayushman Bharat HBP 2022 rates..."
+                    : "Comparing with CGHS rates..."
                   : LOADING_MESSAGES[loadingMessageIndex]}
               </p>
               <div className="loading-bar">
@@ -913,7 +1202,9 @@ function CheckPage() {
                   className="analyze-btn bill-editor-primary"
                   onClick={handleCompare}
                 >
-                  Compare with CGHS →
+                  {selectedPatient?.ayushmanEligible
+                    ? "Compare with PM-JAY HBP →"
+                    : "Compare with CGHS →"}
                 </button>
               </div>
               {error && <p className="error-text">{error}</p>}
@@ -970,6 +1261,22 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <CheckPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/patients"
+          element={
+            <ProtectedRoute>
+              <PatientsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/patients/:patientId"
+          element={
+            <ProtectedRoute>
+              <PatientsPage />
             </ProtectedRoute>
           }
         />

@@ -19,6 +19,7 @@ import {
 } from "firebase/auth";
 import { auth } from "../firebase";
 import { syncPendingBills } from "../services/bills";
+import { syncPendingPatients } from "../services/patients";
 
 const AuthContext = createContext(null);
 
@@ -72,6 +73,9 @@ export function AuthProvider({ children }) {
       setUser(nextUser);
       setLoading(false);
       if (nextUser && !needsEmailVerification(nextUser)) {
+        syncPendingPatients(nextUser.uid).catch((error) => {
+          console.error("Background patient sync failed:", error);
+        });
         syncPendingBills(nextUser.uid).catch((error) => {
           console.error("Background bill sync failed:", error);
         });

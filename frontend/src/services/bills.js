@@ -1,21 +1,44 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
+  query,
   serverTimestamp,
+  where,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import {
+  getLocalBillById,
+  getLocalBills,
   getUnsyncedLocalBills,
   localBillToHistoryEntry,
   markLocalBillSynced,
   persistLocalBill,
+  removeLocalBill,
+  removeLocalBillsForPatientIds,
 } from "./localBillStore";
 
 function billsCollection(userId) {
   return collection(db, "users", userId, "bills");
+}
+
+function isFirestoreSpecialValue(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  if (typeof value.toDate === "function") {
+    return true;
+  }
+  if (typeof value._methodName === "string") {
+    return true;
+  }
+  if (value.constructor?.name === "FieldValue") {
+    return true;
+  }
+  return false;
 }
 
 export function sanitizeForFirestore(value) {
@@ -25,6 +48,9 @@ export function sanitizeForFirestore(value) {
   if (value === null || typeof value !== "object") {
     return value;
   }
+  if (isFirestoreSpecialValue(value)) {
+    return value;
+  }
   if (Array.isArray(value)) {
     return value
       .map((item) => sanitizeForFirestore(item))
@@ -32,9 +58,6 @@ export function sanitizeForFirestore(value) {
   }
   if (value instanceof Date) {
     return value.toISOString();
-  }
-  if (typeof value.toDate === "function") {
-    return value;
   }
 
   const cleaned = {};
@@ -74,17 +97,79 @@ function sortBillsNewestFirst(bills) {
   return [...bills].sort((a, b) => getBillSortTime(b) - getBillSortTime(a));
 }
 
-async function fetchCloudBills(userId) {
-  const snapshot = await getDocs(billsCollection(userId));
-  return snapshot.docs.map((entry) => ({
+function mapCloudBillDocs(docs) {
+  return docs.map((entry) => ({
     id: entry.id,
+    firestoreId: entry.id,
+    localOnly: false,
     ...entry.data(),
   }));
+}
+
+async function fetchCloudBills(userId) {
+  const snapshot = await getDocs(billsCollection(userId));
+  return mapCloudBillDocs(snapshot.docs);
+}
+
+async function fetchCloudBillsForPatientIds(userId, patientIds) {
+  const ids = [...new Set(patientIds.filter(Boolean))].slice(0, 10);
+  if (!ids.length) {
+    return [];
+  }
+  const snapshot = await getDocs(
+    query(billsCollection(userId), where("patientId", "in", ids))
+  );
+  return mapCloudBillDocs(snapshot.docs);
+}
+
+function filterLocalBillEntries(userId, patientIds) {
+  const idSet = new Set(patientIds.filter(Boolean));
+  if (!idSet.size) {
+    return [];
+  }
+  return getLocalBills(userId).filter((entry) => {
+    const data = entry.billData || {};
+    return idSet.has(data.patientId) || idSet.has(data.patient?.id);
+  });
+}
+
+export function getUserBillsLocalSnapshot(userId) {
+  if (!userId) {
+    return [];
+  }
+  const localEntries = getLocalBills(userId);
+  return sortBillsNewestFirst(
+    localEntries.map((entry) => localBillToHistoryEntry(entry))
+  );
+}
+
+function mergeBillLists(cloudBills, localEntries) {
+  const cloudIds = new Set(cloudBills.map((bill) => bill.id));
+  const cloudClientIds = new Set(
+    cloudBills.map((bill) => bill.clientId).filter(Boolean)
+  );
+  const merged = [...cloudBills];
+
+  for (const entry of localEntries) {
+    if (entry.firestoreId && cloudIds.has(entry.firestoreId)) {
+      continue;
+    }
+    if (cloudClientIds.has(entry.localId)) {
+      continue;
+    }
+    const publicId = entry.firestoreId || entry.localId;
+    if (!merged.some((bill) => bill.id === publicId)) {
+      merged.push(localBillToHistoryEntry(entry));
+    }
+  }
+
+  return merged;
 }
 
 export async function saveBill(userId, billData, options = {}) {
   const payload = sanitizeForFirestore({
     ...billData,
+    patientId: options.patientId || billData.patientId || billData.patient?.id || null,
     comparedAt: billData.comparedAt || new Date().toISOString(),
     clientId: options.localId || billData.clientId || null,
     createdAt: serverTimestamp(),
@@ -114,35 +199,127 @@ export async function syncPendingBills(userId) {
 }
 
 export async function getUserBills(userId) {
-  await syncPendingBills(userId);
+  if (!userId) {
+    return [];
+  }
 
-  const cloudBills = await fetchCloudBills(userId);
-  const cloudClientIds = new Set(
-    cloudBills.map((bill) => bill.clientId).filter(Boolean)
-  );
+  syncPendingBills(userId).catch((error) => {
+    console.error("Background bill sync failed:", error);
+  });
 
-  const localOnly = getUnsyncedLocalBills(userId)
-    .filter((entry) => !cloudClientIds.has(entry.localId))
-    .map(localBillToHistoryEntry);
+  let cloudBills = [];
+  try {
+    cloudBills = await fetchCloudBills(userId);
+  } catch (error) {
+    console.error("Failed to load bills from Firebase:", error);
+  }
 
-  return sortBillsNewestFirst([...cloudBills, ...localOnly]);
+  const localEntries = getLocalBills(userId);
+  const merged = mergeBillLists(cloudBills, localEntries);
+  return sortBillsNewestFirst(merged);
+}
+
+export async function getBillsForPatientIds(userId, patientIds) {
+  if (!userId || !patientIds?.length) {
+    return [];
+  }
+
+  const ids = [...new Set(patientIds.filter(Boolean))];
+  const localEntries = filterLocalBillEntries(userId, ids);
+
+  let cloudBills = [];
+  try {
+    cloudBills = await fetchCloudBillsForPatientIds(userId, ids);
+  } catch (error) {
+    console.error("Failed to load patient bills from Firebase:", error);
+  }
+
+  return sortBillsNewestFirst(mergeBillLists(cloudBills, localEntries));
 }
 
 export async function getBill(userId, billId) {
-  const billRef = doc(db, "users", userId, "bills", billId);
-  const snapshot = await getDoc(billRef);
-  if (snapshot.exists()) {
-    return { id: snapshot.id, ...snapshot.data() };
+  if (!userId || !billId) {
+    return null;
   }
 
-  const localMatch = getUnsyncedLocalBills(userId).find(
-    (entry) => entry.localId === billId || entry.firestoreId === billId
-  );
-  if (localMatch) {
-    return localBillToHistoryEntry(localMatch);
+  const local = getLocalBillById(userId, billId);
+  if (local) {
+    return local;
+  }
+
+  try {
+    const billRef = doc(db, "users", userId, "bills", billId);
+    const snapshot = await getDoc(billRef);
+    if (snapshot.exists()) {
+      return {
+        id: snapshot.id,
+        firestoreId: snapshot.id,
+        localOnly: false,
+        ...snapshot.data(),
+      };
+    }
+  } catch (error) {
+    console.error("Failed to load bill from Firebase:", error);
   }
 
   return null;
+}
+
+export async function deleteBillsForPatientIds(userId, patientIds) {
+  if (!userId || !patientIds?.length) {
+    return 0;
+  }
+
+  const ids = [...new Set(patientIds.filter(Boolean))];
+  const bills = await getBillsForPatientIds(userId, ids);
+  const cloudIds = new Set();
+
+  for (const bill of bills) {
+    const cloudId = bill.firestoreId || (!bill.localOnly ? bill.id : null);
+    if (cloudId) {
+      cloudIds.add(cloudId);
+    }
+  }
+
+  await Promise.all(
+    [...cloudIds].map((cloudId) =>
+      deleteDoc(doc(db, "users", userId, "bills", cloudId)).catch((error) => {
+        console.error("Failed to delete bill from Firebase:", error);
+      })
+    )
+  );
+
+  removeLocalBillsForPatientIds(userId, ids);
+  return bills.length;
+}
+
+export async function deleteBill(userId, billId) {
+  if (!userId || !billId) {
+    throw new Error("Missing bill or user.");
+  }
+
+  const bill = await getBill(userId, billId);
+  if (!bill) {
+    throw new Error("Bill not found.");
+  }
+
+  const cloudId = bill.firestoreId || (!bill.localOnly ? bill.id : null);
+  if (cloudId) {
+    try {
+      await deleteDoc(doc(db, "users", userId, "bills", cloudId));
+    } catch (error) {
+      console.error("Failed to delete bill from Firebase:", error);
+      const stillLocal = getLocalBillById(userId, billId);
+      if (!stillLocal) {
+        throw new Error("Could not delete bill from your account. Try again when online.");
+      }
+    }
+  }
+
+  removeLocalBill(userId, billId);
+  if (cloudId && cloudId !== billId) {
+    removeLocalBill(userId, cloudId);
+  }
 }
 
 export { markLocalBillSynced, persistLocalBill } from "./localBillStore";
