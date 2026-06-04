@@ -43,9 +43,20 @@ export function persistLocalBill(userId, billData) {
   return localId;
 }
 
-export function getUnsyncedLocalBills(userId) {
+export function getLocalBills(userId) {
   const store = readStore();
-  return (store.users[userId] || []).filter((entry) => !entry.synced);
+  return store.users[userId] || [];
+}
+
+export function getUnsyncedLocalBills(userId) {
+  return getLocalBills(userId).filter((entry) => !entry.synced);
+}
+
+export function getLocalBillById(userId, billId) {
+  const match = getLocalBills(userId).find(
+    (entry) => entry.localId === billId || entry.firestoreId === billId
+  );
+  return match ? localBillToHistoryEntry(match) : null;
 }
 
 export function markLocalBillSynced(userId, localId, firestoreId) {
@@ -68,4 +79,42 @@ export function localBillToHistoryEntry(entry) {
     comparedAt: entry.comparedAt,
     createdAt: entry.comparedAt,
   };
+}
+
+function billMatchesPatientIds(billData, idSet) {
+  const data = billData || {};
+  return idSet.has(data.patientId) || idSet.has(data.patient?.id);
+}
+
+export function removeLocalBill(userId, billId) {
+  if (!userId || !billId) {
+    return false;
+  }
+  const store = readStore();
+  const entries = store.users[userId] || [];
+  const remaining = entries.filter(
+    (entry) => entry.localId !== billId && entry.firestoreId !== billId
+  );
+  if (remaining.length === entries.length) {
+    return false;
+  }
+  store.users[userId] = remaining;
+  writeStore(store);
+  return true;
+}
+
+export function removeLocalBillsForPatientIds(userId, patientIds) {
+  if (!userId || !patientIds?.length) {
+    return 0;
+  }
+  const idSet = new Set(patientIds.filter(Boolean));
+  const store = readStore();
+  const entries = store.users[userId] || [];
+  const remaining = entries.filter((entry) => !billMatchesPatientIds(entry.billData, idSet));
+  const removed = entries.length - remaining.length;
+  if (removed > 0) {
+    store.users[userId] = remaining;
+    writeStore(store);
+  }
+  return removed;
 }

@@ -111,3 +111,31 @@ export function computeBillSummary(result) {
     { totalCharged: 0, totalOvercharged: 0, itemsFlagged: 0 }
   );
 }
+
+export function buildPatientNameMap(patients) {
+  const map = {};
+  for (const patient of patients || []) {
+    const name = patient?.name?.trim();
+    if (!name) {
+      continue;
+    }
+    for (const id of [patient.id, patient.localId, patient.firestoreId]) {
+      if (id) {
+        map[id] = name;
+      }
+    }
+  }
+  return map;
+}
+
+export function getBillPatientName(bill, patientNameById = {}) {
+  const fromBill = bill?.patient?.name?.trim();
+  if (fromBill) {
+    return fromBill;
+  }
+  const patientId = bill?.patientId || bill?.patient?.id;
+  if (patientId && patientNameById[patientId]) {
+    return patientNameById[patientId];
+  }
+  return null;
+}

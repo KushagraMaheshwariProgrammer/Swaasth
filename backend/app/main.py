@@ -21,6 +21,7 @@ from app.cghs_rates import (
     resolve_rate_type_for_hospital,
     resolve_tier,
 )
+from app.hbp_rates import get_hbp_store
 from app.locations import get_location_store
 from app.nabh_registry import get_nabh_registry
 from app.pharma_rates import get_pharma_store
@@ -73,6 +74,14 @@ def load_reference_data() -> None:
         print(f"Loaded {len(nabh.records)} NABH registry hospitals from {nabh.csv_path}")
     except Exception as exc:
         print(f"WARNING: NABH registry failed to load: {exc}")
+
+    try:
+        hbp = get_hbp_store()
+        print(
+            f"Loaded {len(hbp.rows)} HBP 2022 PM-JAY rates from {hbp.csv_path}"
+        )
+    except Exception as exc:
+        print(f"WARNING: HBP 2022 rates CSV failed to load: {exc}")
 
     try:
         pharma = get_pharma_store()
@@ -369,6 +378,64 @@ def _add_pharma_comparison(line_items: list[dict[str, Any]]) -> list[dict[str, A
     return [store.compare_line_item(dict(raw_item)) for raw_item in line_items]
 
 
+def _add_hbp_comparison(
+    line_items: list[dict[str, Any]],
+    *,
+    tier_id: str,
+) -> list[dict[str, Any]]:
+    try:
+        store = get_hbp_store()
+    except (FileNotFoundError, ValueError) as exc:
+        fallback: list[dict[str, Any]] = []
+        for raw_item in line_items:
+            item = dict(raw_item)
+            item["comparison_source"] = "hbp"
+            item["hbp_rate"] = None
+            item["price_difference"] = None
+            item["flag"] = "no_reference"
+            item["matched_reference_item"] = None
+            item["approximate_match"] = False
+            item["hbp_error"] = str(exc)
+            fallback.append(item)
+        return fallback
+
+    compared_items: list[dict[str, Any]] = []
+    for raw_item in line_items:
+        item = dict(raw_item)
+        item["comparison_source"] = "hbp"
+        item_name = str(item.get("item_name", "")).strip()
+        total_price = _to_float(item.get("total_price"))
+        match = store.find_match(item_name, tier_id=tier_id)
+
+        if match is None:
+            item["hbp_rate"] = None
+            item["price_difference"] = None
+            item["flag"] = "no_reference"
+            item["matched_reference_item"] = None
+            item["approximate_match"] = False
+            item["hbp_procedure_code"] = None
+            item["hbp_package_code"] = None
+            item["hbp_package_name"] = None
+        else:
+            hbp_rate = _to_float(match["rate"])
+            price_difference = round(total_price - hbp_rate, 2)
+            item["hbp_rate"] = hbp_rate
+            item["price_difference"] = price_difference
+            item["flag"] = "overpriced" if price_difference > 0 else "acceptable"
+            item["matched_reference_item"] = match["reference_item"]
+            item["approximate_match"] = bool(match["approximate_match"])
+            item["hbp_procedure_code"] = match["hbp_procedure_code"]
+            item["hbp_package_code"] = match["hbp_package_code"]
+            item["hbp_package_name"] = match["package_name"]
+            item["hbp_tier_1_rate"] = match["tier_1_rate"]
+            item["hbp_tier_2_rate"] = match["tier_2_rate"]
+            item["hbp_tier_3_rate"] = match["tier_3_rate"]
+
+        compared_items.append(item)
+
+    return compared_items
+
+
 def _add_cghs_comparison(
     line_items: list[dict[str, Any]],
     *,
@@ -432,12 +499,19 @@ def _add_price_comparison(
     *,
     tier: str,
     rate_type: str,
+    tier_id: str | None = None,
+    pmjay_eligible: bool = False,
 ) -> list[dict[str, Any]]:
     compared: list[dict[str, Any]] = []
+    effective_tier_id = tier_id or "tier_3"
     for raw_item in line_items:
         item = dict(raw_item)
         if item.get("category") == "medicine":
             compared.extend(_add_pharma_comparison([item]))
+        elif pmjay_eligible:
+            compared.extend(
+                _add_hbp_comparison([item], tier_id=effective_tier_id)
+            )
         else:
             compared.extend(
                 _add_cghs_comparison([item], tier=tier, rate_type=rate_type)
@@ -494,6 +568,11 @@ class CompareBillRequest(BaseModel):
     tier: str | None = None
     filename: str | None = None
     file_type: str | None = None
+    pmjay_eligible: bool = False
+    patient_id: str | None = None
+    patient_name: str | None = None
+    patient_age: int | None = None
+    patient_gender: str | None = None
 
 
 def _normalize_line_items(line_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -534,6 +613,11 @@ def _build_comparison_response(
     tier: str | None = None,
     filename: str = "edited-bill",
     file_type: str = "manual",
+    pmjay_eligible: bool = False,
+    patient_id: str | None = None,
+    patient_name: str | None = None,
+    patient_age: int | None = None,
+    patient_gender: str | None = None,
 ) -> dict[str, Any]:
     if not line_items:
         raise HTTPException(status_code=400, detail="Add at least one line item.")
@@ -548,10 +632,13 @@ def _build_comparison_response(
     )
 
     normalized_items = _normalize_line_items(line_items)
+    tier_id = location_meta.get("tier_id") or tier or "tier_3"
     compared_line_items = _add_price_comparison(
         normalized_items,
         tier=canonical_tier,
         rate_type=canonical_rate_type,
+        tier_id=tier_id,
+        pmjay_eligible=pmjay_eligible,
     )
 
     audit_flags = analyze_claim_items(
@@ -563,7 +650,16 @@ def _build_comparison_response(
     rates_source: dict[str, Any] = {
         "cghs_file": str(store.csv_path.name),
         "total_procedures_loaded": len(store.rows),
+        "comparison_scheme": "hbp_pmjay" if pmjay_eligible else "cghs",
     }
+    if pmjay_eligible:
+        try:
+            hbp_store = get_hbp_store()
+            rates_source["hbp_file"] = str(hbp_store.csv_path.name)
+            rates_source["total_hbp_procedures_loaded"] = len(hbp_store.rows)
+        except Exception:
+            rates_source["hbp_file"] = None
+            rates_source["total_hbp_procedures_loaded"] = 0
     try:
         pharma_store = get_pharma_store()
         rates_source["pharma_file"] = str(pharma_store.primary.csv_path.name)
@@ -579,6 +675,16 @@ def _build_comparison_response(
         rates_source["total_medicines_loaded"] = 0
         rates_source["pharma_backup_file"] = None
         rates_source["total_backup_medicines_loaded"] = 0
+
+    patient_payload: dict[str, Any] | None = None
+    if patient_id or patient_name:
+        patient_payload = {
+            "id": patient_id,
+            "name": patient_name,
+            "age": patient_age,
+            "gender": patient_gender,
+            "ayushman_eligible": pmjay_eligible,
+        }
 
     return {
         "filename": filename,
@@ -599,7 +705,10 @@ def _build_comparison_response(
             "hospital_type": hospital_meta["hospital_type"],
             "rate_type": canonical_rate_type,
             "rate_type_label": _rate_type_label(canonical_rate_type),
+            "pmjay_eligible": pmjay_eligible,
+            "comparison_scheme": "hbp_pmjay" if pmjay_eligible else "cghs",
         },
+        "patient": patient_payload,
         "rates_source": rates_source,
         "line_items": compared_line_items,
         "audit_flags": audit_flags,
@@ -623,6 +732,11 @@ def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
         tier=body.tier,
         filename=body.filename or "edited-bill",
         file_type=body.file_type or "manual",
+        pmjay_eligible=body.pmjay_eligible,
+        patient_id=body.patient_id,
+        patient_name=body.patient_name,
+        patient_age=body.patient_age,
+        patient_gender=body.patient_gender,
     )
 
 

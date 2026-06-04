@@ -2,9 +2,21 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import BillResults from "../components/BillResults";
-import { computeBillSummary, formatCurrency } from "../billUtils";
+import {
+  buildPatientNameMap,
+  computeBillSummary,
+  formatCurrency,
+  getBillPatientName,
+} from "../billUtils";
 import { useAuth } from "../context/AuthContext";
-import { getBill, getBillSortTime, getUserBills } from "../services/bills";
+import {
+  deleteBill,
+  getBill,
+  getBillSortTime,
+  getUserBills,
+  getUserBillsLocalSnapshot,
+} from "../services/bills";
+import { getPatients, getPatientsLocalSnapshot } from "../services/patients";
 
 const pageTransition = {
   initial: { opacity: 0, y: 12 },
@@ -12,6 +24,10 @@ const pageTransition = {
   exit: { opacity: 0, y: -8 },
   transition: { duration: 0.35 },
 };
+
+function billDisplayTitle(bill) {
+  return bill.hospital?.name_from_bill || bill.filename || "Hospital bill";
+}
 
 function formatBillDate(bill) {
   const sortTime = getBillSortTime(bill);
@@ -29,10 +45,40 @@ export default function HistoryPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [bills, setBills] = useState([]);
+  const [patientNameById, setPatientNameById] = useState({});
   const [selectedBill, setSelectedBill] = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncMessage, setSyncMessage] = useState("");
   const [error, setError] = useState("");
+  const [deletingBillId, setDeletingBillId] = useState(null);
+
+  const handleDeleteBill = async (bill) => {
+    if (!user?.uid || !bill?.id) {
+      return;
+    }
+    const title = billDisplayTitle(bill);
+    if (
+      !window.confirm(
+        `Permanently delete this bill?\n\n${title}\nBill ID: ${bill.id}\n\nThis action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    setDeletingBillId(bill.id);
+    setError("");
+    try {
+      await deleteBill(user.uid, bill.id);
+      if (billId === bill.id) {
+        navigate("/history");
+      } else {
+        setBills((prev) => prev.filter((entry) => entry.id !== bill.id));
+      }
+    } catch (err) {
+      setError(err.message || "Unable to delete bill.");
+    } finally {
+      setDeletingBillId(null);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -41,11 +87,11 @@ export default function HistoryPage() {
       if (!user) {
         return;
       }
-      setLoading(true);
       setError("");
       setSyncMessage("");
       try {
         if (billId) {
+          setLoading(true);
           const bill = await getBill(user.uid, billId);
           if (cancelled) {
             return;
@@ -57,10 +103,25 @@ export default function HistoryPage() {
             setSelectedBill(bill);
           }
         } else {
-          const entries = await getUserBills(user.uid);
+          const localSnapshot = getUserBillsLocalSnapshot(user.uid);
+          if (localSnapshot.length) {
+            setBills(localSnapshot);
+            setLoading(false);
+          } else {
+            setLoading(true);
+          }
+          const localPatients = getPatientsLocalSnapshot(user.uid);
+          if (localPatients.length) {
+            setPatientNameById(buildPatientNameMap(localPatients));
+          }
+          const [entries, patients] = await Promise.all([
+            getUserBills(user.uid),
+            getPatients(user.uid),
+          ]);
           if (cancelled) {
             return;
           }
+          setPatientNameById(buildPatientNameMap(patients));
           const pendingLocal = entries.filter((bill) => bill.localOnly).length;
           if (pendingLocal > 0) {
             setSyncMessage(
@@ -127,12 +188,11 @@ export default function HistoryPage() {
           <ul className="history-list">
             {bills.map((bill) => {
               const summary = computeBillSummary(bill);
-              const title =
-                bill.hospital?.name_from_bill ||
-                bill.filename ||
-                "Hospital bill";
+              const patientName = getBillPatientName(bill, patientNameById);
+              const title = billDisplayTitle(bill);
+              const isDeleting = deletingBillId === bill.id;
               return (
-                <li key={bill.id}>
+                <li key={bill.id} className="history-list-row">
                   <button
                     type="button"
                     className="history-card"
@@ -143,6 +203,12 @@ export default function HistoryPage() {
                       <span>{formatBillDate(bill)}</span>
                     </div>
                     <p className="history-card-meta">
+                      {patientName ? (
+                        <>
+                          Patient: <strong>{patientName}</strong>
+                          {" · "}
+                        </>
+                      ) : null}
                       {bill.comparison_settings?.city &&
                       bill.comparison_settings?.state_name
                         ? `${bill.comparison_settings.city}, ${bill.comparison_settings.state_name}`
@@ -157,6 +223,15 @@ export default function HistoryPage() {
                       </span>
                     </div>
                   </button>
+                  <button
+                    type="button"
+                    className="history-delete-btn"
+                    disabled={isDeleting}
+                    aria-label={`Delete bill ${title}`}
+                    onClick={() => handleDeleteBill(bill)}
+                  >
+                    {isDeleting ? "Deleting…" : "Delete"}
+                  </button>
                 </li>
               );
             })}
@@ -164,9 +239,23 @@ export default function HistoryPage() {
         )}
 
         {!loading && billId && selectedBill && (
-          <section className="results-shell">
-            <BillResults result={selectedBill} />
-          </section>
+          <>
+            <div className="history-detail-actions">
+              <button
+                type="button"
+                className="history-delete-btn history-delete-btn-prominent"
+                disabled={deletingBillId === selectedBill.id}
+                onClick={() => handleDeleteBill(selectedBill)}
+              >
+                {deletingBillId === selectedBill.id
+                  ? "Deleting…"
+                  : "Delete this bill"}
+              </button>
+            </div>
+            <section className="results-shell">
+              <BillResults result={selectedBill} />
+            </section>
+          </>
         )}
       </main>
     </motion.div>

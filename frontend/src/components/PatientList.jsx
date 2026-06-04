@@ -1,0 +1,60 @@
+import { Link } from "react-router-dom";
+import { genderLabel } from "./PatientForm";
+
+export default function PatientList({
+  patients,
+  selectedId = "",
+  onSelect,
+  mode = "link",
+}) {
+  if (!patients.length) {
+    return null;
+  }
+
+  return (
+    <ul className="patients-list">
+      {patients.map((patient) => {
+        const isSelected = selectedId === patient.id;
+        const content = (
+          <>
+            <div>
+              <strong>{patient.name || "Unnamed patient"}</strong>
+              <p>
+                {patient.age != null ? `${patient.age} yrs` : "—"} ·{" "}
+                {genderLabel(patient.gender)}
+              </p>
+            </div>
+            {patient.ayushmanEligible && (
+              <span className="patient-pmjay-badge">PM-JAY eligible</span>
+            )}
+          </>
+        );
+
+        if (mode === "select") {
+          return (
+            <li key={patient.id}>
+              <button
+                type="button"
+                className={`patient-list-card patient-list-card-selectable${
+                  isSelected ? " is-selected" : ""
+                }`}
+                aria-pressed={isSelected}
+                onClick={() => onSelect?.(patient.id)}
+              >
+                {content}
+              </button>
+            </li>
+          );
+        }
+
+        return (
+          <li key={patient.id}>
+            <Link to={`/patients/${patient.id}`} className="patient-list-card">
+              {content}
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}

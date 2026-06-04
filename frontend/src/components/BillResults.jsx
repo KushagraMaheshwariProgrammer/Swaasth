@@ -39,6 +39,17 @@ export default function BillResults({ result, toolbar = null }) {
         </p>
       )}
 
+      {result?.patient?.name && (
+        <p className="comparison-context">
+          Patient: <strong>{result.patient.name}</strong>
+          {result.patient.age != null && <> · {result.patient.age} yrs</>}
+          {result.patient.gender && <> · {result.patient.gender}</>}
+          {result.patient.ayushman_eligible && (
+            <> · <strong>Ayushman Bharat PM-JAY</strong></>
+          )}
+        </p>
+      )}
+
       {result?.comparison_settings && (
         <p className="comparison-context">
           {result.comparison_settings.state_name &&
@@ -63,11 +74,21 @@ export default function BillResults({ result, toolbar = null }) {
               (option) => option.id === result.comparison_settings.hospital_type
             )?.label || result.comparison_settings.hospital_type}
           </strong>
-          {" · "}
-          <strong>
-            {result.comparison_settings.rate_type_label ||
-              result.comparison_settings.rate_type}
-          </strong>
+          {result.comparison_settings.comparison_scheme !== "hbp_pmjay" && (
+            <>
+              {" · "}
+              <strong>
+                {result.comparison_settings.rate_type_label ||
+                  result.comparison_settings.rate_type}
+              </strong>
+            </>
+          )}
+          {result.comparison_settings.comparison_scheme === "hbp_pmjay" && (
+            <>
+              {" · "}
+              <strong>PM-JAY HBP 2022 benchmark</strong>
+            </>
+          )}
         </p>
       )}
 
@@ -99,8 +120,17 @@ export default function BillResults({ result, toolbar = null }) {
           const meta = getFlagMeta(item.flag);
           const isMedicine =
             item.comparison_source === "pharma" || item.category === "medicine";
-          const referenceRate = isMedicine ? item.pharma_rate : item.cghs_rate;
-          const referenceLabel = isMedicine ? "Market MRP" : "CGHS Rate";
+          const isHbp = item.comparison_source === "hbp";
+          const referenceRate = isMedicine
+            ? item.pharma_rate
+            : isHbp
+            ? item.hbp_rate
+            : item.cghs_rate;
+          const referenceLabel = isMedicine
+            ? "Market MRP"
+            : isHbp
+            ? "PM-JAY HBP Rate"
+            : "CGHS Rate";
           return (
             <article
               key={`${item.item_name || "item"}-${index}`}
@@ -113,7 +143,11 @@ export default function BillResults({ result, toolbar = null }) {
               {item.matched_reference_item && (
                 <p className="matched-reference">
                   Matched: {item.matched_reference_item}
-                  {item.cghs_code ? ` (${item.cghs_code})` : ""}
+                  {item.hbp_procedure_code
+                    ? ` (${item.hbp_procedure_code})`
+                    : item.cghs_code
+                    ? ` (${item.cghs_code})`
+                    : ""}
                   {item.pharma_product_id ? ` (ID ${item.pharma_product_id})` : ""}
                   {item.pharma_database === "backup" ? " · backup database" : ""}
                   {item.approximate_match ? " · approximate" : ""}
@@ -142,7 +176,16 @@ export default function BillResults({ result, toolbar = null }) {
                     : ""}
                 </p>
               )}
+              {isHbp &&
+                (item.hbp_tier_1_rate != null || item.hbp_tier_2_rate != null) && (
+                  <p className="rate-breakdown">
+                    Tier I {formatCurrency(item.hbp_tier_1_rate)} · Tier II{" "}
+                    {formatCurrency(item.hbp_tier_2_rate)} · Tier III{" "}
+                    {formatCurrency(item.hbp_tier_3_rate)}
+                  </p>
+                )}
               {!isMedicine &&
+                !isHbp &&
                 (item.non_nabh_rate != null || item.nabh_rate != null) && (
                   <p className="rate-breakdown">
                     Non-NABH {formatCurrency(item.non_nabh_rate)} · NABH{" "}
