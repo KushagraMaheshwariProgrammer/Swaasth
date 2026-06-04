@@ -183,6 +183,7 @@ class CghsRatesStore:
         self.csv_path = path
         self.rows: list[CghsRateRow] = []
         self._by_tier: dict[str, list[CghsRateRow]] = {}
+        self._by_token: dict[str, list[CghsRateRow]] = {}
         self._load(path)
 
     def _load(self, path: Path) -> None:
@@ -211,6 +212,9 @@ class CghsRatesStore:
                 )
                 self.rows.append(row)
                 self._by_tier.setdefault(tier, []).append(row)
+                for token in row.procedure_tokens:
+                    if len(token) >= 3:
+                        self._by_token.setdefault(token, []).append(row)
 
         if not self.rows:
             raise ValueError(f"No CGHS rate rows loaded from {path}")
@@ -225,6 +229,26 @@ class CghsRatesStore:
         if rate_type == "super_speciality":
             return row.super_speciality_rate
         return row.nabh_rate
+
+    def _candidate_rows(
+        self, normalized_name: str, tier_rows: list[CghsRateRow]
+    ) -> list[CghsRateRow]:
+        tokens = [token for token in normalized_name.split() if len(token) >= 3]
+        if not tokens:
+            return tier_rows[:400]
+
+        seen: set[int] = set()
+        candidates: list[CghsRateRow] = []
+        tier_ids = {id(row) for row in tier_rows}
+        for token in tokens:
+            for row in self._by_token.get(token, ()):
+                if id(row) not in tier_ids or id(row) in seen:
+                    continue
+                seen.add(id(row))
+                candidates.append(row)
+                if len(candidates) >= 800:
+                    return candidates
+        return candidates if candidates else tier_rows[:400]
 
     def find_match(
         self,
@@ -263,7 +287,8 @@ class CghsRatesStore:
                 approximate=False,
             )
 
-        for row in tier_rows:
+        candidate_rows = self._candidate_rows(normalized_name, tier_rows)
+        for row in candidate_rows:
             ref = row.normalized_procedure
             if ref in normalized_name or normalized_name in ref:
                 return self._match_payload(
@@ -272,7 +297,7 @@ class CghsRatesStore:
 
         input_tokens = set(normalized_name.split())
         best: tuple[float, CghsRateRow] | None = None
-        for row in tier_rows:
+        for row in candidate_rows:
             ref_tokens = row.procedure_tokens
             if not ref_tokens or not input_tokens:
                 continue

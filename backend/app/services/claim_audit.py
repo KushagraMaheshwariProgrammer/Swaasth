@@ -302,6 +302,30 @@ def analyze_claim_items(
             }
         )
 
+    for entry in entries:
+        item = entry["item"]
+        if entry["category"] != "medicine" or item.get("flag") != "overpriced":
+            continue
+        reference = item.get("matched_reference_item") or "market reference"
+        pharma_rate = item.get("pharma_rate")
+        charged = item.get("total_price")
+        diff = item.get("price_difference")
+        flags.append(
+            {
+                "type": "MEDICINE_PRICE_DISCREPANCY",
+                "severity": "HIGH",
+                "item": entry["name"],
+                "reason": (
+                    f"Charged {charged} vs expected market price ~{pharma_rate} for "
+                    f'"{reference}" (difference: {diff}).'
+                ),
+                "recommendation": (
+                    "Verify the medicine name, pack size, and MRP on the pharmacy label "
+                    "or 1mg/Netmeds before paying."
+                ),
+            }
+        )
+
     return {
         "flags_count": len(flags),
         "risk_level": _compute_risk_level(flags),

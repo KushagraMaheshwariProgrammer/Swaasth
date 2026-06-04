@@ -23,6 +23,7 @@ from app.cghs_rates import (
 )
 from app.locations import get_location_store
 from app.nabh_registry import get_nabh_registry
+from app.pharma_rates import get_pharma_store
 from app.services.claim_audit import analyze_claim_items
 
 
@@ -72,6 +73,26 @@ def load_reference_data() -> None:
         print(f"Loaded {len(nabh.records)} NABH registry hospitals from {nabh.csv_path}")
     except Exception as exc:
         print(f"WARNING: NABH registry failed to load: {exc}")
+
+    try:
+        pharma = get_pharma_store()
+        backup_count = len(pharma.backup.rows) if pharma.backup else 0
+        print(
+            f"Loaded {len(pharma.primary.rows)} primary pharmaceutical products "
+            f"from {pharma.primary.csv_path}"
+        )
+        if backup_count:
+            print(
+                f"Loaded {backup_count} backup pharmaceutical products "
+                f"from {pharma.backup.csv_path}"
+            )
+        else:
+            print(
+                "WARNING: Backup pharmaceutical dataset not loaded. "
+                "Run: python backend/scripts/download_pharma_backup_dataset.py"
+            )
+    except Exception as exc:
+        print(f"WARNING: Pharmaceutical price dataset failed to load: {exc}")
 
 
 @app.get("/health")
@@ -328,6 +349,26 @@ def _to_float(value: Any) -> float:
         return 0.0
 
 
+def _add_pharma_comparison(line_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    try:
+        store = get_pharma_store()
+    except (FileNotFoundError, ValueError) as exc:
+        fallback: list[dict[str, Any]] = []
+        for raw_item in line_items:
+            item = dict(raw_item)
+            item["comparison_source"] = "pharma"
+            item["pharma_rate"] = None
+            item["price_difference"] = None
+            item["flag"] = "no_reference"
+            item["matched_reference_item"] = None
+            item["approximate_match"] = False
+            item["pharma_error"] = str(exc)
+            fallback.append(item)
+        return fallback
+
+    return [store.compare_line_item(dict(raw_item)) for raw_item in line_items]
+
+
 def _add_cghs_comparison(
     line_items: list[dict[str, Any]],
     *,
@@ -345,6 +386,7 @@ def _add_cghs_comparison(
 
     for raw_item in line_items:
         item = dict(raw_item)
+        item["comparison_source"] = "cghs"
         item_name = str(item.get("item_name", "")).strip()
         total_price = _to_float(item.get("total_price"))
         match = store.find_match(
@@ -383,6 +425,24 @@ def _add_cghs_comparison(
         compared_items.append(item)
 
     return compared_items
+
+
+def _add_price_comparison(
+    line_items: list[dict[str, Any]],
+    *,
+    tier: str,
+    rate_type: str,
+) -> list[dict[str, Any]]:
+    compared: list[dict[str, Any]] = []
+    for raw_item in line_items:
+        item = dict(raw_item)
+        if item.get("category") == "medicine":
+            compared.extend(_add_pharma_comparison([item]))
+        else:
+            compared.extend(
+                _add_cghs_comparison([item], tier=tier, rate_type=rate_type)
+            )
+    return compared
 
 
 def _resolve_nabh_and_rate_type(
@@ -488,7 +548,7 @@ def _build_comparison_response(
     )
 
     normalized_items = _normalize_line_items(line_items)
-    compared_line_items = _add_cghs_comparison(
+    compared_line_items = _add_price_comparison(
         normalized_items,
         tier=canonical_tier,
         rate_type=canonical_rate_type,
@@ -500,6 +560,25 @@ def _build_comparison_response(
     )
 
     store = get_cghs_store()
+    rates_source: dict[str, Any] = {
+        "cghs_file": str(store.csv_path.name),
+        "total_procedures_loaded": len(store.rows),
+    }
+    try:
+        pharma_store = get_pharma_store()
+        rates_source["pharma_file"] = str(pharma_store.primary.csv_path.name)
+        rates_source["total_medicines_loaded"] = len(pharma_store.primary.rows)
+        if pharma_store.backup:
+            rates_source["pharma_backup_file"] = str(pharma_store.backup.csv_path.name)
+            rates_source["total_backup_medicines_loaded"] = len(pharma_store.backup.rows)
+        else:
+            rates_source["pharma_backup_file"] = None
+            rates_source["total_backup_medicines_loaded"] = 0
+    except Exception:
+        rates_source["pharma_file"] = None
+        rates_source["total_medicines_loaded"] = 0
+        rates_source["pharma_backup_file"] = None
+        rates_source["total_backup_medicines_loaded"] = 0
 
     return {
         "filename": filename,
@@ -521,10 +600,7 @@ def _build_comparison_response(
             "rate_type": canonical_rate_type,
             "rate_type_label": _rate_type_label(canonical_rate_type),
         },
-        "rates_source": {
-            "file": str(store.csv_path.name),
-            "total_procedures_loaded": len(store.rows),
-        },
+        "rates_source": rates_source,
         "line_items": compared_line_items,
         "audit_flags": audit_flags,
     }

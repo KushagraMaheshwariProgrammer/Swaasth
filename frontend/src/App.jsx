@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BrowserRouter,
   Link,
@@ -9,14 +9,16 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
+import BillResults from "./components/BillResults";
+import { HOSPITAL_TYPE_OPTIONS } from "./billUtils";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import LoginPage from "./pages/LoginPage";
+import HistoryPage from "./pages/HistoryPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
+import { markLocalBillSynced, persistLocalBill, saveBill } from "./services/bills";
 
 const API_BASE = "http://127.0.0.1:8000";
 const ALLOWED_EXTENSIONS = ["pdf", "jpg", "jpeg", "png"];
-
-const HOSPITAL_TYPE_OPTIONS = [
-  { id: "general", label: "General hospital" },
-  { id: "speciality", label: "Speciality hospital" },
-];
 
 const CATEGORY_OPTIONS = [
   { id: "medicine", label: "Medicine" },
@@ -74,104 +76,84 @@ const pageTransition = {
   transition: { duration: 0.35 },
 };
 
-const formatCurrency = (value) => {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) {
-    return "--";
-  }
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(Number(value));
-};
-
 const isSupportedFile = (file) => {
   const ext = file.name.split(".").pop()?.toLowerCase();
   return Boolean(ext && ALLOWED_EXTENSIONS.includes(ext));
 };
 
-const getFlagMeta = (flag) => {
-  if (flag === "overpriced") {
-    return {
-      badgeLabel: "Overpriced",
-      badgeClass: "status-pill status-red",
-      cardClass: "result-card result-overpriced",
-    };
+function UserNav({ className = "" }) {
+  const { user, logOut, loading } = useAuth();
+
+  if (loading) {
+    return null;
   }
-  if (flag === "acceptable") {
-    return {
-      badgeLabel: "Acceptable",
-      badgeClass: "status-pill status-green",
-      cardClass: "result-card result-acceptable",
-    };
+
+  if (!user) {
+    return (
+      <div className={`user-nav ${className}`.trim()}>
+        <Link to="/login" className="user-nav-link">
+          Sign in
+        </Link>
+      </div>
+    );
   }
-  return {
-    badgeLabel: "No Data",
-    badgeClass: "status-pill status-neutral",
-    cardClass: "result-card result-neutral",
-  };
-};
 
-const getAuditSeverityMeta = (severity) => {
-  if (severity === "HIGH") {
-    return {
-      badgeLabel: "High",
-      badgeClass: "status-pill status-red",
-      cardClass: "audit-flag-card audit-flag-high",
-    };
+  return (
+    <div className={`user-nav ${className}`.trim()}>
+      <Link to="/history" className="user-nav-link">
+        Past bills
+      </Link>
+      <span className="user-nav-email">{user.email || "Signed in"}</span>
+      <button
+        type="button"
+        className="user-nav-signout"
+        onClick={() => logOut()}
+      >
+        Sign out
+      </button>
+    </div>
+  );
+}
+
+function ProtectedRoute({ children }) {
+  const { user, loading, needsEmailVerification: pendingVerification } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <div className="auth-loading">
+        <div className="spinner-conic" aria-hidden="true" />
+        <p>Loading your account...</p>
+      </div>
+    );
   }
-  if (severity === "MEDIUM") {
-    return {
-      badgeLabel: "Medium",
-      badgeClass: "status-pill status-amber",
-      cardClass: "audit-flag-card audit-flag-medium",
-    };
+
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
-  return {
-    badgeLabel: "Low",
-    badgeClass: "status-pill status-neutral",
-    cardClass: "audit-flag-card audit-flag-low",
-  };
-};
 
-const getAuditRiskMeta = (riskLevel) => {
-  if (riskLevel === "HIGH") {
-    return { label: "High Risk", className: "audit-risk audit-risk-high" };
+  if (pendingVerification) {
+    return (
+      <Navigate
+        to="/verify-email"
+        replace
+        state={{ from: location }}
+      />
+    );
   }
-  if (riskLevel === "MEDIUM") {
-    return { label: "Medium Risk", className: "audit-risk audit-risk-medium" };
-  }
-  return { label: "Low Risk", className: "audit-risk audit-risk-low" };
-};
 
-function CountUp({ value, isCurrency = false, duration = 1200 }) {
-  const [displayValue, setDisplayValue] = useState(0);
-
-  useEffect(() => {
-    let frameId;
-    let startTime;
-    const target = Number(value) || 0;
-
-    const tick = (now) => {
-      if (!startTime) {
-        startTime = now;
-      }
-      const progress = Math.min((now - startTime) / duration, 1);
-      setDisplayValue(target * progress);
-      if (progress < 1) {
-        frameId = window.requestAnimationFrame(tick);
-      }
-    };
-
-    frameId = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(frameId);
-  }, [duration, value]);
-
-  return isCurrency ? formatCurrency(displayValue) : Math.round(displayValue);
+  return children;
 }
 
 function LandingPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const startChecking = () => {
+    navigate(user ? "/check" : "/login", {
+      state: user ? undefined : { from: { pathname: "/check" } },
+    });
+  };
 
   return (
     <motion.div className="landing-page" {...pageTransition}>
@@ -186,7 +168,7 @@ function LandingPage() {
           <span>BillCheck</span>
           <span className="pulse-dot" aria-hidden="true" />
         </div>
-        <p>Free for Indian patients</p>
+        <UserNav className="landing-user-nav" />
       </header>
 
       <main className="landing-wrap">
@@ -207,14 +189,14 @@ function LandingPage() {
             <button
               type="button"
               className="cta-button"
-              onClick={() => navigate("/check")}
+              onClick={startChecking}
             >
               Check My Bill →
             </button>
             <div className="trust-inline">
               <span>✓ Free forever</span>
               <span>•</span>
-              <span>✓ No signup needed</span>
+              <span>✓ Sign in to save bills</span>
               <span>•</span>
               <span>✓ Results in seconds</span>
             </div>
@@ -322,7 +304,7 @@ function LandingPage() {
 
         <section className="trust-bar-dark">
           Comparing against 5,900+ official CGHS 2025 rates · Used by patients across
-          India · No data stored · Built with ❤️ for India
+          India · Secure account storage · Built with ❤️ for India
         </section>
       </main>
 
@@ -344,6 +326,7 @@ function LandingPage() {
 }
 
 function CheckPage() {
+  const { user } = useAuth();
   const inputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [states, setStates] = useState([]);
@@ -364,6 +347,7 @@ function CheckPage() {
   const [isComparing, setIsComparing] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(8);
+  const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
     const loadStates = async () => {
@@ -425,39 +409,27 @@ function CheckPage() {
     }
   }, [city, cities]);
 
-  const summary = useMemo(() => {
-    const lineItems = result?.line_items ?? [];
-    return lineItems.reduce(
-      (acc, item) => {
-        const charged = Number(item.total_price ?? 0) || 0;
-        const diff = Number(item.price_difference ?? 0) || 0;
-        return {
-          totalCharged: acc.totalCharged + charged,
-          totalOvercharged: acc.totalOvercharged + Math.max(diff, 0),
-          itemsFlagged: acc.itemsFlagged + (item.flag === "overpriced" ? 1 : 0),
-        };
-      },
-      { totalCharged: 0, totalOvercharged: 0, itemsFlagged: 0 }
-    );
-  }, [result]);
-
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoading && !isComparing) {
       setLoadingMessageIndex(0);
       setLoadingProgress(8);
       return undefined;
     }
-    const messageTimer = window.setInterval(() => {
-      setLoadingMessageIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
-    }, 2000);
+    const messageTimer = isLoading
+      ? window.setInterval(() => {
+          setLoadingMessageIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
+        }, 2000)
+      : undefined;
     const progressTimer = window.setInterval(() => {
       setLoadingProgress((prev) => Math.min(prev + 3.5, 92));
     }, 260);
     return () => {
-      window.clearInterval(messageTimer);
+      if (messageTimer) {
+        window.clearInterval(messageTimer);
+      }
       window.clearInterval(progressTimer);
     };
-  }, [isLoading]);
+  }, [isLoading, isComparing]);
 
   const uiState = isLoading
     ? "loading"
@@ -533,6 +505,7 @@ function CheckPage() {
     }
 
     setError("");
+    setSaveMessage("");
     setIsComparing(true);
 
     try {
@@ -558,9 +531,24 @@ function CheckPage() {
         throw new Error(message || "Unable to compare this bill.");
       }
       setResult(payload);
+      setIsComparing(false);
+
+      if (user) {
+        const localId = persistLocalBill(user.uid, payload);
+        saveBill(user.uid, payload, { localId })
+          .then((firestoreId) => {
+            markLocalBillSynced(user.uid, localId, firestoreId);
+            setSaveMessage("Bill saved to your account.");
+          })
+          .catch((saveErr) =>
+            setSaveMessage(
+              saveErr.message ||
+                "Comparison saved on this device. It will sync when you open Past bills."
+            )
+          );
+      }
     } catch (err) {
       setError(err.message || "Something went wrong during comparison.");
-    } finally {
       setIsComparing(false);
     }
   };
@@ -619,9 +607,12 @@ function CheckPage() {
   return (
     <motion.div className="check-page" {...pageTransition}>
       <main className="check-wrap">
-        <Link to="/" className="back-link">
-          ← Back
-        </Link>
+        <div className="check-topbar">
+          <Link to="/" className="back-link">
+            ← Back
+          </Link>
+          <UserNav />
+        </div>
 
         <header className="check-header">
           <h1>Upload your hospital bill</h1>
@@ -938,185 +929,26 @@ function CheckPage() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
             >
-              {result?.hospital?.name_from_bill && (
-                <p className="comparison-context">
-                  Hospital on bill: <strong>{result.hospital.name_from_bill}</strong>
-                  {result.hospital.is_accredited != null && (
-                    <>
-                      {" · "}
-                      NABH:{" "}
-                      <strong>
-                        {result.hospital.is_accredited
-                          ? `Accredited (${result.hospital.accreditation_status})`
-                          : "Not found in NABH registry"}
-                      </strong>
-                      {result.hospital.matched_registry_name &&
-                        result.hospital.approximate_match && (
-                          <> · matched as {result.hospital.matched_registry_name}</>
-                        )}
-                    </>
-                  )}
-                </p>
-              )}
-
-              {result?.comparison_settings && (
-                <p className="comparison-context">
-                  {result.comparison_settings.state_name &&
-                    result.comparison_settings.city && (
-                      <>
-                        Location:{" "}
-                        <strong>
-                          {result.comparison_settings.city},{" "}
-                          {result.comparison_settings.state_name}
-                        </strong>
-                        {" · "}
-                      </>
-                    )}
-                  Tier:{" "}
-                  <strong>
-                    {result.comparison_settings.tier_label ||
-                      result.comparison_settings.tier}
-                  </strong>
-                  {" · "}
-                  <strong>
-                    {HOSPITAL_TYPE_OPTIONS.find(
-                      (o) => o.id === result.comparison_settings.hospital_type
-                    )?.label || result.comparison_settings.hospital_type}
-                  </strong>
-                  {" · "}
-                  <strong>
-                    {result.comparison_settings.rate_type_label ||
-                      result.comparison_settings.rate_type}
-                  </strong>
-                </p>
-              )}
-
-              <div className="results-toolbar">
-                <button
-                  type="button"
-                  className="bill-editor-secondary"
-                  onClick={() => {
-                    if (result?.line_items?.length) {
-                      setEditableItems(result.line_items.map(normalizeLineItem));
-                    }
-                    setResult(null);
-                    setError("");
-                  }}
-                >
-                  ← Edit bill items
-                </button>
-              </div>
-
-              <article className="summary-banner">
-                <div className="summary-stat">
-                  <p>Total Charged</p>
-                  <h3>
-                    <CountUp value={summary.totalCharged} isCurrency />
-                  </h3>
-                </div>
-                <div className="summary-stat summary-focus">
-                  <p>Overcharged By</p>
-                  <h3>
-                    <CountUp value={summary.totalOvercharged} isCurrency />
-                  </h3>
-                </div>
-                <div className="summary-stat summary-flagged">
-                  <p>Items Flagged</p>
-                  <h3>
-                    <CountUp value={summary.itemsFlagged} />
-                  </h3>
-                </div>
-              </article>
-
-              <div className="results-grid">
-                {result.line_items.map((item, index) => {
-                  const meta = getFlagMeta(item.flag);
-                  return (
-                    <article
-                      key={`${item.item_name || "item"}-${index}`}
-                      className={meta.cardClass}
-                    >
-                      <div className="result-top">
-                        <h4>{item.item_name || "--"}</h4>
-                        <span className={meta.badgeClass}>{meta.badgeLabel}</span>
-                      </div>
-                      {item.matched_reference_item && (
-                        <p className="matched-reference">
-                          Matched: {item.matched_reference_item}
-                          {item.cghs_code ? ` (${item.cghs_code})` : ""}
-                          {item.approximate_match ? " · approximate" : ""}
-                        </p>
-                      )}
-                      <div className="result-metrics">
-                        <div>
-                          <p>Charged</p>
-                          <h5>{formatCurrency(item.total_price)}</h5>
-                        </div>
-                        <div>
-                          <p>CGHS Rate</p>
-                          <h5>{formatCurrency(item.cghs_rate)}</h5>
-                        </div>
-                        <div>
-                          <p>Difference</p>
-                          <h5>{formatCurrency(item.price_difference)}</h5>
-                        </div>
-                      </div>
-                      {(item.non_nabh_rate != null || item.nabh_rate != null) && (
-                        <p className="rate-breakdown">
-                          Non-NABH {formatCurrency(item.non_nabh_rate)} · NABH{" "}
-                          {formatCurrency(item.nabh_rate)} · Super speciality{" "}
-                          {formatCurrency(item.super_speciality_rate)}
-                        </p>
-                      )}
-                    </article>
-                  );
-                })}
-              </div>
-
-              <section className="audit-section">
-                <div className="audit-section-header">
-                  <h3>Suspicious / Unnecessary Charges</h3>
-                  {result?.audit_flags && (
-                    <div className="audit-summary-badges">
-                      <span className={getAuditRiskMeta(result.audit_flags.risk_level).className}>
-                        {getAuditRiskMeta(result.audit_flags.risk_level).label}
-                      </span>
-                      <span className="audit-flag-count">
-                        {result.audit_flags.flags_count ?? 0} flag
-                        {(result.audit_flags.flags_count ?? 0) === 1 ? "" : "s"}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {result?.audit_flags?.flags?.length ? (
-                  <div className="audit-flags-grid">
-                    {result.audit_flags.flags.map((flag, index) => {
-                      const meta = getAuditSeverityMeta(flag.severity);
-                      return (
-                        <article
-                          key={`${flag.type || "flag"}-${flag.item || "item"}-${index}`}
-                          className={meta.cardClass}
-                        >
-                          <div className="result-top">
-                            <h4>{flag.item || "--"}</h4>
-                            <span className={meta.badgeClass}>{meta.badgeLabel}</span>
-                          </div>
-                          <p className="audit-flag-type">{flag.type?.replaceAll("_", " ") || "--"}</p>
-                          <p className="audit-flag-reason">{flag.reason}</p>
-                          <p className="audit-flag-recommendation">
-                            <strong>Recommendation:</strong> {flag.recommendation}
-                          </p>
-                        </article>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="audit-empty-state">
-                    No suspicious repetitions or unnecessary package-component charges detected.
-                  </p>
-                )}
-              </section>
+              {saveMessage && <p className="save-message">{saveMessage}</p>}
+              <BillResults
+                result={result}
+                toolbar={
+                  <button
+                    type="button"
+                    className="bill-editor-secondary"
+                    onClick={() => {
+                      if (result?.line_items?.length) {
+                        setEditableItems(result.line_items.map(normalizeLineItem));
+                      }
+                      setResult(null);
+                      setSaveMessage("");
+                      setError("");
+                    }}
+                  >
+                    ← Edit bill items
+                  </button>
+                }
+              />
             </motion.section>
           )}
         </AnimatePresence>
@@ -1131,7 +963,32 @@ function AppRoutes() {
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/check" element={<CheckPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route
+          path="/check"
+          element={
+            <ProtectedRoute>
+              <CheckPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/history"
+          element={
+            <ProtectedRoute>
+              <HistoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/history/:billId"
+          element={
+            <ProtectedRoute>
+              <HistoryPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AnimatePresence>
@@ -1140,8 +997,10 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AppRoutes />
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
