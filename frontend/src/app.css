@@ -1846,18 +1846,18 @@ body {
   margin-bottom: 0.75rem;
 }
 
-.patient-delete-btn {
-  margin-top: 2rem;
-  background: none;
-  border: none;
+.patient-delete-action {
   color: var(--danger);
-  font-size: 0.9rem;
-  cursor: pointer;
-  padding: 0;
 }
 
-.patient-delete-btn:hover {
+.patient-delete-action:hover:not(:disabled) {
+  color: var(--danger);
   text-decoration: underline;
+}
+
+.patient-delete-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .patient-select-block {

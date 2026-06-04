@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import {
+  applyActionCode,
   createUserWithEmailAndPassword,
   getRedirectResult,
   GoogleAuthProvider,
@@ -17,6 +18,12 @@ import {
   signInWithRedirect,
   signOut,
 } from "firebase/auth";
+import {
+  clearEmailVerificationLinkParams,
+  getEmailVerificationActionCodeSettings,
+  getEmailVerificationLinkParams,
+  getVerificationErrorMessage,
+} from "../auth/emailVerification";
 import { auth } from "../firebase";
 import { syncPendingBills } from "../services/bills";
 import { syncPendingPatients } from "../services/patients";
@@ -38,10 +45,15 @@ export function needsEmailVerification(user) {
   return usesPasswordProvider && !user.emailVerified;
 }
 
+const idleEmailLinkVerification = { status: "idle", message: "" };
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [redirectHandled, setRedirectHandled] = useState(false);
+  const [emailLinkVerification, setEmailLinkVerification] = useState(
+    idleEmailLinkVerification
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -84,9 +96,56 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, [redirectHandled]);
 
+  useEffect(() => {
+    const linkParams = getEmailVerificationLinkParams();
+    if (!linkParams) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    setEmailLinkVerification({ status: "processing", message: "" });
+
+    const completeVerificationLink = async () => {
+      try {
+        await applyActionCode(auth, linkParams.oobCode);
+        clearEmailVerificationLinkParams();
+
+        if (auth.currentUser) {
+          await auth.currentUser.reload();
+          if (!cancelled) {
+            setUser(auth.currentUser);
+          }
+        }
+
+        if (!cancelled) {
+          setEmailLinkVerification({
+            status: "success",
+            message: "Your email has been verified.",
+          });
+        }
+      } catch (error) {
+        clearEmailVerificationLinkParams();
+        if (!cancelled) {
+          setEmailLinkVerification({
+            status: "error",
+            message: getVerificationErrorMessage(error),
+          });
+        }
+      }
+    };
+
+    completeVerificationLink();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const signUpWithEmail = useCallback(async (email, password) => {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
-    await sendEmailVerification(credential.user);
+    await sendEmailVerification(
+      credential.user,
+      getEmailVerificationActionCodeSettings()
+    );
     return credential;
   }, []);
 
@@ -116,7 +175,14 @@ export function AuthProvider({ children }) {
     if (!auth.currentUser) {
       throw new Error("You must be signed in to resend the verification email.");
     }
-    await sendEmailVerification(auth.currentUser);
+    await sendEmailVerification(
+      auth.currentUser,
+      getEmailVerificationActionCodeSettings()
+    );
+  }, []);
+
+  const resetEmailLinkVerification = useCallback(() => {
+    setEmailLinkVerification(idleEmailLinkVerification);
   }, []);
 
   const reloadUser = useCallback(async () => {
@@ -144,6 +210,8 @@ export function AuthProvider({ children }) {
       resendVerificationEmail,
       reloadUser,
       logOut,
+      emailLinkVerification,
+      resetEmailLinkVerification,
     }),
     [
       user,
@@ -155,6 +223,8 @@ export function AuthProvider({ children }) {
       resendVerificationEmail,
       reloadUser,
       logOut,
+      emailLinkVerification,
+      resetEmailLinkVerification,
     ]
   );
 

@@ -46,6 +46,7 @@ export default function PatientsPage() {
   const [form, setForm] = useState(emptyPatientForm());
   const [saving, setSaving] = useState(false);
   const [deletingBillId, setDeletingBillId] = useState(null);
+  const [deletingPatientId, setDeletingPatientId] = useState(null);
 
   const loadPatients = useCallback(async () => {
     if (!user) {
@@ -225,31 +226,49 @@ export default function PatientsPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!user || !patientId || !selectedPatient) {
-      return;
-    }
-    const patientName = selectedPatient.name || "this patient";
-    const billCount = patientBills.length;
+  const confirmDeletePatient = (patient, billCount = 0) => {
+    const patientName = patient?.name || "this patient";
+    const id = patient?.id || patientId;
     const billWarning =
       billCount > 0
         ? `\n\nAll ${billCount} medical bill${billCount === 1 ? "" : "s"} linked to this patient will also be permanently deleted from Past bills.`
-        : "";
-    if (
-      !window.confirm(
-        `Permanently delete patient "${patientName}"?\n\nPatient ID: ${patientId}${billWarning}\n\nThis action cannot be undone.`
-      )
-    ) {
+        : "\n\nAll medical bills linked to this patient will also be permanently deleted.";
+    return window.confirm(
+      `Permanently delete patient "${patientName}"?\n\nPatient ID: ${id}${billWarning}\n\nThis action cannot be undone.`
+    );
+  };
+
+  const handleDeletePatient = async (patient, { billCount = 0, redirect = false } = {}) => {
+    if (!user?.uid || !patient?.id) {
       return;
     }
+    if (!confirmDeletePatient(patient, billCount)) {
+      return;
+    }
+
+    const patientName = patient.name || "Patient";
+    setDeletingPatientId(patient.id);
+    setError("");
+    setSyncMessage("");
     try {
-      await deletePatient(user.uid, patientId);
-      navigate("/patients");
+      await deletePatient(user.uid, patient.id);
+      if (redirect) {
+        navigate("/patients");
+      }
       await loadPatients();
+      setSyncMessage(`Patient "${patientName}" deleted.`);
     } catch (err) {
       setError(err.message || "Unable to delete patient.");
+    } finally {
+      setDeletingPatientId(null);
     }
   };
+
+  const handleDelete = () =>
+    handleDeletePatient(selectedPatient, {
+      billCount: patientBills.length,
+      redirect: true,
+    });
 
   return (
     <motion.div className="check-page" {...pageTransition}>
@@ -323,7 +342,12 @@ export default function PatientsPage() {
               </p>
             )}
 
-            <PatientList patients={patients} mode="link" />
+            <PatientList
+              patients={patients}
+              mode="link"
+              onDelete={(patient) => handleDeletePatient(patient)}
+              deletingId={deletingPatientId}
+            />
           </>
         ) : (
           <>
@@ -351,13 +375,23 @@ export default function PatientsPage() {
                       Check bill for this patient
                     </Link>
                     {!editing && (
-                      <button
-                        type="button"
-                        className="bill-editor-secondary"
-                        onClick={() => setEditing(true)}
-                      >
-                        Edit profile
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          className="bill-editor-secondary"
+                          onClick={() => setEditing(true)}
+                        >
+                          Edit profile
+                        </button>
+                        <button
+                          type="button"
+                          className="bill-editor-secondary patient-delete-action"
+                          disabled={Boolean(deletingPatientId)}
+                          onClick={handleDelete}
+                        >
+                          {deletingPatientId ? "Deleting…" : "Delete patient"}
+                        </button>
+                      </>
                     )}
                   </div>
                 </header>
@@ -454,16 +488,11 @@ export default function PatientsPage() {
                   </ul>
                 </section>
 
-                <button
-                  type="button"
-                  className="patient-delete-btn"
-                  onClick={handleDelete}
-                >
-                  Delete patient
-                </button>
               </>
             )}
-            {error && !selectedPatient && <p className="error-text">{error}</p>}
+            {error && (!selectedPatient || !editing) && (
+              <p className="error-text">{error}</p>
+            )}
           </>
         )}
       </main>
