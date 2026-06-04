@@ -15,6 +15,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import HistoryPage from "./pages/HistoryPage";
 import PatientsPage from "./pages/PatientsPage";
+import AccountSettingsPage from "./pages/AccountSettingsPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import PatientForm, { emptyPatientForm } from "./components/PatientForm";
 import PatientList from "./components/PatientList";
@@ -109,6 +110,9 @@ function UserNav({ className = "" }) {
       </Link>
       <Link to="/history" className="user-nav-link">
         Past bills
+      </Link>
+      <Link to="/account" className="user-nav-link">
+        Account
       </Link>
       <span className="user-nav-email">{user.email || "Signed in"}</span>
       <button
@@ -1256,6 +1260,14 @@ function AppRoutes() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route
+          path="/account"
+          element={
+            <ProtectedRoute>
+              <AccountSettingsPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/check"
           element={

@@ -5,6 +5,13 @@ export function getEmailVerificationActionCodeSettings() {
   };
 }
 
+export function getAccountActionCodeSettings() {
+  return {
+    url: `${window.location.origin}/account`,
+    handleCodeInApp: true,
+  };
+}
+
 export function getEmailVerificationLinkParams() {
   const params = new URLSearchParams(window.location.search);
   const mode = params.get("mode");
