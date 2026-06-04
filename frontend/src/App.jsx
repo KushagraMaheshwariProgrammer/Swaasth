@@ -679,12 +679,15 @@ function CheckPage() {
             markLocalBillSynced(user.uid, localId, firestoreId);
             setSaveMessage("Bill saved to your account.");
           })
-          .catch((saveErr) =>
+          .catch((saveErr) => {
+            const offline = typeof navigator !== "undefined" && !navigator.onLine;
             setSaveMessage(
               saveErr.message ||
-                "Comparison saved on this device. It will sync when you open Past bills."
-            )
-          );
+                (offline
+                  ? "Comparison saved on this device. It will sync when you're back online."
+                  : "Comparison saved on this device. Open Past bills to retry syncing to your account.")
+            );
+          });
       }
     } catch (err) {
       setError(err.message || "Something went wrong during comparison.");

@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { getAccountErrorMessage } from "../auth/accountSecurity";
 import { useAuth, needsEmailVerification as userNeedsEmailVerification } from "../context/AuthContext";
 
 const pageTransition = {
@@ -44,12 +43,9 @@ export default function LoginPage() {
   const {
     user,
     needsEmailVerification,
-    mfaResolver,
     signInWithEmail,
     signUpWithEmail,
     signInWithGoogle,
-    completeMfaSignIn,
-    cancelMfaSignIn,
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -57,7 +53,6 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [mfaCode, setMfaCode] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,10 +105,6 @@ export default function LoginPage() {
       }
       navigate(redirectTo, { replace: true });
     } catch (err) {
-      if (err?.code === "auth/multi-factor-auth-required") {
-        setError("");
-        return;
-      }
       setError(getAuthErrorMessage(err));
     } finally {
       setIsSubmitting(false);
@@ -132,93 +123,11 @@ export default function LoginPage() {
         setInfo("Redirecting to Google sign-in...");
       }
     } catch (err) {
-      if (err?.code === "auth/multi-factor-auth-required") {
-        setError("");
-        return;
-      }
       setError(getAuthErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  const handleMfaSubmit = async (event) => {
-    event.preventDefault();
-    setError("");
-    setInfo("");
-    setIsSubmitting(true);
-    try {
-      const credential = await completeMfaSignIn(mfaCode);
-      if (userNeedsEmailVerification(credential.user)) {
-        navigate("/verify-email", {
-          replace: true,
-          state: { from: location.state?.from, email: credential.user.email || email.trim() },
-        });
-        return;
-      }
-      navigate(redirectTo, { replace: true });
-    } catch (err) {
-      setError(getAccountErrorMessage(err));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  if (mfaResolver) {
-    return (
-      <motion.div className="auth-page" {...pageTransition}>
-        <main className="auth-wrap">
-          <Link to="/" className="back-link">
-            ← Back
-          </Link>
-
-          <section className="auth-card">
-            <header className="auth-header">
-              <h1>Two-factor authentication</h1>
-              <p>Enter the 6-digit code from your authenticator app to finish signing in.</p>
-            </header>
-
-            <form className="auth-form" onSubmit={handleMfaSubmit}>
-              <label className="setting-field setting-field-full">
-                <span>Authentication code</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  pattern="[0-9]{6}"
-                  maxLength={6}
-                  value={mfaCode}
-                  onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, ""))}
-                  required
-                />
-              </label>
-              <button
-                type="submit"
-                className="analyze-btn auth-submit-btn"
-                disabled={isSubmitting || mfaCode.length !== 6}
-              >
-                {isSubmitting ? "Verifying..." : "Verify and sign in"}
-              </button>
-              <button
-                type="button"
-                className="auth-toggle-btn"
-                onClick={() => {
-                  cancelMfaSignIn();
-                  setMfaCode("");
-                  setError("");
-                }}
-                disabled={isSubmitting}
-              >
-                Back to sign in
-              </button>
-            </form>
-
-            {error && <p className="error-text">{error}</p>}
-          </section>
-        </main>
-      </motion.div>
-    );
-  }
 
   return (
     <motion.div className="auth-page" {...pageTransition}>

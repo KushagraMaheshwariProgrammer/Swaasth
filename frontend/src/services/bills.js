@@ -198,14 +198,28 @@ export async function syncPendingBills(userId) {
   return syncedCount;
 }
 
+export function getPendingBillSyncMessage(pendingCount) {
+  if (pendingCount <= 0) {
+    return "";
+  }
+  const label = `${pendingCount} bill${pendingCount === 1 ? "" : "s"} saved on this device`;
+  const offline = typeof navigator !== "undefined" && !navigator.onLine;
+  if (offline) {
+    return `${label} — will sync when you're back online.`;
+  }
+  return `${label} — couldn't reach your account. Reopen this page to retry.`;
+}
+
 export async function getUserBills(userId) {
   if (!userId) {
     return [];
   }
 
-  syncPendingBills(userId).catch((error) => {
+  try {
+    await syncPendingBills(userId);
+  } catch (error) {
     console.error("Background bill sync failed:", error);
-  });
+  }
 
   let cloudBills = [];
   try {
