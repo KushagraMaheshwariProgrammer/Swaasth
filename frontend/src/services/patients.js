@@ -283,6 +283,10 @@ export async function updatePatient(userId, patientId, patientData) {
 }
 
 export async function deletePatient(userId, patientId) {
+  if (!userId || !patientId) {
+    throw new Error("Missing patient or user.");
+  }
+
   const patientIds = collectPatientIdVariants(userId, patientId);
   await deleteBillsForPatientIds(userId, patientIds);
 
@@ -292,16 +296,19 @@ export async function deletePatient(userId, patientId) {
   );
   const firestoreId = localMatch?.firestoreId || patientId;
 
-  removeLocalPatient(userId, patientId);
-
   try {
     await withTimeout(deleteDoc(patientDocRef(userId, firestoreId)));
   } catch (error) {
-    const localStill = getLocalPatientById(userId, patientId);
-    if (localStill) {
+    const code = error?.code || "";
+    if (code === "permission-denied") {
       throw new Error(firebaseErrorMessage(error));
     }
+    if (code !== "not-found") {
+      console.error("Cloud patient delete failed:", error);
+    }
   }
+
+  removeLocalPatient(userId, patientId);
 }
 
 export async function getPatientBills(userId, patientId) {

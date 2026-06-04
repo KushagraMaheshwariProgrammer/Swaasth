@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth, needsEmailVerification as userNeedsEmailVerification } from "../context/AuthContext";
 
 const pageTransition = {
   initial: { opacity: 0, y: 12 },
@@ -95,7 +95,14 @@ export default function LoginPage() {
         return;
       }
 
-      await signInWithEmail(email.trim(), password);
+      const credential = await signInWithEmail(email.trim(), password);
+      if (userNeedsEmailVerification(credential.user)) {
+        navigate("/verify-email", {
+          replace: true,
+          state: { from: location.state?.from, email: email.trim() },
+        });
+        return;
+      }
       navigate(redirectTo, { replace: true });
     } catch (err) {
       setError(getAuthErrorMessage(err));
