@@ -9,6 +9,7 @@ import {
 import {
   applyActionCode,
   createUserWithEmailAndPassword,
+  getMultiFactorResolver,
   getRedirectResult,
   GoogleAuthProvider,
   onAuthStateChanged,
@@ -17,7 +18,19 @@ import {
   signInWithPopup,
   signInWithRedirect,
   signOut,
+  TotpMultiFactorGenerator,
 } from "firebase/auth";
+import {
+  changeUserEmail,
+  changeUserPassword,
+  enrollTotpMfa,
+  generateTotpEnrollment,
+  getTotpFactors,
+  hasTotpMfa,
+  reauthenticateCurrentUser,
+  unenrollTotpMfa,
+  usesPasswordProvider,
+} from "../auth/accountSecurity";
 import {
   clearEmailVerificationLinkParams,
   getEmailVerificationActionCodeSettings,
@@ -54,6 +67,7 @@ export function AuthProvider({ children }) {
   const [emailLinkVerification, setEmailLinkVerification] = useState(
     idleEmailLinkVerification
   );
+  const [mfaResolver, setMfaResolver] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -150,13 +164,24 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signInWithEmail = useCallback(async (email, password) => {
-    return signInWithEmailAndPassword(auth, email, password);
+    try {
+      return await signInWithEmailAndPassword(auth, email, password);
+    } catch (error) {
+      if (error?.code === "auth/multi-factor-auth-required") {
+        setMfaResolver(getMultiFactorResolver(auth, error));
+      }
+      throw error;
+    }
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
     try {
       return await signInWithPopup(auth, googleProvider);
     } catch (error) {
+      if (error?.code === "auth/multi-factor-auth-required") {
+        setMfaResolver(getMultiFactorResolver(auth, error));
+        throw error;
+      }
       const popupIssues = new Set([
         "auth/popup-blocked",
         "auth/popup-closed-by-user",
@@ -170,6 +195,63 @@ export function AuthProvider({ children }) {
       throw error;
     }
   }, []);
+
+  const completeMfaSignIn = useCallback(async (verificationCode) => {
+    if (!mfaResolver) {
+      throw new Error("No two-factor sign-in is in progress.");
+    }
+    const totpHint = mfaResolver.hints.find(
+      (hint) => hint.factorId === TotpMultiFactorGenerator.FACTOR_ID
+    );
+    if (!totpHint) {
+      throw new Error("Unsupported second factor. Use an authenticator app.");
+    }
+    const assertion = TotpMultiFactorGenerator.assertionForSignIn(
+      totpHint.uid,
+      verificationCode.trim()
+    );
+    const credential = await mfaResolver.resolveSignIn(assertion);
+    setMfaResolver(null);
+    return credential;
+  }, [mfaResolver]);
+
+  const cancelMfaSignIn = useCallback(() => {
+    setMfaResolver(null);
+  }, []);
+
+  const reloadUser = useCallback(async () => {
+    if (!auth.currentUser) {
+      return null;
+    }
+    await auth.currentUser.reload();
+    const refreshed = auth.currentUser;
+    setUser(refreshed);
+    return refreshed;
+  }, []);
+
+  const changePassword = useCallback(async (currentPassword, newPassword) => {
+    await changeUserPassword(currentPassword, newPassword);
+    await reloadUser();
+  }, [reloadUser]);
+
+  const changeEmail = useCallback(async (currentPassword, newEmail) => {
+    await changeUserEmail(currentPassword, newEmail);
+  }, []);
+
+  const startTotpEnrollment = useCallback(async (currentPassword) => {
+    await reauthenticateCurrentUser(currentPassword);
+    return generateTotpEnrollment();
+  }, []);
+
+  const finishTotpEnrollment = useCallback(async (totpSecret, verificationCode) => {
+    await enrollTotpMfa(totpSecret, verificationCode);
+    await reloadUser();
+  }, [reloadUser]);
+
+  const removeTotpMfa = useCallback(async (factorUid, currentPassword) => {
+    await unenrollTotpMfa(factorUid, currentPassword);
+    await reloadUser();
+  }, [reloadUser]);
 
   const resendVerificationEmail = useCallback(async () => {
     if (!auth.currentUser) {
@@ -185,17 +267,8 @@ export function AuthProvider({ children }) {
     setEmailLinkVerification(idleEmailLinkVerification);
   }, []);
 
-  const reloadUser = useCallback(async () => {
-    if (!auth.currentUser) {
-      return null;
-    }
-    await auth.currentUser.reload();
-    const refreshed = auth.currentUser;
-    setUser(refreshed);
-    return refreshed;
-  }, []);
-
   const logOut = useCallback(async () => {
+    setMfaResolver(null);
     return signOut(auth);
   }, []);
 
@@ -204,12 +277,23 @@ export function AuthProvider({ children }) {
       user,
       loading: loading || !redirectHandled,
       needsEmailVerification: needsEmailVerification(user),
+      usesPasswordProvider: usesPasswordProvider(user),
+      hasTotpMfa: hasTotpMfa(user),
+      totpFactors: getTotpFactors(user),
+      mfaResolver,
       signUpWithEmail,
       signInWithEmail,
       signInWithGoogle,
+      completeMfaSignIn,
+      cancelMfaSignIn,
       resendVerificationEmail,
       reloadUser,
       logOut,
+      changePassword,
+      changeEmail,
+      startTotpEnrollment,
+      finishTotpEnrollment,
+      removeTotpMfa,
       emailLinkVerification,
       resetEmailLinkVerification,
     }),
@@ -217,12 +301,20 @@ export function AuthProvider({ children }) {
       user,
       loading,
       redirectHandled,
+      mfaResolver,
       signUpWithEmail,
       signInWithEmail,
       signInWithGoogle,
+      completeMfaSignIn,
+      cancelMfaSignIn,
       resendVerificationEmail,
       reloadUser,
       logOut,
+      changePassword,
+      changeEmail,
+      startTotpEnrollment,
+      finishTotpEnrollment,
+      removeTotpMfa,
       emailLinkVerification,
       resetEmailLinkVerification,
     ]
