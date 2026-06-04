@@ -12,3 +12,7 @@ backend/venv/
 venv/
 __pycache__/
 *.pyc
+backend/data/indian_pharmaceutical_products.csv
+backend/data/indian_pharmaceutical_products_clean.csv
+backend/data/az_medicines_india.csv
+backend/data/A_Z_medicines_dataset_of_India.csv
