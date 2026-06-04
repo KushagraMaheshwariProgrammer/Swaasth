@@ -2016,34 +2016,3 @@ body {
   color: var(--text-secondary);
   font-size: 0.92rem;
 }
-
-.account-mfa-status {
-  margin: 0 0 1rem;
-  font-size: 0.95rem;
-}
-
-.account-mfa-qr-wrap {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 0.75rem;
-}
-
-.account-mfa-qr {
-  border-radius: var(--neu-radius-sm);
-  background: #fff;
-  padding: 0.5rem;
-}
-
-.account-mfa-secret {
-  word-break: break-all;
-  font-size: 0.85rem;
-}
-
-.account-danger-btn {
-  width: 100%;
-}
-
-.account-cancel-btn {
-  justify-self: center;
-  margin-top: 0.25rem;
-}

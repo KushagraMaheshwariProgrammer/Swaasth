@@ -28,17 +28,7 @@ function PasswordField({ label, value, onChange, autoComplete }) {
 }
 
 export default function AccountSettingsPage() {
-  const {
-    user,
-    usesPasswordProvider,
-    hasTotpMfa,
-    totpFactors,
-    changePassword,
-    changeEmail,
-    startTotpEnrollment,
-    finishTotpEnrollment,
-    removeTotpMfa,
-  } = useAuth();
+  const { user, usesPasswordProvider, changePassword, changeEmail } = useAuth();
 
   const [passwordForm, setPasswordForm] = useState({
     current: "",
@@ -49,21 +39,14 @@ export default function AccountSettingsPage() {
     currentPassword: "",
     nextEmail: "",
   });
-  const [securityPassword, setSecurityPassword] = useState("");
-  const [mfaSetup, setMfaSetup] = useState(null);
-  const [mfaCode, setMfaCode] = useState("");
-  const [disablePassword, setDisablePassword] = useState("");
 
   const [passwordInfo, setPasswordInfo] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [emailInfo, setEmailInfo] = useState("");
   const [emailError, setEmailError] = useState("");
-  const [mfaInfo, setMfaInfo] = useState("");
-  const [mfaError, setMfaError] = useState("");
 
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
   const [emailSubmitting, setEmailSubmitting] = useState(false);
-  const [mfaSubmitting, setMfaSubmitting] = useState(false);
 
   const handlePasswordChange = async (event) => {
     event.preventDefault();
@@ -106,56 +89,6 @@ export default function AccountSettingsPage() {
     }
   };
 
-  const handleStartMfa = async () => {
-    setMfaInfo("");
-    setMfaError("");
-    setMfaSubmitting(true);
-    try {
-      const enrollment = await startTotpEnrollment(securityPassword);
-      setMfaSetup(enrollment);
-      setSecurityPassword("");
-      setMfaInfo("Scan the QR code with Google Authenticator, Authy, or a similar app.");
-    } catch (error) {
-      setMfaError(getAccountErrorMessage(error));
-    } finally {
-      setMfaSubmitting(false);
-    }
-  };
-
-  const handleFinishMfa = async (event) => {
-    event.preventDefault();
-    setMfaInfo("");
-    setMfaError("");
-    setMfaSubmitting(true);
-    try {
-      await finishTotpEnrollment(mfaSetup.totpSecret, mfaCode);
-      setMfaSetup(null);
-      setMfaCode("");
-      setMfaInfo("Two-factor authentication is now enabled.");
-    } catch (error) {
-      setMfaError(getAccountErrorMessage(error));
-    } finally {
-      setMfaSubmitting(false);
-    }
-  };
-
-  const handleDisableMfa = async (event) => {
-    event.preventDefault();
-    setMfaInfo("");
-    setMfaError("");
-    setMfaSubmitting(true);
-    try {
-      const factorUid = totpFactors[0]?.uid;
-      await removeTotpMfa(factorUid, disablePassword);
-      setDisablePassword("");
-      setMfaInfo("Two-factor authentication has been disabled.");
-    } catch (error) {
-      setMfaError(getAccountErrorMessage(error));
-    } finally {
-      setMfaSubmitting(false);
-    }
-  };
-
   const identityLabel = usesPasswordProvider
     ? "Email and password"
     : "Google sign-in";
@@ -170,7 +103,7 @@ export default function AccountSettingsPage() {
         </div>
 
         <header className="check-header">
-          <h1>Account & security</h1>
+          <h1>Account settings</h1>
           <p>
             Signed in as <strong>{user?.email || "your account"}</strong> via {identityLabel}.
           </p>
@@ -254,122 +187,14 @@ export default function AccountSettingsPage() {
           </section>
         )}
 
-        <section className="account-section">
-          <h2>Two-factor authentication</h2>
-          <p className="account-section-copy">
-            Add an authenticator app for a second sign-in step. Required on every login once enabled.
-          </p>
-
-          {hasTotpMfa ? (
-            <>
-              <p className="account-mfa-status">
-                Status: <strong>Enabled</strong>
-                {totpFactors[0]?.displayName ? ` (${totpFactors[0].displayName})` : ""}
-              </p>
-              <form className="auth-form" onSubmit={handleDisableMfa}>
-                {usesPasswordProvider ? (
-                  <PasswordField
-                    label="Current password"
-                    value={disablePassword}
-                    onChange={setDisablePassword}
-                    autoComplete="current-password"
-                  />
-                ) : (
-                  <p className="account-section-copy">
-                    Confirm with Google when prompted to disable two-factor authentication.
-                  </p>
-                )}
-                <button
-                  type="submit"
-                  className="bill-editor-secondary account-danger-btn"
-                  disabled={mfaSubmitting}
-                >
-                  {mfaSubmitting ? "Disabling..." : "Disable two-factor authentication"}
-                </button>
-              </form>
-            </>
-          ) : mfaSetup ? (
-            <form className="auth-form" onSubmit={handleFinishMfa}>
-              <div className="account-mfa-qr-wrap">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(mfaSetup.qrCodeUrl)}`}
-                  alt="Scan with your authenticator app"
-                  className="account-mfa-qr"
-                  width="180"
-                  height="180"
-                />
-              </div>
-              <p className="account-section-copy">
-                Or enter this key manually:{" "}
-                <code className="account-mfa-secret">{mfaSetup.secretKey}</code>
-              </p>
-              <label className="setting-field setting-field-full">
-                <span>6-digit code from authenticator</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  pattern="[0-9]{6}"
-                  maxLength={6}
-                  value={mfaCode}
-                  onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, ""))}
-                  required
-                />
-              </label>
-              <button
-                type="submit"
-                className="analyze-btn auth-submit-btn"
-                disabled={mfaSubmitting || mfaCode.length !== 6}
-              >
-                {mfaSubmitting ? "Verifying..." : "Enable two-factor authentication"}
-              </button>
-              <button
-                type="button"
-                className="auth-toggle-btn account-cancel-btn"
-                onClick={() => {
-                  setMfaSetup(null);
-                  setMfaCode("");
-                  setMfaInfo("");
-                  setMfaError("");
-                }}
-                disabled={mfaSubmitting}
-              >
-                Cancel setup
-              </button>
-            </form>
-          ) : (
-            <form
-              className="auth-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                handleStartMfa();
-              }}
-            >
-              {usesPasswordProvider ? (
-                <PasswordField
-                  label="Current password"
-                  value={securityPassword}
-                  onChange={setSecurityPassword}
-                  autoComplete="current-password"
-                />
-              ) : (
-                <p className="account-section-copy">
-                  Confirm with Google when prompted to begin setup.
-                </p>
-              )}
-              <button
-                type="submit"
-                className="analyze-btn auth-submit-btn"
-                disabled={mfaSubmitting}
-              >
-                {mfaSubmitting ? "Starting..." : "Set up authenticator app"}
-              </button>
-            </form>
-          )}
-
-          {mfaInfo && <p className="auth-info">{mfaInfo}</p>}
-          {mfaError && <p className="error-text">{mfaError}</p>}
-        </section>
+        {!usesPasswordProvider && (
+          <section className="account-section">
+            <p className="account-section-copy">
+              Your email and sign-in method are managed through Google. Use your Google account
+              settings to update them.
+            </p>
+          </section>
+        )}
       </main>
     </motion.div>
   );

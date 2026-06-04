@@ -1,8 +1,6 @@
 import {
   EmailAuthProvider,
   GoogleAuthProvider,
-  TotpMultiFactorGenerator,
-  multiFactor,
   reauthenticateWithCredential,
   reauthenticateWithPopup,
   updatePassword,
@@ -16,19 +14,6 @@ googleProvider.setCustomParameters({ prompt: "login" });
 
 export function usesPasswordProvider(user) {
   return user?.providerData?.some((provider) => provider.providerId === "password") ?? false;
-}
-
-export function getTotpFactors(user) {
-  if (!user) {
-    return [];
-  }
-  return multiFactor(user).enrolledFactors.filter(
-    (factor) => factor.factorId === TotpMultiFactorGenerator.FACTOR_ID
-  );
-}
-
-export function hasTotpMfa(user) {
-  return getTotpFactors(user).length > 0;
 }
 
 export function getAccountErrorMessage(error) {
@@ -50,9 +35,6 @@ export function getAccountErrorMessage(error) {
   }
   if (code === "auth/too-many-requests") {
     return "Too many attempts. Please wait a few minutes and try again.";
-  }
-  if (code === "auth/invalid-verification-code") {
-    return "Invalid authentication code. Use the latest code from your app.";
   }
   if (code === "auth/unverified-email") {
     return "Verify your current email before changing it.";
@@ -88,34 +70,4 @@ export async function changeUserEmail(currentPassword, newEmail) {
     newEmail.trim(),
     getAccountActionCodeSettings()
   );
-}
-
-export async function generateTotpEnrollment() {
-  const user = auth.currentUser;
-  const session = await multiFactor(user).getSession();
-  const totpSecret = await TotpMultiFactorGenerator.generateSecret(session);
-  return {
-    totpSecret,
-    qrCodeUrl: totpSecret.generateQrCodeUrl(user.email, "BillCheck"),
-    secretKey: totpSecret.secretKey,
-  };
-}
-
-export async function enrollTotpMfa(totpSecret, verificationCode, displayName = "Authenticator app") {
-  const assertion = TotpMultiFactorGenerator.assertionForEnrollment(
-    totpSecret,
-    verificationCode.trim()
-  );
-  await multiFactor(auth.currentUser).enroll(assertion, displayName);
-}
-
-export async function unenrollTotpMfa(factorUid, currentPassword) {
-  await reauthenticateCurrentUser(currentPassword);
-  const factor = multiFactor(auth.currentUser).enrolledFactors.find(
-    (entry) => entry.uid === factorUid
-  );
-  if (!factor) {
-    throw new Error("Authenticator not found.");
-  }
-  await multiFactor(auth.currentUser).unenroll(factor);
 }

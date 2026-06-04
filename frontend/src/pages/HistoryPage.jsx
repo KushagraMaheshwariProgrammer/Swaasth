@@ -13,6 +13,7 @@ import {
   deleteBill,
   getBill,
   getBillSortTime,
+  getPendingBillSyncMessage,
   getUserBills,
   getUserBillsLocalSnapshot,
 } from "../services/bills";
@@ -123,10 +124,9 @@ export default function HistoryPage() {
           }
           setPatientNameById(buildPatientNameMap(patients));
           const pendingLocal = entries.filter((bill) => bill.localOnly).length;
-          if (pendingLocal > 0) {
-            setSyncMessage(
-              `${pendingLocal} bill${pendingLocal === 1 ? "" : "s"} saved on this device — will sync when online.`
-            );
+          const syncMessage = getPendingBillSyncMessage(pendingLocal);
+          if (syncMessage) {
+            setSyncMessage(syncMessage);
           }
           setBills(entries);
           setSelectedBill(null);
