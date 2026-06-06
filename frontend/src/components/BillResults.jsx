@@ -127,7 +127,7 @@ export default function BillResults({ result, toolbar = null }) {
             ? item.hbp_rate
             : item.cghs_rate;
           const referenceLabel = isMedicine
-            ? "Market MRP"
+            ? "NPPA Ceiling"
             : isHbp
             ? "PM-JAY HBP Rate"
             : "CGHS Rate";
@@ -148,8 +148,10 @@ export default function BillResults({ result, toolbar = null }) {
                     : item.cghs_code
                     ? ` (${item.cghs_code})`
                     : ""}
-                  {item.pharma_product_id ? ` (ID ${item.pharma_product_id})` : ""}
-                  {item.pharma_database === "backup" ? " · backup database" : ""}
+                  {item.pharma_product_id ? ` (NPPA #${item.pharma_product_id})` : ""}
+                  {item.pharma_database === "nppa_via_az" && item.resolved_generic_name
+                    ? ` · resolved from brand`
+                    : ""}
                   {item.approximate_match ? " · approximate" : ""}
                 </p>
               )}
@@ -167,12 +169,13 @@ export default function BillResults({ result, toolbar = null }) {
                   <h5>{formatCurrency(item.price_difference)}</h5>
                 </div>
               </div>
-              {isMedicine && item.pharma_manufacturer && (
+              {isMedicine && (item.resolved_generic_name || item.pharma_price_basis) && (
                 <p className="rate-breakdown">
-                  {item.pharma_manufacturer}
-                  {item.pharma_pack_size ? ` · pack of ${item.pharma_pack_size}` : ""}
+                  {item.resolved_generic_name
+                    ? `Generic: ${item.resolved_generic_name}`
+                    : ""}
                   {item.pharma_price_basis
-                    ? ` · compared as ${item.pharma_price_basis}`
+                    ? `${item.resolved_generic_name ? " · " : ""}per ${item.pharma_price_basis}`
                     : ""}
                 </p>
               )}
