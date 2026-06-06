@@ -85,23 +85,23 @@ def load_reference_data() -> None:
 
     try:
         pharma = get_pharma_store()
-        backup_count = len(pharma.backup.rows) if pharma.backup else 0
+        az_count = len(pharma.az.rows) if pharma.az else 0
         print(
-            f"Loaded {len(pharma.primary.rows)} primary pharmaceutical products "
-            f"from {pharma.primary.csv_path}"
+            f"Loaded {len(pharma.nppa.rows)} NPPA ceiling prices "
+            f"from {pharma.nppa.csv_path}"
         )
-        if backup_count:
+        if az_count:
             print(
-                f"Loaded {backup_count} backup pharmaceutical products "
-                f"from {pharma.backup.csv_path}"
+                f"Loaded {az_count} brand-to-generic mappings "
+                f"from {pharma.az.csv_path}"
             )
         else:
             print(
-                "WARNING: Backup pharmaceutical dataset not loaded. "
+                "WARNING: AZ brand dataset not loaded (brand resolution disabled). "
                 "Run: python backend/scripts/download_pharma_backup_dataset.py"
             )
     except Exception as exc:
-        print(f"WARNING: Pharmaceutical price dataset failed to load: {exc}")
+        print(f"WARNING: NPPA price dataset failed to load: {exc}")
 
 
 @app.get("/health")
@@ -662,19 +662,19 @@ def _build_comparison_response(
             rates_source["total_hbp_procedures_loaded"] = 0
     try:
         pharma_store = get_pharma_store()
-        rates_source["pharma_file"] = str(pharma_store.primary.csv_path.name)
-        rates_source["total_medicines_loaded"] = len(pharma_store.primary.rows)
-        if pharma_store.backup:
-            rates_source["pharma_backup_file"] = str(pharma_store.backup.csv_path.name)
-            rates_source["total_backup_medicines_loaded"] = len(pharma_store.backup.rows)
+        rates_source["nppa_file"] = str(pharma_store.nppa.csv_path.name)
+        rates_source["total_nppa_entries"] = len(pharma_store.nppa.rows)
+        if pharma_store.az:
+            rates_source["az_brand_file"] = str(pharma_store.az.csv_path.name)
+            rates_source["az_brand_index_size"] = len(pharma_store.az.rows)
         else:
-            rates_source["pharma_backup_file"] = None
-            rates_source["total_backup_medicines_loaded"] = 0
+            rates_source["az_brand_file"] = None
+            rates_source["az_brand_index_size"] = 0
     except Exception:
-        rates_source["pharma_file"] = None
-        rates_source["total_medicines_loaded"] = 0
-        rates_source["pharma_backup_file"] = None
-        rates_source["total_backup_medicines_loaded"] = 0
+        rates_source["nppa_file"] = None
+        rates_source["total_nppa_entries"] = 0
+        rates_source["az_brand_file"] = None
+        rates_source["az_brand_index_size"] = 0
 
     patient_payload: dict[str, Any] | None = None
     if patient_id or patient_name:

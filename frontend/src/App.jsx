@@ -953,7 +953,7 @@ function CheckPage() {
               {selectedPatient?.ayushmanEligible && (
                 <p className="comparison-settings-hint pmjay-hint">
                   Procedures and tests will be compared against Ayushman Bharat HBP
-                  2022 rates (medicines use market MRP).
+                  2022 rates (medicines use NPPA ceiling prices).
                 </p>
               )}
 

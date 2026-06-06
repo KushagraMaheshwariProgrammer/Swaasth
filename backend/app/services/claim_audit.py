@@ -306,7 +306,7 @@ def analyze_claim_items(
         item = entry["item"]
         if entry["category"] != "medicine" or item.get("flag") != "overpriced":
             continue
-        reference = item.get("matched_reference_item") or "market reference"
+        reference = item.get("matched_reference_item") or "NPPA reference"
         pharma_rate = item.get("pharma_rate")
         charged = item.get("total_price")
         diff = item.get("price_difference")
@@ -316,12 +316,12 @@ def analyze_claim_items(
                 "severity": "HIGH",
                 "item": entry["name"],
                 "reason": (
-                    f"Charged {charged} vs expected market price ~{pharma_rate} for "
+                    f"Charged {charged} vs NPPA ceiling {pharma_rate} for "
                     f'"{reference}" (difference: {diff}).'
                 ),
                 "recommendation": (
-                    "Verify the medicine name, pack size, and MRP on the pharmacy label "
-                    "or 1mg/Netmeds before paying."
+                    "Verify the medicine name, strength, and dosage form against "
+                    "the NPPA ceiling price schedule before paying."
                 ),
             }
         )

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Download AZ medicine dataset (backup) from Kaggle into backend/data."""
+"""Download AZ medicine dataset from Kaggle for brand-to-generic name resolution.
+
+This dataset maps branded medicine names to their generic ingredients via
+short_composition1/short_composition2 columns. Prices from this dataset are
+NOT used — pricing comes from the NPPA ceiling price list.
+"""
 
 from __future__ import annotations
 
