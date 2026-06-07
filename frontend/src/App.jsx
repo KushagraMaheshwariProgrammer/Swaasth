@@ -22,7 +22,8 @@ import PatientList from "./components/PatientList";
 import { createPatient, getPatients, getPatientsLocalSnapshot } from "./services/patients";
 import { markLocalBillSynced, persistLocalBill, saveBill } from "./services/bills";
 
-const API_BASE = "http://127.0.0.1:8000";
+// Use VITE_API_BASE="" in .env.local to route through the Vite dev proxy (see vite.config.js).
+const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
 const ALLOWED_EXTENSIONS = ["pdf", "jpg", "jpeg", "png"];
 
 const CATEGORY_OPTIONS = [
@@ -343,7 +344,7 @@ function CheckPage() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
-  const [stateCode, setStateCode] = useState("");
+  const [stateUtName, setStateUtName] = useState("");
   const [city, setCity] = useState("");
   const [resolvedTier, setResolvedTier] = useState(null);
   const [hospitalType, setHospitalType] = useState("general");
@@ -483,12 +484,12 @@ function CheckPage() {
   useEffect(() => {
     const loadStates = async () => {
       try {
-        const response = await fetch(`${API_BASE}/locations/states`);
+        const response = await fetch(`${API_BASE}/api/locations/states`);
         const payload = await response.json();
         if (!response.ok) {
           throw new Error(payload?.detail || "Unable to load states.");
         }
-        setStates(payload.states ?? []);
+        setStates(Array.isArray(payload) ? payload : []);
       } catch (err) {
         setLocationError(err.message || "Unable to load state list.");
       }
@@ -497,7 +498,7 @@ function CheckPage() {
   }, []);
 
   useEffect(() => {
-    if (!stateCode) {
+    if (!stateUtName) {
       setCities([]);
       setCity("");
       setResolvedTier(null);
@@ -511,13 +512,13 @@ function CheckPage() {
       setResolvedTier(null);
       try {
         const response = await fetch(
-          `${API_BASE}/locations/cities?state_code=${encodeURIComponent(stateCode)}`
+          `${API_BASE}/api/locations/cities?state=${encodeURIComponent(stateUtName)}`
         );
         const payload = await response.json();
         if (!response.ok) {
           throw new Error(payload?.detail || "Unable to load cities.");
         }
-        setCities(payload.cities ?? []);
+        setCities(Array.isArray(payload) ? payload : []);
       } catch (err) {
         setCities([]);
         setLocationError(err.message || "Unable to load cities for this state.");
@@ -527,18 +528,41 @@ function CheckPage() {
     };
 
     loadCities();
-  }, [stateCode]);
+  }, [stateUtName]);
 
   useEffect(() => {
-    if (!city) {
+    if (!stateUtName || !city) {
       setResolvedTier(null);
       return undefined;
     }
-    const selected = cities.find((entry) => entry.name === city);
-    if (selected) {
-      setResolvedTier(selected);
-    }
-  }, [city, cities]);
+
+    let cancelled = false;
+    const loadTier = async () => {
+      try {
+        const params = new URLSearchParams({
+          state: stateUtName,
+          city,
+        });
+        const response = await fetch(`${API_BASE}/api/locations/tier?${params}`);
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.detail || "Unable to resolve city tier.");
+        }
+        if (!cancelled) {
+          setResolvedTier(payload);
+        }
+      } catch {
+        if (!cancelled) {
+          setResolvedTier(null);
+        }
+      }
+    };
+
+    loadTier();
+    return () => {
+      cancelled = true;
+    };
+  }, [stateUtName, city]);
 
   useEffect(() => {
     if (!isLoading && !isComparing) {
@@ -630,7 +654,7 @@ function CheckPage() {
       return;
     }
 
-    if (!stateCode || !city) {
+    if (!stateUtName || !city) {
       setError("Location settings are missing. Please upload the bill again.");
       return;
     }
@@ -645,7 +669,7 @@ function CheckPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           line_items: validItems,
-          state_code: stateCode,
+          state_ut_name: stateUtName,
           city,
           hospital_type: hospitalType,
           hospital_name: hospitalNameEdit.trim() || null,
@@ -705,8 +729,8 @@ function CheckPage() {
       setError("Please select your hospital bill first.");
       return;
     }
-    if (!stateCode || !city) {
-      setError("Please select the state and city where the hospital is located.");
+    if (!stateUtName || !city) {
+      setError("Please select the state/UT and city where the hospital is located.");
       return;
     }
     setError("");
@@ -719,7 +743,7 @@ function CheckPage() {
 
     try {
       const params = new URLSearchParams({
-        state_code: stateCode,
+        state_ut_name: stateUtName,
         city,
         hospital_type: hospitalType,
       });
@@ -961,15 +985,15 @@ function CheckPage() {
                 <p className="comparison-settings-title">Hospital location</p>
                 <div className="comparison-settings-grid">
                   <label className="setting-field">
-                    <span>State</span>
+                    <span>State/UT</span>
                     <select
-                      value={stateCode}
-                      onChange={(event) => setStateCode(event.target.value)}
+                      value={stateUtName}
+                      onChange={(event) => setStateUtName(event.target.value)}
                     >
-                      <option value="">Select state</option>
-                      {states.map((state) => (
-                        <option key={state.code} value={state.code}>
-                          {state.name}
+                      <option value="">Select state/UT</option>
+                      {states.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
                         </option>
                       ))}
                     </select>
@@ -978,19 +1002,19 @@ function CheckPage() {
                     <span>City</span>
                     <select
                       value={city}
-                      disabled={!stateCode || isLoadingCities}
+                      disabled={!stateUtName || isLoadingCities}
                       onChange={(event) => setCity(event.target.value)}
                     >
                       <option value="">
                         {isLoadingCities
                           ? "Loading cities..."
-                          : stateCode
+                          : stateUtName
                           ? "Select city"
-                          : "Select state first"}
+                          : "Select state/UT first"}
                       </option>
-                      {cities.map((entry) => (
-                        <option key={entry.name} value={entry.name}>
-                          {entry.name}
+                      {cities.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
                         </option>
                       ))}
                     </select>
