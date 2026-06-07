@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "384794855513",
+    "project_id": "swaasth-5bf90",
+    "storage_bucket": "swaasth-5bf90.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:384794855513:android:3c6962c864b98e1734c948",
+        "android_client_info": {
+          "package_name": "swaasth.for.india"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "384794855513-gb1ksnu57492h76rhvbttf5utkahpotj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAZZeorckb2L5Hw3MrzsSHjD9srIMFcy8M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "384794855513-gb1ksnu57492h76rhvbttf5utkahpotj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
