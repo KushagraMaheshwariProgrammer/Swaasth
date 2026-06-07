@@ -18,12 +18,6 @@ DEFAULT_TIER_LABEL = "Tier III (Z City)"
 
 
 @dataclass(frozen=True)
-class StateInfo:
-    code: str
-    name: str
-
-
-@dataclass(frozen=True)
 class CityInfo:
     name: str
     tier_id: str
@@ -38,14 +32,16 @@ def _project_root() -> Path:
 def _default_directory_path() -> Path:
     root = _project_root()
     candidates = [
-        Path(__file__).resolve().parent.parent / "data" / "directory_statse_cities.csv",
-        root / "directory_statse_cities.csv",
+        Path(__file__).resolve().parent.parent
+        / "data"
+        / "india_official_gov_urban_cities_swaasth_sorted.csv",
+        root / "india_official_gov_urban_cities_swaasth_sorted.csv",
     ]
     for path in candidates:
         if path.exists():
             return path
     raise FileNotFoundError(
-        "directory_statse_cities.csv not found. Expected one of: "
+        "india_official_gov_urban_cities_swaasth_sorted.csv not found. Expected one of: "
         + ", ".join(str(p) for p in candidates)
     )
 
@@ -90,8 +86,9 @@ class LocationStore:
     ) -> None:
         self.directory_path = directory_path or _default_directory_path()
         self.tier_path = tier_path or _default_tier_path()
-        self.states: list[StateInfo] = []
-        self.cities_by_state: dict[str, list[CityInfo]] = {}
+        self.state_ut_names: list[str] = []
+        self.cities_by_state_ut: dict[str, list[CityInfo]] = {}
+        self._state_code_by_ut_name: dict[str, str] = {}
         self._tier_by_city: dict[str, str] = {}
         self._tier_by_state_city: dict[tuple[str, str], str] = {}
         self._cghs_city_entries: list[tuple[str, str, str]] = []
@@ -139,43 +136,29 @@ class LocationStore:
         return DEFAULT_TIER_ID, DEFAULT_TIER_LABEL, "default_tier_3"
 
     def _load_directory(self) -> None:
-        state_names: dict[str, str] = {}
         raw_cities: dict[str, list[str]] = {}
 
         with self.directory_path.open(newline="", encoding="utf-8-sig") as handle:
             reader = csv.DictReader(handle)
             for row in reader:
-                state_code = (row.get("State Code") or "").strip()
-                district_code = (row.get("District Code") or "").strip()
-                sub_district_code = (row.get("Sub District Code") or "").strip()
-                town_code = (row.get("Town-Village Code") or "").strip()
-                town_name = (row.get("Town-Village Name") or "").strip()
+                state_code = (row.get("state_code") or "").strip()
+                state_ut_name = (row.get("state_ut_name") or "").strip()
+                city_name = (row.get("city_name") or "").strip()
 
-                if not state_code or not town_name:
+                if not state_ut_name or not city_name:
                     continue
 
-                if (
-                    district_code == "000"
-                    and sub_district_code == "00000"
-                    and town_code == "000000"
-                ):
-                    state_names[state_code] = town_name
-                    continue
+                if state_code:
+                    self._state_code_by_ut_name[state_ut_name] = state_code
+                raw_cities.setdefault(state_ut_name, []).append(city_name)
 
-                if town_code.startswith("8"):
-                    raw_cities.setdefault(state_code, []).append(town_name)
+        self.state_ut_names = sorted(raw_cities)
 
-        self.states = [
-            StateInfo(code=code, name=state_names[code])
-            for code in sorted(state_names)
-            if code in raw_cities
-        ]
-
-        for state in self.states:
-            unique_names = sorted(set(raw_cities.get(state.code, [])))
+        for state_ut_name in self.state_ut_names:
+            unique_names = sorted(set(raw_cities.get(state_ut_name, [])))
             cities: list[CityInfo] = []
             for name in unique_names:
-                tier_id, tier_label, tier_source = self._lookup_tier(state.name, name)
+                tier_id, tier_label, tier_source = self._lookup_tier(state_ut_name, name)
                 cities.append(
                     CityInfo(
                         name=name,
@@ -184,13 +167,34 @@ class LocationStore:
                         tier_source=tier_source,
                     )
                 )
-            self.cities_by_state[state.code] = cities
+            self.cities_by_state_ut[state_ut_name] = cities
+
+    def get_state_ut_names(self) -> list[str]:
+        return list(self.state_ut_names)
 
     def get_states(self) -> list[dict[str, str]]:
-        return [{"code": state.code, "name": state.name} for state in self.states]
+        return [
+            {
+                "code": self._state_code_by_ut_name.get(name, ""),
+                "name": name,
+            }
+            for name in self.state_ut_names
+        ]
 
-    def get_cities(self, state_code: str) -> list[dict[str, str]]:
-        cities = self.cities_by_state.get(state_code.strip(), [])
+    def get_state_ut_name_by_code(self, state_code: str) -> str | None:
+        state_code = state_code.strip()
+        if not state_code:
+            return None
+        for name, code in self._state_code_by_ut_name.items():
+            if code == state_code:
+                return name
+        return None
+
+    def get_city_names(self, state_ut_name: str) -> list[str]:
+        return [city.name for city in self.cities_by_state_ut.get(state_ut_name.strip(), [])]
+
+    def get_cities(self, state_ut_name: str) -> list[dict[str, str]]:
+        cities = self.cities_by_state_ut.get(state_ut_name.strip(), [])
         return [
             {
                 "name": city.name,
@@ -201,30 +205,34 @@ class LocationStore:
             for city in cities
         ]
 
-    def resolve_tier(self, state_code: str, city_name: str) -> dict[str, str]:
-        state = next((s for s in self.states if s.code == state_code.strip()), None)
-        if state is None:
-            raise ValueError(f"Invalid state_code '{state_code}'.")
+    def resolve_tier(self, state_ut_name: str, city_name: str) -> dict[str, str]:
+        state_ut_name = state_ut_name.strip()
+        if state_ut_name not in self.cities_by_state_ut:
+            raise ValueError(f"Invalid state_ut_name '{state_ut_name}'.")
 
         city_name = city_name.strip()
         if not city_name:
             raise ValueError("city_name is required.")
 
-        for city in self.cities_by_state.get(state.code, []):
+        state_code = self._state_code_by_ut_name.get(state_ut_name, "")
+
+        for city in self.cities_by_state_ut.get(state_ut_name, []):
             if city.name == city_name:
                 return {
-                    "state_code": state.code,
-                    "state_name": state.name,
+                    "state_code": state_code,
+                    "state_ut_name": state_ut_name,
+                    "state_name": state_ut_name,
                     "city_name": city.name,
                     "tier_id": city.tier_id,
                     "tier_label": city.tier_label,
                     "tier_source": city.tier_source,
                 }
 
-        tier_id, tier_label, tier_source = self._lookup_tier(state.name, city_name)
+        tier_id, tier_label, tier_source = self._lookup_tier(state_ut_name, city_name)
         return {
-            "state_code": state.code,
-            "state_name": state.name,
+            "state_code": state_code,
+            "state_ut_name": state_ut_name,
+            "state_name": state_ut_name,
             "city_name": city_name,
             "tier_id": tier_id,
             "tier_label": tier_label,
