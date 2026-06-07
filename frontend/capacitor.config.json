@@ -1,0 +1,9 @@
+{
+  "appId": "com.swaasth.billcheck",
+  "appName": "Swaasth",
+  "webDir": "dist",
+  "server": {
+    "hostname": "localhost",
+    "androidScheme": "https"
+  }
+}
