@@ -160,8 +160,10 @@ export function AuthProvider({ children }) {
 
   const signInWithGoogle = useCallback(async () => {
     try {
+      console.log("Attempting Google Sign-In with popup...");
       return await signInWithPopup(auth, googleProvider);
     } catch (error) {
+      console.error("Google popup sign-in failed:", error.code, error.message);
       const popupIssues = new Set([
         "auth/popup-blocked",
         "auth/popup-closed-by-user",
@@ -169,7 +171,16 @@ export function AuthProvider({ children }) {
         "auth/operation-not-supported-in-this-environment",
       ]);
       if (popupIssues.has(error?.code)) {
-        await signInWithRedirect(auth, googleProvider);
+        console.log("Environment issue or popup blocked. Attempting redirect...");
+        try {
+          await signInWithRedirect(auth, googleProvider);
+        } catch (redirectError) {
+          console.error("Google redirect sign-in failed:", redirectError.code, redirectError.message);
+          if (redirectError.code === "auth/operation-not-supported-in-this-environment") {
+            alert("Google Sign-In is not supported in this mobile environment via the Web SDK. Please use the native Capacitor Firebase plugin for Android support.");
+          }
+          throw redirectError;
+        }
         return null;
       }
       throw error;

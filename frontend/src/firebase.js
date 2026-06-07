@@ -17,6 +17,8 @@ const missingKeys = Object.entries(firebaseConfig)
   .map(([key]) => key);
 
 if (missingKeys.length) {
+  console.error("Missing Firebase config keys:", missingKeys);
+  console.log("Current env values:", import.meta.env);
   throw new Error(
     `Missing Firebase config: ${missingKeys.join(", ")}. Copy frontend/.env.example to frontend/.env.`
   );
