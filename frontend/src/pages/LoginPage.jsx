@@ -33,6 +33,9 @@ function getAuthErrorMessage(error) {
   if (code === "auth/popup-closed-by-user") {
     return "Google sign-in was cancelled.";
   }
+  if (code === "auth/popup-blocked") {
+    return "Your browser blocked the Google sign-in popup. Allow popups for this site and try again.";
+  }
   if (code === "auth/too-many-requests") {
     return "Too many attempts. Please wait a few minutes and try again.";
   }
@@ -116,12 +119,8 @@ export default function LoginPage() {
     setInfo("");
     setIsSubmitting(true);
     try {
-      const result = await signInWithGoogle();
-      if (result) {
-        navigate(redirectTo, { replace: true });
-      } else {
-        setInfo("Redirecting to Google sign-in...");
-      }
+      await signInWithGoogle();
+      navigate(redirectTo, { replace: true });
     } catch (err) {
       setError(getAuthErrorMessage(err));
     } finally {
