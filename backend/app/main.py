@@ -24,6 +24,7 @@ from app.cghs_rates import (
 from app.hbp_rates import get_hbp_store
 from app.locations import get_location_store
 from app.nabh_registry import get_nabh_registry
+from app.jan_aushadhi_rates import enrich_line_items_with_jan_aushadhi, get_jan_aushadhi_store
 from app.pharma_rates import get_pharma_store
 from app.services.claim_audit import analyze_claim_items
 
@@ -106,6 +107,15 @@ def load_reference_data() -> None:
             )
     except Exception as exc:
         print(f"WARNING: NPPA price dataset failed to load: {exc}")
+
+    try:
+        jan_aushadhi = get_jan_aushadhi_store()
+        print(
+            f"Loaded {len(jan_aushadhi.rows)} Jan Aushadhi products "
+            f"from {jan_aushadhi.csv_path}"
+        )
+    except Exception as exc:
+        print(f"WARNING: Jan Aushadhi product list failed to load: {exc}")
 
 
 @app.get("/health")
@@ -712,6 +722,9 @@ def _build_comparison_response(
         tier_id=tier_id,
         pmjay_eligible=pmjay_eligible,
     )
+    compared_line_items, jan_aushadhi = enrich_line_items_with_jan_aushadhi(
+        compared_line_items
+    )
 
     audit_flags = analyze_claim_items(
         compared_line_items,
@@ -747,6 +760,13 @@ def _build_comparison_response(
         rates_source["total_nppa_entries"] = 0
         rates_source["az_brand_file"] = None
         rates_source["az_brand_index_size"] = 0
+    try:
+        jan_aushadhi_store = get_jan_aushadhi_store()
+        rates_source["jan_aushadhi_file"] = str(jan_aushadhi_store.csv_path.name)
+        rates_source["total_jan_aushadhi_products"] = len(jan_aushadhi_store.rows)
+    except Exception:
+        rates_source["jan_aushadhi_file"] = None
+        rates_source["total_jan_aushadhi_products"] = 0
 
     patient_payload: dict[str, Any] | None = None
     if patient_id or patient_name:
@@ -784,6 +804,7 @@ def _build_comparison_response(
         "patient": patient_payload,
         "rates_source": rates_source,
         "line_items": compared_line_items,
+        "jan_aushadhi": jan_aushadhi,
         "audit_flags": audit_flags,
     }
 

@@ -803,6 +803,82 @@ body {
   gap: 0.85rem;
 }
 
+.jan-aushadhi-banner {
+  padding: 1rem 1.1rem;
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.12) 0%,
+    rgba(16, 185, 129, 0.08) 100%
+  );
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  border-radius: var(--neu-radius);
+  box-shadow: var(--neu-shadow-soft);
+  margin-bottom: 0.25rem;
+}
+
+.jan-aushadhi-banner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.55rem;
+}
+
+.jan-aushadhi-banner-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #166534;
+}
+
+.jan-aushadhi-count {
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  background: #16a34a;
+  color: #fff;
+}
+
+.jan-aushadhi-intro,
+.jan-aushadhi-advisory,
+.jan-aushadhi-match-list {
+  margin: 0;
+}
+
+.jan-aushadhi-intro {
+  color: var(--text-primary);
+  line-height: 1.5;
+  font-size: 0.92rem;
+}
+
+.jan-aushadhi-match-list {
+  margin: 0.65rem 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.jan-aushadhi-advisory {
+  color: #166534;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.jan-aushadhi-item-note {
+  margin: 0.55rem 0 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.5rem;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  color: #166534;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
 .summary-banner {
   padding: 1rem;
   background: var(--neu-surface);
