@@ -19,12 +19,23 @@ import AccountSettingsPage from "./pages/AccountSettingsPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import PatientForm, { emptyPatientForm } from "./components/PatientForm";
 import PatientList from "./components/PatientList";
+import { Capacitor } from "@capacitor/core";
 import { createPatient, getPatients, getPatientsLocalSnapshot } from "./services/patients";
 import { markLocalBillSynced, persistLocalBill, saveBill } from "./services/bills";
 
-// Use VITE_API_BASE="" in .env.local to route through the Vite dev proxy (see vite.config.js).
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
+// Web dev: leave VITE_API_BASE unset (or "") to use the Vite proxy (see vite.config.js).
+// Android emulator: defaults to host loopback via 10.0.2.2:8000.
+const API_BASE =
+  import.meta.env.VITE_API_BASE ??
+  (Capacitor.isNativePlatform() ? "http://10.0.2.2:8000" : "");
 const ALLOWED_EXTENSIONS = ["pdf", "jpg", "jpeg", "png"];
+
+function formatFetchError(err, fallback) {
+  if (err?.message === "Failed to fetch") {
+    return "Could not reach the backend. Start it on port 8000 and refresh.";
+  }
+  return err?.message || fallback;
+}
 
 const CATEGORY_OPTIONS = [
   { id: "medicine", label: "Medicine" },
@@ -491,7 +502,7 @@ function CheckPage() {
         }
         setStates(Array.isArray(payload) ? payload : []);
       } catch (err) {
-        setLocationError(err.message || "Unable to load state list.");
+        setLocationError(formatFetchError(err, "Unable to load state list."));
       }
     };
     loadStates();
@@ -521,7 +532,7 @@ function CheckPage() {
         setCities(Array.isArray(payload) ? payload : []);
       } catch (err) {
         setCities([]);
-        setLocationError(err.message || "Unable to load cities for this state.");
+        setLocationError(formatFetchError(err, "Unable to load cities for this state."));
       } finally {
         setIsLoadingCities(false);
       }
