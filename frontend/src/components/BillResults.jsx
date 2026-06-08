@@ -12,12 +12,57 @@ import {
 export default function BillResults({ result, toolbar = null }) {
   const summary = useMemo(() => computeBillSummary(result), [result]);
 
+  const janAushadhiMatches = result?.jan_aushadhi?.matches ?? [];
+
   if (!result?.line_items?.length) {
     return null;
   }
 
   return (
     <>
+      {janAushadhiMatches.length > 0 && (
+        <section className="jan-aushadhi-banner" aria-label="Jan Aushadhi scheme advisory">
+          <div className="jan-aushadhi-banner-header">
+            <h3>Jan Aushadhi — subsidized medicines available</h3>
+            <span className="jan-aushadhi-count">
+              {janAushadhiMatches.length} on your bill
+            </span>
+          </div>
+          <p className="jan-aushadhi-intro">
+            The Government of India sells the following medicine
+            {janAushadhiMatches.length === 1 ? "" : "s"} from your bill at
+            subsidized rates under the{" "}
+            <strong>
+              {result.jan_aushadhi?.scheme_name ||
+                "Pradhan Mantri Bhartiya Janaushadhi Pariyojana (PMBJP)"}
+            </strong>{" "}
+            (Jan Aushadhi scheme).
+          </p>
+          <ul className="jan-aushadhi-match-list">
+            {janAushadhiMatches.map((match, index) => (
+              <li key={`${match.bill_item_name || "item"}-${index}`}>
+                <strong>{match.bill_item_name}</strong>
+                {match.generic_name && match.generic_name !== match.bill_item_name && (
+                  <> · matched as {match.generic_name}</>
+                )}
+                {match.mrp != null && (
+                  <>
+                    {" "}
+                    · Jan Aushadhi MRP: <strong>{formatCurrency(match.mrp)}</strong>
+                    {match.unit_size ? ` per ${match.unit_size}` : ""}
+                  </>
+                )}
+                {match.approximate_match ? " · approximate match" : ""}
+              </li>
+            ))}
+          </ul>
+          <p className="jan-aushadhi-advisory">
+            {result.jan_aushadhi?.advisory ||
+              "Visit your nearest Jan Aushadhi Kendra (medical store) to purchase these medicines at the subsidized MRP."}
+          </p>
+        </section>
+      )}
+
       {result?.hospital?.name_from_bill && (
         <p className="comparison-context">
           Hospital on bill: <strong>{result.hospital.name_from_bill}</strong>
@@ -169,6 +214,19 @@ export default function BillResults({ result, toolbar = null }) {
                   <h5>{formatCurrency(item.price_difference)}</h5>
                 </div>
               </div>
+              {item.jan_aushadhi_available && (
+                <p className="jan-aushadhi-item-note">
+                  Available under Jan Aushadhi at subsidized rates
+                  {item.jan_aushadhi_mrp != null
+                    ? ` (MRP ${formatCurrency(item.jan_aushadhi_mrp)}${
+                        item.jan_aushadhi_unit_size
+                          ? ` per ${item.jan_aushadhi_unit_size}`
+                          : ""
+                      })`
+                    : ""}
+                  . Visit a Jan Aushadhi Kendra.
+                </p>
+              )}
               {isMedicine && (item.resolved_generic_name || item.pharma_price_basis) && (
                 <p className="rate-breakdown">
                   {item.resolved_generic_name
