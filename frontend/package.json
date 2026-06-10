@@ -6,12 +6,9 @@
   "scripts": {
     "dev": "vite",
     "sync:firebase": "cp google-services.json android/app/google-services.json",
-    "build:dev": "npm run sync:firebase && vite build --mode development && npx cap sync android",
-    "build:release": "node scripts/verify-release-env.mjs && npm run sync:firebase && vite build && npx cap sync android",
-    "build": "npm run build:dev",
+    "build": "npm run sync:firebase && vite build && npx cap sync android",
     "preview": "vite preview",
-    "cap:sync": "npm run sync:firebase && npx cap sync android",
-    "sync:android": "npm run cap:sync"
+    "cap:sync": "npm run sync:firebase && npx cap sync android"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",
