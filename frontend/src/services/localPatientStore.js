@@ -44,6 +44,7 @@ export function persistLocalPatient(userId, patientData, localId = null) {
       age: Number(patientData.age) || 0,
       gender: patientData.gender || "",
       ayushmanEligible: Boolean(patientData.ayushmanEligible),
+      savePastBills: Boolean(patientData.savePastBills),
     },
     synced: existing?.synced ?? false,
     firestoreId: existing?.firestoreId ?? null,

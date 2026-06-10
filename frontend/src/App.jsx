@@ -19,12 +19,13 @@ import AccountSettingsPage from "./pages/AccountSettingsPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import PatientForm, { emptyPatientForm } from "./components/PatientForm";
 import PatientList from "./components/PatientList";
+import LocationSearchPicker from "./components/LocationSearchPicker";
 import { Capacitor } from "@capacitor/core";
 import { createPatient, getPatients, getPatientsLocalSnapshot } from "./services/patients";
 import { markLocalBillSynced, persistLocalBill, saveBill } from "./services/bills";
 
-// Web dev: leave VITE_API_BASE unset (or "") to use the Vite proxy (see vite.config.js).
-// Android emulator: defaults to host loopback via 10.0.2.2:8000.
+// Web dev: leave unset so requests use the Vite proxy (/api → :8000).
+// Set VITE_API_BASE in .env for production APK or a deployed API.
 const API_BASE =
   import.meta.env.VITE_API_BASE ??
   (Capacitor.isNativePlatform() ? "http://10.0.2.2:8000" : "");
@@ -494,14 +495,17 @@ function CheckPage() {
 
   useEffect(() => {
     const loadStates = async () => {
+      setLocationError("");
       try {
-        const response = await fetch(`${API_BASE}/api/locations/states`);
+        const url = `${API_BASE}/api/locations/states`;
+        const response = await fetch(url);
         const payload = await response.json();
         if (!response.ok) {
           throw new Error(payload?.detail || "Unable to load states.");
         }
         setStates(Array.isArray(payload) ? payload : []);
       } catch (err) {
+        setStates([]);
         setLocationError(formatFetchError(err, "Unable to load state list."));
       }
     };
@@ -704,7 +708,7 @@ function CheckPage() {
       setResult(payload);
       setIsComparing(false);
 
-      if (user) {
+      if (user && selectedPatient?.savePastBills) {
         const localId = persistLocalBill(user.uid, payload);
         saveBill(user.uid, payload, {
           localId,
@@ -892,6 +896,7 @@ function CheckPage() {
                     saving={patientSaving}
                     error={error}
                     info={patientInfo}
+                    isCreate
                   />
                 </section>
               )}
@@ -910,6 +915,7 @@ function CheckPage() {
                     saving={patientSaving}
                     error={error}
                     info={patientInfo}
+                    isCreate
                   />
                 </section>
               )}
@@ -995,41 +1001,36 @@ function CheckPage() {
               <div className="comparison-settings">
                 <p className="comparison-settings-title">Hospital location</p>
                 <div className="comparison-settings-grid">
-                  <label className="setting-field">
-                    <span>State/UT</span>
-                    <select
-                      value={stateUtName}
-                      onChange={(event) => setStateUtName(event.target.value)}
-                    >
-                      <option value="">Select state/UT</option>
-                      {states.map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="setting-field">
-                    <span>City</span>
-                    <select
-                      value={city}
-                      disabled={!stateUtName || isLoadingCities}
-                      onChange={(event) => setCity(event.target.value)}
-                    >
-                      <option value="">
-                        {isLoadingCities
-                          ? "Loading cities..."
-                          : stateUtName
-                          ? "Select city"
-                          : "Select state/UT first"}
-                      </option>
-                      {cities.map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <LocationSearchPicker
+                    label="State/UT"
+                    items={states}
+                    value={stateUtName}
+                    onSelect={setStateUtName}
+                    disabled={!states.length && !locationError}
+                    isLoading={!states.length && !locationError}
+                    loadingLabel="Loading states..."
+                    placeholder="Select state/UT"
+                    emptyLabel={
+                      locationError
+                        ? "Could not load states"
+                        : "No states available"
+                    }
+                  />
+                  <LocationSearchPicker
+                    label="City"
+                    items={cities}
+                    value={city}
+                    onSelect={setCity}
+                    disabled={!stateUtName}
+                    isLoading={isLoadingCities}
+                    loadingLabel="Loading cities..."
+                    placeholder="Select city"
+                    emptyLabel={
+                      stateUtName
+                        ? "No cities available"
+                        : "Select state/UT first"
+                    }
+                  />
                 </div>
                 <label className="setting-field setting-field-full">
                   <span>Hospital type</span>
