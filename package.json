@@ -1,0 +1,17 @@
+{
+  "name": "swaasth",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace medbill-frontend",
+    "build:dev": "npm run build:dev --workspace medbill-frontend",
+    "build:release": "npm run build:release --workspace medbill-frontend",
+    "cap:sync": "npm run sync:firebase --workspace medbill-frontend && cap sync android",
+    "sync:android": "npm run cap:sync"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.0"
+  }
+}
