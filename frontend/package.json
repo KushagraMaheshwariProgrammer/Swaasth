@@ -10,7 +10,8 @@
     "build:release": "node scripts/verify-release-env.mjs && npm run sync:firebase && vite build && npx cap sync android",
     "build": "npm run build:dev",
     "preview": "vite preview",
-    "cap:sync": "npm run sync:firebase && npx cap sync android"
+    "cap:sync": "npm run sync:firebase && npx cap sync android",
+    "sync:android": "npm run cap:sync"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",
