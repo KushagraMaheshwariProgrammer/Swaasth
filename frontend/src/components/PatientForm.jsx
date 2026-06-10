@@ -13,6 +13,7 @@ export const emptyPatientForm = () => ({
   age: "",
   gender: "",
   ayushmanEligible: false,
+  savePastBills: false,
 });
 
 export function genderLabel(gender) {
@@ -30,6 +31,7 @@ export default function PatientForm({
   saving,
   error,
   info,
+  isCreate = false,
 }) {
   const [showEligibility, setShowEligibility] = useState(false);
 
@@ -92,6 +94,24 @@ export default function PatientForm({
         />
         <span>Patient is eligible for Ayushman Bharat scheme</span>
       </label>
+      {isCreate && (
+        <label className="patient-checkbox">
+          <input
+            type="checkbox"
+            checked={form.savePastBills}
+            onChange={(event) =>
+              setForm((prev) => ({
+                ...prev,
+                savePastBills: event.target.checked,
+              }))
+            }
+          />
+          <span>
+            Allow Swaasth to save this patient&apos;s past bills so they can be
+            viewed later.
+          </span>
+        </label>
+      )}
       <button
         type="button"
         className="eligibility-learn-btn"

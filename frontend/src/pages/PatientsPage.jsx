@@ -100,6 +100,7 @@ export default function PatientsPage() {
           age: localPatient.age != null ? String(localPatient.age) : "",
           gender: localPatient.gender || "",
           ayushmanEligible: Boolean(localPatient.ayushmanEligible),
+          savePastBills: Boolean(localPatient.savePastBills),
         });
       } else {
         setLoading(true);
@@ -125,6 +126,7 @@ export default function PatientsPage() {
           age: patient.age != null ? String(patient.age) : "",
           gender: patient.gender || "",
           ayushmanEligible: Boolean(patient.ayushmanEligible),
+          savePastBills: Boolean(patient.savePastBills),
         });
         setPatientBills(bills);
         const pendingLocal = bills.filter((bill) => bill.localOnly).length;
@@ -325,6 +327,7 @@ export default function PatientsPage() {
                   submitLabel="Save patient"
                   saving={saving}
                   error={error}
+                  isCreate
                 />
               </section>
             )}
@@ -415,6 +418,7 @@ export default function PatientsPage() {
                           ayushmanEligible: Boolean(
                             selectedPatient.ayushmanEligible
                           ),
+                          savePastBills: Boolean(selectedPatient.savePastBills),
                         });
                       }}
                       submitLabel="Save changes"

@@ -68,7 +68,13 @@ export function validatePatientInput(patientData) {
   if (!Number.isFinite(age) || age < 0 || age > 150) {
     throw new Error("Please enter a valid age (0–150).");
   }
-  return { name, gender, age, ayushmanEligible: Boolean(patientData?.ayushmanEligible) };
+  return {
+    name,
+    gender,
+    age,
+    ayushmanEligible: Boolean(patientData?.ayushmanEligible),
+    savePastBills: Boolean(patientData?.savePastBills),
+  };
 }
 
 function mergePatientLists(cloudPatients, localEntries) {
@@ -99,6 +105,7 @@ function buildFirestorePayload(patientData) {
     age: validated.age,
     gender: validated.gender,
     ayushmanEligible: validated.ayushmanEligible,
+    savePastBills: validated.savePastBills,
     updatedAt: serverTimestamp(),
   };
 }
