@@ -24,8 +24,8 @@ import { Capacitor } from "@capacitor/core";
 import { createPatient, getPatients, getPatientsLocalSnapshot } from "./services/patients";
 import { markLocalBillSynced, persistLocalBill, saveBill } from "./services/bills";
 
-// Web dev: leave unset so requests use the Vite proxy (/api → :8000).
-// Set VITE_API_BASE in .env for production APK or a deployed API.
+// Web dev: leave VITE_API_BASE unset to use the Vite proxy (/api → :8000).
+// Android emulator: uses http://10.0.2.2:8000 (your Mac's localhost).
 const API_BASE =
   import.meta.env.VITE_API_BASE ??
   (Capacitor.isNativePlatform() ? "http://10.0.2.2:8000" : "");
@@ -33,6 +33,12 @@ const ALLOWED_EXTENSIONS = ["pdf", "jpg", "jpeg", "png"];
 
 function formatFetchError(err, fallback) {
   if (err?.message === "Failed to fetch") {
+    if (Capacitor.isNativePlatform()) {
+      return (
+        "Could not reach the backend. On your Mac run: cd backend && ./run_dev.sh " +
+        "(must listen on 0.0.0.0:8000), then reopen the app."
+      );
+    }
     return "Could not reach the backend. Start it on port 8000 and refresh.";
   }
   return err?.message || fallback;

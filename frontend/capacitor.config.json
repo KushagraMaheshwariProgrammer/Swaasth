@@ -6,7 +6,13 @@
     "hostname": "localhost",
     "androidScheme": "https"
   },
+  "android": {
+    "allowMixedContent": true
+  },
   "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    },
     "FirebaseAuthentication": {
       "skipNativeAuth": false,
       "providers": ["google.com"]
