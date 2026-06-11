@@ -33,4 +33,15 @@ Share `GROQ_API_KEY` with teammates through a password manager or secure channel
 
 ## Rotating exposed keys
 
-If a secret was ever committed to git, rotate it in the provider console (Groq, Firebase, etc.) and update your local `backend/.env`.
+A `GROQ_API_KEY` was previously committed to git history and has been scrubbed. **Rotate the key** at [console.groq.com/keys](https://console.groq.com/keys), then update `backend/.env` locally and share the new key with teammates securely.
+
+## After a history rewrite
+
+If `git pull` fails after a force-push, reset to the remote:
+
+```bash
+git fetch origin
+git reset --hard origin/main
+```
+
+Then run `npm run setup:env` if you are missing local `.env` files.
