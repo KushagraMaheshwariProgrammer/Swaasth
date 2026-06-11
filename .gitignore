@@ -1,4 +1,5 @@
 .DS_Store
+Swaasth/
 .env
 .env.local
 backend/.env
