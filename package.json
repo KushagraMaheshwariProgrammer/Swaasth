@@ -5,6 +5,7 @@
     "frontend"
   ],
   "scripts": {
+    "setup:env": "bash scripts/setup-env.sh",
     "dev": "npm run dev --workspace medbill-frontend",
     "build": "npm run build --workspace medbill-frontend",
     "cap:sync": "npm run sync:firebase --workspace medbill-frontend && cap sync android",
