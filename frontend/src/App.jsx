@@ -20,9 +20,16 @@ import VerifyEmailPage from "./pages/VerifyEmailPage";
 import PatientForm, { emptyPatientForm } from "./components/PatientForm";
 import PatientList from "./components/PatientList";
 import LocationSearchPicker from "./components/LocationSearchPicker";
+import AarogyaFlow from "./components/AarogyaFlow";
 import { Capacitor } from "@capacitor/core";
 import { createPatient, getPatients, getPatientsLocalSnapshot } from "./services/patients";
 import { markLocalBillSynced, persistLocalBill, saveBill } from "./services/bills";
+import {
+  getCities,
+  getStates,
+  isTelanganaState,
+  resolveCityTier,
+} from "./services/locations";
 
 // Web dev: leave VITE_API_BASE unset to use the Vite proxy (/api → :8000).
 // Android emulator: uses http://10.0.2.2:8000 (your Mac's localhost).
@@ -360,7 +367,7 @@ function CheckPage() {
   const location = useLocation();
   const inputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [states, setStates] = useState([]);
+  const [states] = useState(() => getStates());
   const [cities, setCities] = useState([]);
   const [stateUtName, setStateUtName] = useState("");
   const [city, setCity] = useState("");
@@ -368,8 +375,9 @@ function CheckPage() {
   const [hospitalType, setHospitalType] = useState("general");
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingCities, setIsLoadingCities] = useState(false);
-  const [locationError, setLocationError] = useState("");
+  const locationError = states.length
+    ? ""
+    : "Location directory is missing. Run npm run build to regenerate it.";
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
   const [scanMeta, setScanMeta] = useState(null);
@@ -449,6 +457,9 @@ function CheckPage() {
   }, [user, reloadPatients]);
 
   const selectedPatient = patients.find((p) => p.id === selectedPatientId);
+  const aarogyaMode =
+    isTelanganaState(selectedPatient?.state) &&
+    Boolean(selectedPatient?.aarogyaBhadrathaEligible);
 
   const handleSaveNewPatient = async (event) => {
     event.preventDefault();
@@ -500,89 +511,25 @@ function CheckPage() {
   };
 
   useEffect(() => {
-    const loadStates = async () => {
-      setLocationError("");
-      try {
-        const url = `${API_BASE}/api/locations/states`;
-        const response = await fetch(url);
-        const payload = await response.json();
-        if (!response.ok) {
-          throw new Error(payload?.detail || "Unable to load states.");
-        }
-        setStates(Array.isArray(payload) ? payload : []);
-      } catch (err) {
-        setStates([]);
-        setLocationError(formatFetchError(err, "Unable to load state list."));
-      }
-    };
-    loadStates();
-  }, []);
-
-  useEffect(() => {
     if (!stateUtName) {
       setCities([]);
       setCity("");
       setResolvedTier(null);
-      return undefined;
+      return;
     }
 
-    const loadCities = async () => {
-      setIsLoadingCities(true);
-      setLocationError("");
-      setCity("");
-      setResolvedTier(null);
-      try {
-        const response = await fetch(
-          `${API_BASE}/api/locations/cities?state=${encodeURIComponent(stateUtName)}`
-        );
-        const payload = await response.json();
-        if (!response.ok) {
-          throw new Error(payload?.detail || "Unable to load cities.");
-        }
-        setCities(Array.isArray(payload) ? payload : []);
-      } catch (err) {
-        setCities([]);
-        setLocationError(formatFetchError(err, "Unable to load cities for this state."));
-      } finally {
-        setIsLoadingCities(false);
-      }
-    };
-
-    loadCities();
+    setCity("");
+    setResolvedTier(null);
+    setCities(getCities(stateUtName));
   }, [stateUtName]);
 
   useEffect(() => {
     if (!stateUtName || !city) {
       setResolvedTier(null);
-      return undefined;
+      return;
     }
 
-    let cancelled = false;
-    const loadTier = async () => {
-      try {
-        const params = new URLSearchParams({
-          state: stateUtName,
-          city,
-        });
-        const response = await fetch(`${API_BASE}/api/locations/tier?${params}`);
-        const payload = await response.json();
-        if (!response.ok) {
-          throw new Error(payload?.detail || "Unable to resolve city tier.");
-        }
-        if (!cancelled) {
-          setResolvedTier(payload);
-        }
-      } catch {
-        if (!cancelled) {
-          setResolvedTier(null);
-        }
-      }
-    };
-
-    loadTier();
-    return () => {
-      cancelled = true;
-    };
+    setResolvedTier(resolveCityTier(stateUtName, city));
   }, [stateUtName, city]);
 
   useEffect(() => {
@@ -902,7 +849,6 @@ function CheckPage() {
                     saving={patientSaving}
                     error={error}
                     info={patientInfo}
-                    isCreate
                   />
                 </section>
               )}
@@ -921,7 +867,6 @@ function CheckPage() {
                     saving={patientSaving}
                     error={error}
                     info={patientInfo}
-                    isCreate
                   />
                 </section>
               )}
@@ -935,7 +880,23 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {uiState === "upload" && billStep === "bill" && (
+          {billStep === "bill" && aarogyaMode && (
+            <motion.section
+              key="aarogya-flow"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25 }}
+            >
+              <AarogyaFlow
+                patient={selectedPatient}
+                user={user}
+                onChangePatient={handleChangePatient}
+              />
+            </motion.section>
+          )}
+
+          {uiState === "upload" && billStep === "bill" && !aarogyaMode && (
             <motion.section
               key="upload"
               className="upload-card"
@@ -1028,7 +989,6 @@ function CheckPage() {
                     value={city}
                     onSelect={setCity}
                     disabled={!stateUtName}
-                    isLoading={isLoadingCities}
                     loadingLabel="Loading cities..."
                     placeholder="Select city"
                     emptyLabel={
@@ -1081,7 +1041,7 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {(uiState === "loading" || uiState === "comparing") && (
+          {(uiState === "loading" || uiState === "comparing") && !aarogyaMode && (
             <motion.section
               key={uiState === "comparing" ? "comparing" : "loading"}
               className="loading-card"
@@ -1104,7 +1064,7 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {uiState === "edit" && (
+          {uiState === "edit" && !aarogyaMode && (
             <motion.section
               key="edit"
               className="bill-editor-shell"
@@ -1260,7 +1220,7 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {uiState === "results" && (
+          {uiState === "results" && !aarogyaMode && (
             <motion.section
               key="results"
               className="results-shell"

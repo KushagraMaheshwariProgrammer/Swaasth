@@ -1,5 +1,9 @@
-import { useState } from "react";
-import EligibilityCriteriaModal from "./EligibilityCriteriaModal";
+import { useEffect, useState } from "react";
+import EligibilityCriteriaModal, {
+  AAROGYA_BHADRATHA_ELIGIBILITY_SECTIONS,
+  PMJAY_ELIGIBILITY_SECTIONS,
+} from "./EligibilityCriteriaModal";
+import { getStateOptions, isTelanganaState } from "../services/locations";
 
 export const GENDER_OPTIONS = [
   { id: "male", label: "Male" },
@@ -12,7 +16,9 @@ export const emptyPatientForm = () => ({
   name: "",
   age: "",
   gender: "",
+  state: "",
   ayushmanEligible: false,
+  aarogyaBhadrathaEligible: false,
   savePastBills: false,
 });
 
@@ -21,6 +27,8 @@ export function genderLabel(gender) {
     GENDER_OPTIONS.find((option) => option.id === gender)?.label || gender || "—"
   );
 }
+
+const STATE_OPTIONS = getStateOptions();
 
 export default function PatientForm({
   form,
@@ -31,9 +39,18 @@ export default function PatientForm({
   saving,
   error,
   info,
-  isCreate = false,
 }) {
-  const [showEligibility, setShowEligibility] = useState(false);
+  const [activeModal, setActiveModal] = useState(null);
+
+  const showAarogyaCard = isTelanganaState(form.state);
+
+  // When the patient is no longer in Telangana, the Aarogya Bhadratha scheme
+  // does not apply, so reset its eligibility flag.
+  useEffect(() => {
+    if (!showAarogyaCard && form.aarogyaBhadrathaEligible) {
+      setForm((prev) => ({ ...prev, aarogyaBhadrathaEligible: false }));
+    }
+  }, [showAarogyaCard, form.aarogyaBhadrathaEligible, setForm]);
 
   return (
     <form className="patient-form" onSubmit={onSubmit}>
@@ -81,48 +98,103 @@ export default function PatientForm({
           </select>
         </label>
       </div>
+      <label className="setting-field setting-field-full">
+        <span>State</span>
+        <select
+          value={form.state}
+          onChange={(event) =>
+            setForm((prev) => ({ ...prev, state: event.target.value }))
+          }
+        >
+          <option value="">Select state</option>
+          {STATE_OPTIONS.map((stateName) => (
+            <option key={stateName} value={stateName}>
+              {stateName}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <fieldset className="scheme-eligibility">
+        <legend className="scheme-eligibility-title">Scheme eligibility</legend>
+        <div className="scheme-card-list">
+          <div className="scheme-card">
+            <label className="scheme-card-checkbox">
+              <input
+                type="checkbox"
+                checked={form.ayushmanEligible}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    ayushmanEligible: event.target.checked,
+                  }))
+                }
+              />
+              <span>Patient is eligible for Ayushman Bharat Scheme</span>
+            </label>
+            <button
+              type="button"
+              className="eligibility-learn-btn"
+              onClick={() => setActiveModal("ayushman")}
+            >
+              Learn eligibility criteria
+            </button>
+          </div>
+
+          {showAarogyaCard && (
+            <div className="scheme-card">
+              <label className="scheme-card-checkbox">
+                <input
+                  type="checkbox"
+                  checked={form.aarogyaBhadrathaEligible}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      aarogyaBhadrathaEligible: event.target.checked,
+                    }))
+                  }
+                />
+                <span>Patient is eligible for Aarogya Bhadratha Scheme</span>
+              </label>
+              <button
+                type="button"
+                className="eligibility-learn-btn"
+                onClick={() => setActiveModal("aarogya")}
+              >
+                Learn eligibility criteria
+              </button>
+            </div>
+          )}
+        </div>
+      </fieldset>
+
       <label className="patient-checkbox">
         <input
           type="checkbox"
-          checked={form.ayushmanEligible}
+          checked={form.savePastBills}
           onChange={(event) =>
             setForm((prev) => ({
               ...prev,
-              ayushmanEligible: event.target.checked,
+              savePastBills: event.target.checked,
             }))
           }
         />
-        <span>Patient is eligible for Ayushman Bharat scheme</span>
+        <span>Do you want to save this patient&apos;s past bills?</span>
       </label>
-      {isCreate && (
-        <label className="patient-checkbox">
-          <input
-            type="checkbox"
-            checked={form.savePastBills}
-            onChange={(event) =>
-              setForm((prev) => ({
-                ...prev,
-                savePastBills: event.target.checked,
-              }))
-            }
-          />
-          <span>
-            Allow Swaasth to save this patient&apos;s past bills so they can be
-            viewed later.
-          </span>
-        </label>
-      )}
-      <button
-        type="button"
-        className="eligibility-learn-btn"
-        onClick={() => setShowEligibility(true)}
-      >
-        Learn eligibility criteria
-      </button>
+
       <EligibilityCriteriaModal
-        open={showEligibility}
-        onClose={() => setShowEligibility(false)}
+        open={activeModal === "ayushman"}
+        onClose={() => setActiveModal(null)}
+        title="Ayushman Bharat PM-JAY eligibility"
+        sections={PMJAY_ELIGIBILITY_SECTIONS}
       />
+      <EligibilityCriteriaModal
+        open={activeModal === "aarogya"}
+        onClose={() => setActiveModal(null)}
+        title="Aarogya Bhadratha Scheme eligibility"
+        sections={AAROGYA_BHADRATHA_ELIGIBILITY_SECTIONS}
+      />
+
       {info && <p className="auth-info">{info}</p>}
       {error && <p className="error-text">{error}</p>}
       <div className="patient-form-actions">

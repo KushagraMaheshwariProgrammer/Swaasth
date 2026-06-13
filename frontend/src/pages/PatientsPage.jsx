@@ -99,7 +99,11 @@ export default function PatientsPage() {
           name: localPatient.name || "",
           age: localPatient.age != null ? String(localPatient.age) : "",
           gender: localPatient.gender || "",
+          state: localPatient.state || "",
           ayushmanEligible: Boolean(localPatient.ayushmanEligible),
+          aarogyaBhadrathaEligible: Boolean(
+            localPatient.aarogyaBhadrathaEligible
+          ),
           savePastBills: Boolean(localPatient.savePastBills),
         });
       } else {
@@ -125,7 +129,9 @@ export default function PatientsPage() {
           name: patient.name || "",
           age: patient.age != null ? String(patient.age) : "",
           gender: patient.gender || "",
+          state: patient.state || "",
           ayushmanEligible: Boolean(patient.ayushmanEligible),
+          aarogyaBhadrathaEligible: Boolean(patient.aarogyaBhadrathaEligible),
           savePastBills: Boolean(patient.savePastBills),
         });
         setPatientBills(bills);
@@ -327,7 +333,6 @@ export default function PatientsPage() {
                   submitLabel="Save patient"
                   saving={saving}
                   error={error}
-                  isCreate
                 />
               </section>
             )}
@@ -415,8 +420,12 @@ export default function PatientsPage() {
                               ? String(selectedPatient.age)
                               : "",
                           gender: selectedPatient.gender || "",
+                          state: selectedPatient.state || "",
                           ayushmanEligible: Boolean(
                             selectedPatient.ayushmanEligible
+                          ),
+                          aarogyaBhadrathaEligible: Boolean(
+                            selectedPatient.aarogyaBhadrathaEligible
                           ),
                           savePastBills: Boolean(selectedPatient.savePastBills),
                         });

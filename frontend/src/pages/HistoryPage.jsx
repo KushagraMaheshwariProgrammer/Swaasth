@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import BillResults from "../components/BillResults";
+import AarogyaResults from "../components/AarogyaResults";
 import {
   buildPatientNameMap,
   computeBillSummary,
@@ -253,7 +254,11 @@ export default function HistoryPage() {
               </button>
             </div>
             <section className="results-shell">
-              <BillResults result={selectedBill} />
+              {selectedBill.report_kind === "aarogya_bhadratha" ? (
+                <AarogyaResults report={selectedBill} />
+              ) : (
+                <BillResults result={selectedBill} />
+              )}
             </section>
           </>
         )}

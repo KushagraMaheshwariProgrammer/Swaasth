@@ -32,6 +32,8 @@ def _project_root() -> Path:
 def _default_directory_path() -> Path:
     root = _project_root()
     candidates = [
+        Path(__file__).resolve().parent.parent / "data" / "india_states_cities_new.csv",
+        root / "india_states_cities_new.csv",
         Path(__file__).resolve().parent.parent
         / "data"
         / "india_official_gov_urban_cities_swaasth_sorted.csv",
@@ -41,7 +43,7 @@ def _default_directory_path() -> Path:
         if path.exists():
             return path
     raise FileNotFoundError(
-        "india_official_gov_urban_cities_swaasth_sorted.csv not found. Expected one of: "
+        "Locations CSV not found. Expected one of: "
         + ", ".join(str(p) for p in candidates)
     )
 

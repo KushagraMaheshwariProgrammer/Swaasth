@@ -4,6 +4,7 @@ Swaasth/
 .env.local
 backend/.env
 frontend/.env
+frontend/.env.production.local
 backend/firebase-service-account.json
 node_modules/
 frontend/node_modules/
@@ -17,3 +18,6 @@ backend/data/indian_pharmaceutical_products.csv
 backend/data/indian_pharmaceutical_products_clean.csv
 backend/data/az_medicines_india.csv
 backend/data/A_Z_medicines_dataset_of_India.csv
+# Aarogya Bhadratha runtime report cache (generated per analysis)
+backend/data/aarogya_bhadratha_cache/reports/
+Swaasth_OLD_BACKUP/

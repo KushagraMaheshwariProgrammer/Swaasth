@@ -68,11 +68,14 @@ export function validatePatientInput(patientData) {
   if (!Number.isFinite(age) || age < 0 || age > 150) {
     throw new Error("Please enter a valid age (0–150).");
   }
+  const state = patientData?.state?.trim() || "";
   return {
     name,
     gender,
     age,
+    state,
     ayushmanEligible: Boolean(patientData?.ayushmanEligible),
+    aarogyaBhadrathaEligible: Boolean(patientData?.aarogyaBhadrathaEligible),
     savePastBills: Boolean(patientData?.savePastBills),
   };
 }
@@ -104,7 +107,9 @@ function buildFirestorePayload(patientData) {
     name: validated.name,
     age: validated.age,
     gender: validated.gender,
+    state: validated.state,
     ayushmanEligible: validated.ayushmanEligible,
+    aarogyaBhadrathaEligible: validated.aarogyaBhadrathaEligible,
     savePastBills: validated.savePastBills,
     updatedAt: serverTimestamp(),
   };
