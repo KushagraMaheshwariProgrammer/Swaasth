@@ -8,30 +8,75 @@ export const API_BASE =
 
 const BASE = `${API_BASE}/api/aarogya-bhadratha`;
 
+function backendUnreachableMessage() {
+  if (Capacitor.isNativePlatform()) {
+    return (
+      "Could not reach the Swaasth backend. On your Mac run: cd backend && ./run_dev.sh " +
+      "(it must listen on 0.0.0.0:8000), then try again."
+    );
+  }
+  return (
+    "Could not reach the Swaasth backend. Start it with: cd backend && ./run_dev.sh " +
+    "(port 8000), then try again."
+  );
+}
+
 async function parseJson(response) {
-  const payload = await response.json().catch(() => null);
+  const text = await response.text();
+  let payload = null;
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = null;
+    }
+  }
   if (!response.ok) {
     const detail = payload?.detail;
     const message = Array.isArray(detail)
       ? detail.map((entry) => entry.msg).join(", ")
       : detail;
-    throw new Error(message || "Aarogya Bhadratha request failed.");
+    if (message) {
+      throw new Error(message);
+    }
+    if (response.status === 404) {
+      throw new Error(
+        "Aarogya Bhadratha endpoint not found (404). Restart the backend so the new routes load."
+      );
+    }
+    if (response.status >= 502 && response.status <= 504) {
+      throw new Error(backendUnreachableMessage());
+    }
+    throw new Error(`Aarogya Bhadratha request failed (HTTP ${response.status}).`);
   }
   return payload;
+}
+
+// fetch wrapper that turns network failures (backend down) into a clear message.
+async function request(url, options) {
+  let response;
+  try {
+    response = await fetch(url, options);
+  } catch (error) {
+    if (error?.message === "Failed to fetch" || error?.name === "TypeError") {
+      throw new Error(backendUnreachableMessage());
+    }
+    throw error;
+  }
+  return parseJson(response);
 }
 
 export async function extractAarogyaBill(file) {
   const formData = new FormData();
   formData.append("file", file);
-  const response = await fetch(`${API_BASE}/api/aarogya-bhadratha/extract-bill`, {
+  return request(`${API_BASE}/api/aarogya-bhadratha/extract-bill`, {
     method: "POST",
     body: formData,
   });
-  return parseJson(response);
 }
 
 export async function verifyHospital({ hospitalName, district = "", address = "" }) {
-  const response = await fetch(`${BASE}/verify-hospital`, {
+  return request(`${BASE}/verify-hospital`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -40,16 +85,14 @@ export async function verifyHospital({ hospitalName, district = "", address = ""
       address,
     }),
   });
-  return parseJson(response);
 }
 
 export async function compareRates(body) {
-  const response = await fetch(`${BASE}/compare-rates`, {
+  return request(`${BASE}/compare-rates`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  return parseJson(response);
 }
 
 export async function searchHospitals({
@@ -65,18 +108,15 @@ export async function searchHospitals({
   if (speciality) params.set("speciality", speciality);
   params.set("page", String(page));
   params.set("limit", String(limit));
-  const response = await fetch(`${BASE}/hospitals/search?${params}`);
-  return parseJson(response);
+  return request(`${BASE}/hospitals/search?${params}`);
 }
 
 export async function getDistricts() {
-  const response = await fetch(`${BASE}/districts`);
-  return parseJson(response);
+  return request(`${BASE}/districts`);
 }
 
 export async function getSpecialities() {
-  const response = await fetch(`${BASE}/specialities`);
-  return parseJson(response);
+  return request(`${BASE}/specialities`);
 }
 
 export function reportPdfUrl(reportId) {
@@ -182,6 +222,5 @@ export function buildAarogyaBillEntry(report, patient) {
 }
 
 export async function getReport(reportId) {
-  const response = await fetch(`${BASE}/reports/${reportId}`);
-  return parseJson(response);
+  return request(`${BASE}/reports/${reportId}`);
 }
