@@ -1827,6 +1827,63 @@ body {
   color: var(--primary);
 }
 
+.scheme-eligibility {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.scheme-eligibility-title {
+  padding: 0;
+  margin: 0 0 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.scheme-card-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.85rem;
+}
+
+.scheme-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem 1.1rem;
+  background: var(--neu-surface);
+  border: 1px solid rgba(184, 190, 200, 0.4);
+  border-radius: var(--neu-radius-sm);
+  box-shadow: var(--neu-shadow-soft);
+}
+
+.scheme-card-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.scheme-card-checkbox input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.scheme-card .eligibility-learn-btn {
+  font-size: 0.88rem;
+}
+
+@media (max-width: 640px) {
+  .scheme-card-list {
+    grid-template-columns: 1fr;
+  }
+}
+
 .patient-form-actions {
   display: flex;
   gap: 0.75rem;
@@ -2320,4 +2377,326 @@ body {
   margin: 0 0 1rem;
   color: var(--text-secondary);
   font-size: 0.92rem;
+}
+
+/* ----------------------------------------------------------------------- */
+/* Aarogya Bhadratha Scheme                                                */
+/* ----------------------------------------------------------------------- */
+.abh-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.abh-empanel-badge {
+  margin: 0;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--neu-radius-sm);
+  background: rgba(72, 187, 120, 0.16);
+  color: #1e8449;
+  font-weight: 700;
+  font-size: 0.92rem;
+  box-shadow: var(--neu-shadow-inset-sm);
+}
+
+.abh-warn-banner {
+  margin: 0 0 0.5rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--neu-radius-sm);
+  background: rgba(245, 101, 101, 0.14);
+  color: #c0392b;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.abh-edit,
+.abh-multiple,
+.abh-not-found,
+.abh-empanelled {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+/* Directory + search */
+.abh-directory {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.abh-search-input {
+  width: 100%;
+  border: none;
+  border-radius: var(--neu-radius-sm);
+  padding: 0.7rem 0.85rem;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  background: var(--neu-surface);
+  box-shadow: var(--neu-shadow-inset-sm);
+}
+
+.abh-search-input:focus {
+  outline: none;
+  box-shadow: var(--neu-shadow-inset), 0 0 0 2px var(--primary);
+}
+
+.abh-filter-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.abh-directory-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.abh-result-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.abh-clear-filters {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.abh-hospital-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.abh-hospital-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0.9rem 1rem;
+  background: var(--neu-surface);
+  border-radius: var(--neu-radius-sm);
+  box-shadow: var(--neu-shadow-soft);
+}
+
+.abh-hospital-card-detail {
+  flex-direction: column;
+}
+
+.abh-hospital-card-body {
+  min-width: 0;
+}
+
+.abh-hospital-card strong {
+  font-size: 0.98rem;
+}
+
+.abh-hospital-district {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--primary-dark);
+}
+
+.abh-hospital-address,
+.abh-hospital-spec,
+.abh-hospital-meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.abh-hospital-select {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.abh-load-more {
+  align-self: center;
+}
+
+/* Report */
+.abh-report {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.abh-report-header h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1.25rem;
+}
+
+.abh-info-card {
+  background: var(--neu-surface);
+  border-radius: var(--neu-radius);
+  padding: 1rem 1.1rem;
+  box-shadow: var(--neu-shadow-soft);
+}
+
+.abh-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem 1rem;
+}
+
+.abh-info-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.abh-info-wide {
+  grid-column: 1 / -1;
+}
+
+.abh-info-label {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+}
+
+.abh-info-grid strong {
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.abh-status-empanelled {
+  color: #1e8449;
+}
+
+.abh-summary .summary-stat h3 {
+  font-size: 1.2rem;
+}
+
+.abh-matched-note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.abh-summary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.abh-summary-chips span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--neu-surface);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  box-shadow: var(--neu-shadow-inset-sm);
+}
+
+.abh-item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.abh-item-card {
+  background: var(--neu-surface);
+  border-radius: var(--neu-radius-sm);
+  padding: 0.85rem 1rem;
+  box-shadow: var(--neu-shadow-soft);
+  border-left: 4px solid var(--neu-dark);
+}
+
+.abh-item-above {
+  border-left-color: var(--danger);
+}
+
+.abh-item-ok {
+  border-left-color: var(--success);
+}
+
+.abh-item-manual {
+  border-left-color: #e0a800;
+}
+
+.abh-item-unverified {
+  border-left-color: #b0b8c4;
+}
+
+.abh-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.abh-item-top h4 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.abh-unverified-note {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.abh-manual-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+  color: #b9770e;
+}
+
+.abh-disclaimer {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  line-height: 1.45;
+  padding: 0.75rem 0.9rem;
+  background: var(--neu-surface);
+  border-radius: var(--neu-radius-sm);
+  box-shadow: var(--neu-shadow-inset-sm);
+}
+
+.abh-report-actions,
+.abh-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.abh-share-btn {
+  margin-top: 0;
+  width: auto;
+  flex: 1 1 140px;
+}
+
+@media (max-width: 640px) {
+  .abh-info-grid {
+    grid-template-columns: 1fr;
+  }
+  .abh-filter-row {
+    grid-template-columns: 1fr;
+  }
+  .abh-hospital-card {
+    flex-direction: column;
+  }
+  .abh-hospital-select {
+    width: 100%;
+  }
 }

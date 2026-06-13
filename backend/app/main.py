@@ -14,6 +14,8 @@ from groq import Groq
 from PIL import Image
 from pydantic import BaseModel, Field, model_validator
 
+from app.aarogya_bhadratha import get_aarogya_store
+from app.aarogya_routes import router as aarogya_router
 from app.cghs_rates import (
     get_cghs_store,
     resolve_hospital_type,
@@ -44,12 +46,16 @@ app.add_middleware(
         "http://localhost:5174",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
+        "https://localhost",
+        "capacitor://localhost",
     ],
     allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(aarogya_router)
 
 
 @app.on_event("startup")
@@ -117,6 +123,16 @@ def load_reference_data() -> None:
         )
     except Exception as exc:
         print(f"WARNING: Jan Aushadhi product list failed to load: {exc}")
+
+    try:
+        aarogya = get_aarogya_store()
+        print(
+            f"Loaded {len(aarogya.hospitals)} Aarogya Bhadratha hospitals "
+            f"({len(aarogya.list_districts())} districts) and "
+            f"{len(aarogya.rates)} rate rows"
+        )
+    except Exception as exc:
+        print(f"WARNING: Aarogya Bhadratha data failed to load: {exc}")
 
 
 @app.get("/health")
@@ -943,5 +959,96 @@ async def upload_bill(
             "city": location_meta.get("city", city),
             "hospital_type": hospital_meta["hospital_type"],
         },
+        "line_items": normalized_items,
+    }
+
+
+def _extract_bill_date(text: str) -> str | None:
+    """Best-effort bill-date extraction from raw OCR text."""
+    if not text:
+        return None
+    patterns = [
+        r"\b(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})\b",
+        r"\b(\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2})\b",
+        r"\b(\d{1,2}\s+[A-Za-z]{3,9}\.?\s+\d{2,4})\b",
+    ]
+    for line in text.splitlines():
+        if re.search(r"date", line, re.IGNORECASE):
+            for pattern in patterns:
+                match = re.search(pattern, line)
+                if match:
+                    return match.group(1)
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.group(1)
+    return None
+
+
+@app.post("/api/aarogya-bhadratha/extract-bill")
+async def aarogya_extract_bill(file: UploadFile = File(...)) -> dict[str, Any]:
+    """OCR-extract a bill for the Aarogya Bhadratha workflow.
+
+    Reuses the same OCR + extraction pipeline as /upload-bill but without
+    requiring CGHS state/city/tier (Telangana is not in the CGHS city
+    directory). Preserves the original OCR text and extracted values.
+    """
+    allowed_types = {
+        "application/pdf": "pdf",
+        "image/jpeg": "jpeg",
+        "image/png": "png",
+    }
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file type. Allowed types: pdf, jpg, jpeg, png.",
+        )
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    file_type = allowed_types[file.content_type]
+    if file_type == "pdf":
+        extracted_text = _extract_text_from_pdf(file_bytes)
+    else:
+        extracted_text = _extract_text_from_image(file_bytes)
+
+    if not extracted_text:
+        raise HTTPException(
+            status_code=400,
+            detail="No readable text found in the uploaded file.",
+        )
+
+    ai_result = _analyze_bill_text_with_groq(extracted_text)
+    if not ai_result.get("is_medical_bill", False):
+        raise HTTPException(
+            status_code=400,
+            detail=ai_result.get(
+                "error", "Uploaded document does not appear to be a medical bill."
+            ),
+        )
+
+    line_items = ai_result.get("line_items", [])
+    if not isinstance(line_items, list):
+        line_items = []
+    normalized_items = _normalize_line_items(line_items)
+
+    hospital_name = ai_result.get("hospital_name")
+    if hospital_name is not None:
+        hospital_name = str(hospital_name).strip() or None
+
+    original_total = round(
+        sum(max(_to_float(i.get("total_price")), 0.0) for i in normalized_items), 2
+    )
+
+    return {
+        "filename": file.filename or "unknown",
+        "file_type": file_type,
+        "message": "Bill extracted successfully",
+        "ocr_hospital_name": hospital_name,
+        "ocr_text": extracted_text,
+        "bill_date": _extract_bill_date(extracted_text),
+        "original_total": original_total,
         "line_items": normalized_items,
     }

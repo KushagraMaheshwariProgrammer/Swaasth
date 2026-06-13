@@ -1,3 +1,5 @@
 -r requirements.txt
 kagglehub[pandas-datasets]
 pandas
+pytest
+httpx

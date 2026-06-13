@@ -43,7 +43,26 @@ export const PMJAY_ELIGIBILITY_SECTIONS = [
   },
 ];
 
-export default function EligibilityCriteriaModal({ open, onClose }) {
+export const AAROGYA_BHADRATHA_ELIGIBILITY_SECTIONS = [
+  {
+    title: "Aarogya Bhadratha Scheme – Eligibility Criteria",
+    items: [
+      "All categories of employees working in the Police Department on a regular basis.",
+      "Male and female children of members are eligible up to 25 years of age, restricted to a maximum of three children. Gainfully employed sons and married daughters are excluded.",
+      "Stipendiary recruits, including Induction Trainee Police Constables and Sub-Inspectors.",
+      "Boarders residing in Police Boys Hostels.",
+      "Widows of police personnel who died in extremist or terrorist activities.",
+      "Membership under the scheme continues only until retirement.",
+    ],
+  },
+];
+
+export default function EligibilityCriteriaModal({
+  open,
+  onClose,
+  title = "Ayushman Bharat PM-JAY eligibility",
+  sections = PMJAY_ELIGIBILITY_SECTIONS,
+}) {
   if (!open) {
     return null;
   }
@@ -61,7 +80,7 @@ export default function EligibilityCriteriaModal({ open, onClose }) {
         onClick={(event) => event.stopPropagation()}
       >
         <header className="modal-header">
-          <h2 id="eligibility-modal-title">Ayushman Bharat PM-JAY eligibility</h2>
+          <h2 id="eligibility-modal-title">{title}</h2>
           <button
             type="button"
             className="modal-close"
@@ -72,7 +91,7 @@ export default function EligibilityCriteriaModal({ open, onClose }) {
           </button>
         </header>
         <div className="modal-body eligibility-modal-body">
-          {PMJAY_ELIGIBILITY_SECTIONS.map((section) => (
+          {sections.map((section) => (
             <section key={section.title} className="eligibility-section">
               <h3>{section.title}</h3>
               {section.intro && <p>{section.intro}</p>}
