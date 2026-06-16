@@ -57,6 +57,35 @@ export const AAROGYA_BHADRATHA_ELIGIBILITY_SECTIONS = [
   },
 ];
 
+export const AAROGYA_BHADRATHA_COVERAGE_LIMITS = [
+  {
+    title: "Per-Case Reimbursement Limits (G.O.Ms.No.101, 1-12-2015)",
+    items: [
+      "General ailments: Up to Rs. 5,00,000 per treatment episode.",
+      "Major ailments (heart surgery, kidney transplant, cancer, neuro-surgery): Up to Rs. 7,50,000 per treatment.",
+      "If treatment cost exceeds the package limit, the CEO of EHS may review on a case-by-case basis.",
+    ],
+  },
+  {
+    title: "Annual Family Limits (Financial Year)",
+    intro:
+      "The scheme covers a family (self + spouse + up to 3 children under 25 + parents) with the following annual limits:",
+    items: [
+      "Up to Rs. 8,00,000 per year: Automatic coverage without additional approval.",
+      "Rs. 8,00,000 to Rs. 15,00,000: Requires DGP approval.",
+      "Beyond Rs. 15,00,000: Requires Trust Board approval.",
+    ],
+  },
+  {
+    title: "Payment Basis by Hospital Type",
+    items: [
+      "Non-NABH and regular NABH hospitals: Payment at EHS package rates. Packages are all-inclusive (investigations, medicines, implants, consumables, diet, complications, and 10-day follow-up).",
+      "NABH Super Specialty hospitals: Surgical procedures at package rates, plus consumables (implants, stents, mesh) at actual cost. Medical management (non-surgical) is on actual claims basis with bill scrutiny.",
+      "Hospital rates: Used as fallback only for procedures not covered in the EHS schedule.",
+    ],
+  },
+];
+
 export default function EligibilityCriteriaModal({
   open,
   onClose,

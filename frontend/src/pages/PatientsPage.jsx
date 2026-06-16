@@ -11,6 +11,7 @@ import {
   formatCurrency,
   getBillPatientName,
 } from "../billUtils";
+import { resolveScheme } from "../data/schemes";
 import { useAuth } from "../context/AuthContext";
 import { deleteBill } from "../services/bills";
 import {
@@ -474,10 +475,7 @@ export default function PatientsPage() {
                                 )}
                                 {bill.comparison_settings?.city &&
                                   `${bill.comparison_settings.city} · `}
-                                {bill.comparison_settings?.comparison_scheme ===
-                                "hbp_pmjay"
-                                  ? "PM-JAY HBP rates"
-                                  : "CGHS rates"}
+                                {resolveScheme(bill).label}
                               </p>
                             </div>
                             <div className="history-list-meta">

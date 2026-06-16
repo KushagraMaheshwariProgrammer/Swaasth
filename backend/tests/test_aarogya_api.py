@@ -19,6 +19,14 @@ def _first_hospital_id() -> str:
     return results[0]["id"]
 
 
+def test_status_endpoint() -> None:
+    res = client.get("/api/aarogya-bhadratha/status")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["status"] == "ok"
+    assert body["hospitals_loaded"] > 0
+
+
 def test_districts_endpoint() -> None:
     res = client.get("/api/aarogya-bhadratha/districts")
     assert res.status_code == 200
@@ -50,6 +58,17 @@ def test_verify_hospital_endpoint() -> None:
     assert res.status_code == 200
     body = res.json()
     assert body["empanelment_status"] in {"empanelled", "multiple", "not_found"}
+
+
+def test_verify_brand_only_hospital() -> None:
+    res = client.post(
+        "/api/aarogya-bhadratha/verify-hospital",
+        json={"hospital_name": "Apollo Hospital", "district": "Hyderabad"},
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["empanelment_status"] == "multiple"
+    assert len(body.get("candidates") or []) >= 2
 
 
 def test_verify_missing_name() -> None:

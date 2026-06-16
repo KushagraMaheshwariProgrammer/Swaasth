@@ -3,9 +3,12 @@ import AarogyaResults from "./AarogyaResults";
 import AarogyaHospitalDirectory from "./AarogyaHospitalDirectory";
 import {
   buildAarogyaBillEntry,
+  buildHospitalSearchQuery,
   compareRates,
   extractAarogyaBill,
   getDistricts,
+  isSameHospitalBrand,
+  searchHospitals,
   verifyHospital,
 } from "../services/aarogyaBhadratha";
 import {
@@ -35,7 +38,12 @@ const recalc = (item) => {
   return { ...item, total_price: Math.round(quantity * unit * 100) / 100 };
 };
 
-export default function AarogyaFlow({ patient, user, onChangePatient }) {
+export default function AarogyaFlow({
+  patient,
+  user,
+  onChangePatient,
+  onCompareWithCghs = null,
+}) {
   const inputRef = useRef(null);
   const [phase, setPhase] = useState("upload");
   const [file, setFile] = useState(null);
@@ -53,6 +61,11 @@ export default function AarogyaFlow({ patient, user, onChangePatient }) {
 
   const [report, setReport] = useState(null);
   const [saveMessage, setSaveMessage] = useState("");
+  const [suggestedHospitals, setSuggestedHospitals] = useState([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionsError, setSuggestionsError] = useState("");
+  const [cghsLoading, setCghsLoading] = useState(false);
+  const [consumableIndices, setConsumableIndices] = useState(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -65,6 +78,74 @@ export default function AarogyaFlow({ patient, user, onChangePatient }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (phase !== "not_found") {
+      return undefined;
+    }
+
+    let cancelled = false;
+    (async () => {
+      setSuggestionsLoading(true);
+      setSuggestionsError("");
+      try {
+        let results = [];
+        const searchQuery = buildHospitalSearchQuery(hospitalName);
+        if (district) {
+          const byDistrict = await searchHospitals({
+            district,
+            limit: 8,
+          });
+          results = (byDistrict.results || [])
+            .filter((hospital) => !isSameHospitalBrand(hospitalName, hospital))
+            .slice(0, 4);
+        }
+        if (!results.length && searchQuery) {
+          const byName = await searchHospitals({
+            query: searchQuery,
+            district: district || undefined,
+            limit: 6,
+          });
+          results = (byName.results || [])
+            .filter((hospital) => !isSameHospitalBrand(hospitalName, hospital))
+            .slice(0, 4);
+        }
+        if (!results.length && searchQuery && !district) {
+          const byName = await searchHospitals({
+            query: searchQuery,
+            limit: 4,
+          });
+          results = byName.results || [];
+        }
+        if (!results.length && district) {
+          const byDistrict = await searchHospitals({
+            district,
+            limit: 4,
+          });
+          results = byDistrict.results || [];
+        }
+        if (!cancelled) {
+          setSuggestedHospitals(results);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setSuggestedHospitals([]);
+          setSuggestionsError(
+            err.message ||
+              "Could not load empanelled hospitals. Check that the backend is running."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setSuggestionsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, hospitalName, district]);
 
   const resetAll = () => {
     setPhase("upload");
@@ -79,6 +160,46 @@ export default function AarogyaFlow({ patient, user, onChangePatient }) {
     setMatchInfo({ confidence: null, method: null });
     setReport(null);
     setSaveMessage("");
+    setSuggestedHospitals([]);
+    setSuggestionsLoading(false);
+    setConsumableIndices(new Set());
+  };
+
+  const isNabhSuperSpecialty = (hospital) => {
+    const accreditation = (hospital?.accreditation || "").toUpperCase();
+    return accreditation.includes("SUPER");
+  };
+
+  const toggleConsumable = (index) => {
+    setConsumableIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
+
+  const handleCompareWithCghs = async () => {
+    if (!onCompareWithCghs) {
+      return;
+    }
+    setError("");
+    setCghsLoading(true);
+    try {
+      await onCompareWithCghs({
+        items: validItems(),
+        hospitalName: hospitalName.trim(),
+        district,
+        ocr,
+        file,
+      });
+    } catch (err) {
+      setError(err.message || "Could not start CGHS comparison.");
+      setCghsLoading(false);
+    }
   };
 
   const handleFile = (selected) => {
@@ -220,6 +341,7 @@ export default function AarogyaFlow({ patient, user, onChangePatient }) {
         ocr_text: ocr?.ocr_text || "",
         match_confidence: matchInfo.confidence,
         match_method: matchInfo.method,
+        consumable_indices: Array.from(consumableIndices),
       });
       setReport(generated);
       setPhase("results");
@@ -490,11 +612,86 @@ export default function AarogyaFlow({ patient, user, onChangePatient }) {
       {phase === "not_found" && (
         <div className="abh-not-found">
           <p className="abh-warn-banner">
-            This hospital was not found in the Aarogya Bhadratha empanelled
-            hospital list.
+            {hospitalName.trim()
+              ? `"${hospitalName.trim()}" is not empanelled under Aarogya Bhadratha.`
+              : "This hospital was not found in the Aarogya Bhadratha empanelled hospital list."}
           </p>
+
+          <div className="abh-ineligible-options">
+            <p className="abh-ineligible-lead">
+              You&apos;re eligible for Aarogya Bhadratha, but this hospital
+              doesn&apos;t participate in the scheme. You can:
+            </p>
+
+            <div className="abh-ineligible-actions">
+              <section className="abh-ineligible-panel">
+                <h3 className="abh-ineligible-panel-title">
+                  Switch to an empanelled hospital
+                </h3>
+                <p className="comparison-settings-hint">
+                  {district
+                    ? `Suggested Aarogya Bhadratha hospitals in ${district}:`
+                    : "Suggested empanelled hospitals near your bill:"}
+                </p>
+                {suggestionsLoading ? (
+                  <p className="auth-info">Finding nearby empanelled hospitals…</p>
+                ) : suggestionsError ? (
+                  <p className="error-text">{suggestionsError}</p>
+                ) : suggestedHospitals.length ? (
+                  <ul className="abh-hospital-list abh-suggested-list">
+                    {suggestedHospitals.map((hospital) => (
+                      <li key={hospital.id} className="abh-hospital-card">
+                        <div className="abh-hospital-card-body">
+                          <strong>{hospital.name}</strong>
+                          <p className="abh-hospital-district">{hospital.district}</p>
+                          <p className="abh-hospital-address">{hospital.address}</p>
+                        </div>
+                        <button
+                          type="button"
+                          className="bill-editor-secondary abh-hospital-select"
+                          onClick={() =>
+                            confirmHospital(hospital, { method: "user_confirmed" })
+                          }
+                        >
+                          Use this hospital
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="comparison-settings-hint">
+                    Search the directory below for an empanelled hospital in your
+                    area.
+                  </p>
+                )}
+              </section>
+
+              {onCompareWithCghs && (
+                <section className="abh-ineligible-panel abh-ineligible-panel-alt">
+                  <h3 className="abh-ineligible-panel-title">
+                    Stay at this hospital
+                  </h3>
+                  <p className="comparison-settings-hint">
+                    Compare your bill against CGHS government benchmark rates
+                    instead. This won&apos;t use Aarogya Bhadratha scheme rates.
+                  </p>
+                  <button
+                    type="button"
+                    className="analyze-btn abh-cghs-fallback-btn"
+                    onClick={handleCompareWithCghs}
+                    disabled={cghsLoading}
+                  >
+                    {cghsLoading
+                      ? "Comparing with CGHS rates…"
+                      : "Compare with CGHS rates →"}
+                  </button>
+                </section>
+              )}
+            </div>
+          </div>
+
           <p className="comparison-settings-hint">
-            You can search for an eligible Aarogya Bhadratha hospital below.
+            Or search all eligible Aarogya Bhadratha hospitals below.
           </p>
           <AarogyaHospitalDirectory
             initialDistrict={district}
@@ -537,6 +734,45 @@ export default function AarogyaFlow({ patient, user, onChangePatient }) {
                 : ""}
             </p>
           </div>
+
+          {/* Consumables selection for NABH Super Specialty */}
+          {isNabhSuperSpecialty(confirmedHospital) && (
+            <div className="abh-consumables-section">
+              <h4 className="abh-consumables-title">Mark Consumables (Optional)</h4>
+              <p className="comparison-settings-hint">
+                For NABH Super Specialty hospitals, consumables like implants, stents, and mesh
+                are reimbursed at actual cost (on top of package rates). Mark any applicable items below.
+              </p>
+              <ul className="abh-consumables-list">
+                {items.map((item, index) => {
+                  const itemName = String(item.item_name || "").trim();
+                  if (!itemName) return null;
+                  return (
+                    <li key={`consumable-${index}`} className="abh-consumable-item">
+                      <label className="abh-consumable-label">
+                        <input
+                          type="checkbox"
+                          checked={consumableIndices.has(index)}
+                          onChange={() => toggleConsumable(index)}
+                        />
+                        <span className="abh-consumable-name">{itemName}</span>
+                        <span className="abh-consumable-price">
+                          ₹{Number(item.total_price || 0).toLocaleString("en-IN")}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+              {consumableIndices.size > 0 && (
+                <p className="abh-consumables-note">
+                  {consumableIndices.size} item{consumableIndices.size > 1 ? "s" : ""} marked as
+                  consumable — will be passed at actual cost.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="bill-editor-actions">
             <button type="button" className="bill-editor-secondary" onClick={() => setPhase("edit")}>
               ← Edit items

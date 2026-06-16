@@ -22,7 +22,7 @@ function SearchIcon() {
   );
 }
 
-const MAX_VISIBLE_RESULTS = 200;
+const MAX_SEARCH_RESULTS = 200;
 
 export default function LocationSearchPicker({
   label,
@@ -39,15 +39,21 @@ export default function LocationSearchPicker({
   const [query, setQuery] = useState("");
   const searchRef = useRef(null);
 
+  const normalizedQuery = query.trim().toLowerCase();
+
   const filteredItems = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) {
       return items;
     }
     return items.filter((item) => item.toLowerCase().includes(normalizedQuery));
-  }, [items, query]);
+  }, [items, normalizedQuery]);
 
-  const visibleItems = filteredItems.slice(0, MAX_VISIBLE_RESULTS);
+  const visibleItems = useMemo(() => {
+    if (!normalizedQuery) {
+      return filteredItems;
+    }
+    return filteredItems.slice(0, MAX_SEARCH_RESULTS);
+  }, [filteredItems, normalizedQuery]);
 
   const closePicker = () => {
     setOpen(false);
@@ -127,9 +133,9 @@ export default function LocationSearchPicker({
             )}
           </button>
         ))}
-        {filteredItems.length > MAX_VISIBLE_RESULTS && (
+        {normalizedQuery && filteredItems.length > MAX_SEARCH_RESULTS && (
           <p className="location-picker-empty location-search-more">
-            Showing first {MAX_VISIBLE_RESULTS} matches. Keep typing to narrow
+            Showing first {MAX_SEARCH_RESULTS} matches. Keep typing to narrow
             down.
           </p>
         )}

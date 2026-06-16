@@ -8,6 +8,62 @@ export const API_BASE =
 
 const BASE = `${API_BASE}/api/aarogya-bhadratha`;
 
+const HOSPITAL_SEARCH_STOP = new Set([
+  "hospital",
+  "hospitals",
+  "hosp",
+  "medical",
+  "centre",
+  "center",
+  "pvt",
+  "ltd",
+  "limited",
+  "the",
+  "and",
+  "of",
+  "a",
+  "unit",
+  "care",
+  "super",
+  "speciality",
+  "specialty",
+  "multi",
+  "private",
+]);
+
+/** Build a forgiving search query from a bill OCR hospital name. */
+export function buildHospitalSearchQuery(name) {
+  const raw = String(name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+  let tokens = raw.filter(
+    (token) => token.length >= 3 && !HOSPITAL_SEARCH_STOP.has(token)
+  );
+  if (!tokens.length) {
+    tokens = raw.filter((token) => token.length >= 2);
+  }
+  if (tokens.length) {
+    return tokens.slice(0, 4).join(" ");
+  }
+  return String(name || "").trim();
+}
+
+/** True when a directory result looks like the same brand as the bill hospital. */
+export function isSameHospitalBrand(billName, hospital) {
+  const billTokens = buildHospitalSearchQuery(billName)
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!billTokens.length) {
+    return false;
+  }
+  const hay = `${hospital?.name || ""} ${hospital?.full_name || ""}`.toLowerCase();
+  return billTokens.every((token) => hay.includes(token));
+}
+
 function backendUnreachableMessage() {
   if (Capacitor.isNativePlatform()) {
     return (
@@ -119,70 +175,21 @@ export async function getSpecialities() {
   return request(`${BASE}/specialities`);
 }
 
+export async function getAarogyaStatus() {
+  return request(`${BASE}/status`);
+}
+
 export function reportPdfUrl(reportId) {
   return `${BASE}/reports/${reportId}/pdf`;
 }
 
 // Render the report PDF from the full client-held report object so it works
 // for both freshly generated and reopened (history) reports.
-async function fetchReportPdfBlob(report) {
-  const response = await fetch(`${BASE}/reports/render-pdf`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(report),
-  });
-  if (!response.ok) {
-    throw new Error("Could not generate the report PDF.");
-  }
-  return response.blob();
-}
-
-export async function openReportPdf(report) {
-  const blob = await fetchReportPdfBlob(report);
-  const blobUrl = URL.createObjectURL(blob);
-  window.open(blobUrl, "_blank", "noopener");
-}
-
-export async function downloadReportPdf(report, filename = "aarogya-bhadratha-report.pdf") {
-  const blob = await fetchReportPdfBlob(report);
-  const blobUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = blobUrl;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(blobUrl);
-}
-
-export async function shareReportPdf(report) {
-  const blob = await fetchReportPdfBlob(report);
-  const filename = "aarogya-bhadratha-report.pdf";
-  const file =
-    typeof File !== "undefined"
-      ? new File([blob], filename, { type: "application/pdf" })
-      : null;
-
-  if (file && navigator.canShare?.({ files: [file] }) && navigator.share) {
-    try {
-      await navigator.share({
-        title: "Aarogya Bhadratha Bill Comparison Report",
-        text: "Aarogya Bhadratha Bill Comparison Report",
-        files: [file],
-      });
-      return true;
-    } catch (error) {
-      if (error?.name === "AbortError") {
-        return false;
-      }
-    }
-  }
-
-  // Fallback: open the PDF so the user can use the OS share/save sheet.
-  const blobUrl = URL.createObjectURL(blob);
-  window.open(blobUrl, "_blank", "noopener");
-  return false;
-}
+export {
+  openReportPdf,
+  downloadReportPdf,
+  shareReportPdf,
+} from "./reportPdf";
 
 /**
  * Shape an Aarogya Bhadratha report into a bill-history entry that is

@@ -8,6 +8,7 @@ import {
   getFlagMeta,
   HOSPITAL_TYPE_OPTIONS,
 } from "../billUtils";
+import ReportActions from "./ReportActions";
 
 export default function BillResults({ result, toolbar = null }) {
   const summary = useMemo(() => computeBillSummary(result), [result]);
@@ -308,6 +309,8 @@ export default function BillResults({ result, toolbar = null }) {
           </p>
         )}
       </section>
+
+      <ReportActions report={result} />
     </>
   );
 }

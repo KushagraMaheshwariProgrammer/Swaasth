@@ -50,6 +50,7 @@ def build_report(
     comparison: dict[str, Any],
     bill: dict[str, Any],
     ocr: dict[str, Any],
+    jan_aushadhi: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     report_id = uuid.uuid4().hex
     now = _now_iso()
@@ -65,6 +66,7 @@ def build_report(
         "bill": bill,
         "ocr": ocr,
         "comparison": comparison,
+        "jan_aushadhi": jan_aushadhi,
         "disclaimer": DISCLAIMER,
     }
 
@@ -134,19 +136,36 @@ def render_report_html(report: dict[str, Any]) -> str:
         color = _status_color(item.get("status", ""))
         conf = item.get("match_confidence")
         conf_txt = f"{round(float(conf) * 100)}%" if conf else "—"
+        is_medicine = item.get("comparison_source") == "pharma" or item.get("category") == "medicine"
+        matched_label = item.get("matched_name") or "—"
+        if is_medicine and matched_label != "—":
+            matched_label = f"{matched_label} (NPPA ceiling)"
         rows_html.append(
             "<tr>"
             f"<td>{escape(str(item.get('item_name', '')))}</td>"
             f"<td class='num'>{escape(str(item.get('quantity', '')))}</td>"
             f"<td class='num'>{_fmt_currency(item.get('total_price'))}</td>"
-            f"<td>{escape(str(item.get('matched_name') or '—'))}"
+            f"<td>{escape(str(matched_label))}"
             f"{(' (' + escape(str(item.get('matched_code'))) + ')') if item.get('matched_code') else ''}</td>"
-            f"<td class='num'>{_fmt_currency(item.get('approved_amount'))}</td>"
+            f"<td class='num'>{_fmt_currency(item.get('approved_amount') if not is_medicine else item.get('pharma_rate'))}</td>"
             f"<td class='num'>{_fmt_currency(item.get('difference'))}</td>"
             f"<td class='num'>{_fmt_currency(item.get('excess_amount'))}</td>"
             f"<td style='color:{color}'>{escape(str(item.get('status', '')))}</td>"
             f"<td class='num'>{conf_txt}</td>"
             "</tr>"
+        )
+
+    jan_aushadhi = report.get("jan_aushadhi") or {}
+    jan_matches = jan_aushadhi.get("matches") or []
+    jan_rows = []
+    for match in jan_matches:
+        jan_rows.append(
+            "<li>"
+            f"<b>{escape(str(match.get('bill_item_name', '')))}</b>"
+            f" — {escape(str(match.get('generic_name') or ''))}"
+            f" · Jan Aushadhi MRP {_fmt_currency(match.get('mrp'))}"
+            f"{(' per ' + escape(str(match.get('unit_size')))) if match.get('unit_size') else ''}"
+            "</li>"
         )
 
     eligible = "Yes" if patient.get("aarogya_bhadratha_eligible") else "No"
@@ -208,7 +227,8 @@ def render_report_html(report: dict[str, Any]) -> str:
     <tr><td><b>Unmatched items</b></td><td class='num'>{summary.get('unmatched_items', 0)}</td></tr>
     <tr><td><b>Items requiring manual verification</b></td><td class='num'>{summary.get('manual_verification_items', 0)}</td></tr>
   </table>
-  <p style='margin-top:6px;font-size:9px;'>The approved total only includes items that were reliably matched with the Aarogya Bhadratha rates database.</p>
+  <p style='margin-top:6px;font-size:9px;'>Medicines are compared against NPPA ceiling prices (with brand-to-generic resolution when needed). Procedures and other services use Aarogya Bhadratha annexure rates.</p>
+  {"<h2>Jan Aushadhi — subsidized medicines</h2><ul>" + ''.join(jan_rows) + "</ul><p>" + escape(str(jan_aushadhi.get('advisory', ''))) + "</p>" if jan_rows else ""}
 
   <p class='disclaimer'>{escape(DISCLAIMER)}</p>
 </body>
@@ -217,22 +237,7 @@ def render_report_html(report: dict[str, Any]) -> str:
 
 
 def render_report_pdf(report: dict[str, Any]) -> bytes:
-    """Render the report to a PDF using PyMuPDF's Story (HTML) engine."""
-    import io
+    """Render the report to a PDF via the shared scheme registry."""
+    from app.report_pdf import render_report_pdf as render_scheme_pdf
 
-    import fitz
-
-    html = render_report_html(report)
-    story = fitz.Story(html=html)
-    stream = io.BytesIO()
-    buffer = fitz.DocumentWriter(stream)
-    media = fitz.paper_rect("a4")
-    where = media + (36, 36, -36, -36)
-    more = True
-    while more:
-        device = buffer.begin_page(media)
-        more, _ = story.place(where)
-        story.draw(device)
-        buffer.end_page()
-    buffer.close()
-    return stream.getvalue()
+    return render_scheme_pdf(report)

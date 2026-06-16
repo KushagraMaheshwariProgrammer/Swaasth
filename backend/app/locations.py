@@ -34,10 +34,6 @@ def _default_directory_path() -> Path:
     candidates = [
         Path(__file__).resolve().parent.parent / "data" / "india_states_cities_new.csv",
         root / "india_states_cities_new.csv",
-        Path(__file__).resolve().parent.parent
-        / "data"
-        / "india_official_gov_urban_cities_swaasth_sorted.csv",
-        root / "india_official_gov_urban_cities_swaasth_sorted.csv",
     ]
     for path in candidates:
         if path.exists():

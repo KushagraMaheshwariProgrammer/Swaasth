@@ -25,6 +25,7 @@ from app.aarogya_reports import (
     render_report_pdf,
     save_report,
 )
+from app.medicine_comparison import enrich_scheme_line_items_with_jan_aushadhi
 
 router = APIRouter(prefix="/api/aarogya-bhadratha", tags=["aarogya-bhadratha"])
 
@@ -38,6 +39,18 @@ def _store():
         # Log server-side detail without exposing it to the client.
         print(f"WARNING: Aarogya Bhadratha data failed to load: {exc}")
         raise HTTPException(status_code=503, detail=_DATA_UNAVAILABLE) from exc
+
+
+@router.get("/status")
+def aarogya_status() -> dict[str, Any]:
+    """Lightweight health check for the empanelled-hospital directory."""
+    store = _store()
+    return {
+        "status": "ok",
+        "hospitals_loaded": len(store.hospitals),
+        "districts": len(store.list_districts()),
+        "rates_loaded": len(store.rates),
+    }
 
 
 @router.get("/hospitals")
@@ -128,6 +141,10 @@ class CompareRatesRequest(BaseModel):
     ocr_text: str = ""
     match_confidence: float | None = None
     match_method: str | None = None
+    consumable_indices: list[int] = Field(
+        default_factory=list,
+        description="Indices of line items marked as consumables (for NABH Super Specialty: paid at actual cost)",
+    )
 
 
 @router.post("/compare-rates")
@@ -145,7 +162,16 @@ def compare_rates(body: CompareRatesRequest) -> dict[str, Any]:
     if not line_items:
         raise HTTPException(status_code=400, detail="No bill items to compare.")
 
-    comparison = store.compare_bill_items(line_items)
+    comparison = store.compare_bill_items(
+        line_items,
+        hospital=hospital,
+        consumable_indices=body.consumable_indices,
+    )
+
+    enriched_items, jan_aushadhi = enrich_scheme_line_items_with_jan_aushadhi(
+        comparison.get("items") or []
+    )
+    comparison = {**comparison, "items": enriched_items}
 
     original_total = body.bill.original_total
     if original_total is None:
@@ -182,6 +208,7 @@ def compare_rates(body: CompareRatesRequest) -> dict[str, Any]:
             "text": body.ocr_text or "",
             "line_items": line_items,
         },
+        jan_aushadhi=jan_aushadhi,
     )
     save_report(report)
     return report

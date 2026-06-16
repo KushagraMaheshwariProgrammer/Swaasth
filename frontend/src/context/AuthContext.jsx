@@ -31,6 +31,10 @@ import {
 import { auth } from "../firebase";
 import { syncPendingBills } from "../services/bills";
 import { syncPendingPatients } from "../services/patients";
+import {
+  acceptTerms as persistTermsAcceptance,
+  getTermsAcceptance,
+} from "../services/userProfile";
 
 const AuthContext = createContext(null);
 
@@ -58,6 +62,8 @@ export function AuthProvider({ children }) {
   const [emailLinkVerification, setEmailLinkVerification] = useState(
     idleEmailLinkVerification
   );
+  const [termsAccepted, setTermsAccepted] = useState(null);
+  const [termsLoading, setTermsLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,6 +105,39 @@ export function AuthProvider({ children }) {
     });
     return unsubscribe;
   }, [redirectHandled]);
+
+  useEffect(() => {
+    if (!user || needsEmailVerification(user)) {
+      setTermsAccepted(null);
+      setTermsLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setTermsLoading(true);
+
+    getTermsAcceptance(user.uid)
+      .then(({ accepted }) => {
+        if (!cancelled) {
+          setTermsAccepted(accepted);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load terms acceptance:", error);
+        if (!cancelled) {
+          setTermsAccepted(false);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setTermsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     const linkParams = getEmailVerificationLinkParams();
@@ -194,6 +233,14 @@ export function AuthProvider({ children }) {
     setEmailLinkVerification(idleEmailLinkVerification);
   }, []);
 
+  const acceptTerms = useCallback(async () => {
+    if (!auth.currentUser) {
+      throw new Error("You must be signed in to accept the Terms and Conditions.");
+    }
+    await persistTermsAcceptance(auth.currentUser.uid);
+    setTermsAccepted(true);
+  }, []);
+
   const logOut = useCallback(async () => {
     return signOut(auth);
   }, []);
@@ -203,6 +250,9 @@ export function AuthProvider({ children }) {
       user,
       loading: loading || !redirectHandled,
       needsEmailVerification: needsEmailVerification(user),
+      termsAccepted,
+      termsLoading,
+      acceptTerms,
       usesPasswordProvider: usesPasswordProvider(user),
       signUpWithEmail,
       signInWithEmail,
@@ -219,6 +269,9 @@ export function AuthProvider({ children }) {
       user,
       loading,
       redirectHandled,
+      termsAccepted,
+      termsLoading,
+      acceptTerms,
       signUpWithEmail,
       signInWithEmail,
       signInWithGoogle,

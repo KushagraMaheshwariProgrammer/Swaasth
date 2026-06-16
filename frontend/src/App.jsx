@@ -17,17 +17,22 @@ import HistoryPage from "./pages/HistoryPage";
 import PatientsPage from "./pages/PatientsPage";
 import AccountSettingsPage from "./pages/AccountSettingsPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
+import TermsDevPreview from "./pages/TermsDevPreview";
 import PatientForm, { emptyPatientForm } from "./components/PatientForm";
 import PatientList from "./components/PatientList";
 import LocationSearchPicker from "./components/LocationSearchPicker";
 import AarogyaFlow from "./components/AarogyaFlow";
+import TermsAndConditionsModal from "./components/TermsAndConditionsModal";
 import { Capacitor } from "@capacitor/core";
 import { createPatient, getPatients, getPatientsLocalSnapshot } from "./services/patients";
 import { markLocalBillSynced, persistLocalBill, saveBill } from "./services/bills";
 import {
   getCities,
-  getStates,
+  getStateOptions,
   isTelanganaState,
+  mapDistrictToCghsCity,
+  resolveCanonicalStateUtName,
+  resolveCghsFallbackLocation,
   resolveCityTier,
 } from "./services/locations";
 
@@ -153,10 +158,16 @@ function UserNav({ className = "" }) {
 }
 
 function ProtectedRoute({ children }) {
-  const { user, loading, needsEmailVerification: pendingVerification } = useAuth();
+  const {
+    user,
+    loading,
+    needsEmailVerification: pendingVerification,
+    termsAccepted,
+    termsLoading,
+  } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  if (loading || termsLoading) {
     return (
       <div className="auth-loading">
         <div className="spinner-conic" aria-hidden="true" />
@@ -179,7 +190,70 @@ function ProtectedRoute({ children }) {
     );
   }
 
+  if (!termsAccepted) {
+    return null;
+  }
+
   return children;
+}
+
+function TermsGate({ children }) {
+  const {
+    user,
+    loading,
+    needsEmailVerification: pendingVerification,
+    termsAccepted,
+    termsLoading,
+    acceptTerms,
+    logOut,
+  } = useAuth();
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [acceptError, setAcceptError] = useState("");
+
+  const showTerms =
+    user &&
+    !pendingVerification &&
+    !loading &&
+    !termsLoading &&
+    termsAccepted === false;
+
+  const handleAccept = async () => {
+    setAcceptError("");
+    setIsAccepting(true);
+    try {
+      await acceptTerms();
+    } catch (err) {
+      setAcceptError(
+        err?.message ||
+          "Could not save your acceptance. Check your connection and try again."
+      );
+    } finally {
+      setIsAccepting(false);
+    }
+  };
+
+  const handleDecline = async () => {
+    setAcceptError("");
+    try {
+      await logOut();
+    } catch (err) {
+      setAcceptError(err?.message || "Could not sign out. Please try again.");
+    }
+  };
+
+  return (
+    <>
+      {children}
+      {showTerms && (
+        <TermsAndConditionsModal
+          onAccept={handleAccept}
+          onDecline={handleDecline}
+          isSubmitting={isAccepting}
+          error={acceptError}
+        />
+      )}
+    </>
+  );
 }
 
 function LandingPage() {
@@ -366,8 +440,9 @@ function CheckPage() {
   const { user } = useAuth();
   const location = useLocation();
   const inputRef = useRef(null);
+  const cghsLocationRef = useRef({ state: "", city: "" });
   const [selectedFile, setSelectedFile] = useState(null);
-  const [states] = useState(() => getStates());
+  const [states] = useState(() => getStateOptions());
   const [cities, setCities] = useState([]);
   const [stateUtName, setStateUtName] = useState("");
   const [city, setCity] = useState("");
@@ -395,6 +470,7 @@ function CheckPage() {
   const [patientForm, setPatientForm] = useState(emptyPatientForm);
   const [patientSaving, setPatientSaving] = useState(false);
   const [patientInfo, setPatientInfo] = useState("");
+  const [cghsFromAarogya, setCghsFromAarogya] = useState(false);
 
   const reloadPatients = useCallback(async () => {
     if (!user) {
@@ -460,6 +536,8 @@ function CheckPage() {
   const aarogyaMode =
     isTelanganaState(selectedPatient?.state) &&
     Boolean(selectedPatient?.aarogyaBhadrathaEligible);
+  const showAarogyaFlow = aarogyaMode && !cghsFromAarogya;
+  const showCghsBillFlow = !aarogyaMode || cghsFromAarogya;
 
   const handleSaveNewPatient = async (event) => {
     event.preventDefault();
@@ -508,6 +586,169 @@ function CheckPage() {
     setResult(null);
     setScanMeta(null);
     setEditableItems([]);
+    setCghsFromAarogya(false);
+    cghsLocationRef.current = { state: "", city: "" };
+  };
+
+  const handleAarogyaCghsFallback = async ({
+    items,
+    hospitalName,
+    district,
+    ocr: ocrMeta,
+    file: billFile,
+  }) => {
+    const normalizedItems = (items || []).map(normalizeLineItem);
+    if (!normalizedItems.length) {
+      setError("Add at least one bill item before comparing with CGHS.");
+      return;
+    }
+
+    const location = resolveCghsFallbackLocation({
+      patientState: selectedPatient?.state || "Telangana",
+      district,
+    });
+    if (!location.state || !location.city) {
+      setError(
+        "Could not determine the hospital city for CGHS comparison. Select Hyderabad as the district on the bill review step and try again."
+      );
+      return;
+    }
+
+    cghsLocationRef.current = location;
+    setStateUtName(location.state);
+    setCity(location.city);
+    setCities(getCities(location.state));
+    setResolvedTier(resolveCityTier(location.state, location.city));
+    setHospitalType("general");
+    setHospitalNameEdit(hospitalName || "");
+    setEditableItems(normalizedItems);
+    setScanMeta({
+      filename: ocrMeta?.filename || billFile?.name || "bill",
+      file_type: ocrMeta?.file_type || null,
+      hospital: { name_from_bill: hospitalName || null },
+      comparison_settings: {
+        state_name: location.state,
+        city: location.city,
+        aarogya_district: district || "",
+        comparison_scheme: "cghs",
+        cghs_fallback_from_aarogya: true,
+      },
+    });
+    setResult(null);
+    setError("");
+    setSaveMessage("");
+    setCghsFromAarogya(true);
+    setIsComparing(true);
+
+    await runCghsComparison(normalizedItems, location, {
+      hospitalName: hospitalName || "",
+      filename: ocrMeta?.filename || billFile?.name || "bill",
+      file_type: ocrMeta?.file_type || null,
+    });
+  };
+
+  const resolveCompareLocation = () => {
+    const refLocation = cghsLocationRef.current;
+    const compareState =
+      resolveCanonicalStateUtName(
+        refLocation.state ||
+          stateUtName ||
+          scanMeta?.comparison_settings?.state_name ||
+          selectedPatient?.state ||
+          ""
+      ) || "";
+    let compareCity =
+      refLocation.city ||
+      city ||
+      scanMeta?.comparison_settings?.city ||
+      "";
+    if (!compareCity && compareState) {
+      compareCity =
+        mapDistrictToCghsCity(
+          compareState,
+          scanMeta?.comparison_settings?.aarogya_district || ""
+        ) ||
+        getCities(compareState).find((name) => name === "Hyderabad") ||
+        getCities(compareState)[0] ||
+        "";
+    }
+    return { state: compareState, city: compareCity };
+  };
+
+  const runCghsComparison = async (
+    validItems,
+    locationOverride = null,
+    metaOverride = {}
+  ) => {
+    const location =
+      locationOverride?.state && locationOverride?.city
+        ? locationOverride
+        : resolveCompareLocation();
+
+    if (!location.state || !location.city) {
+      setError("Location settings are missing. Please upload the bill again.");
+      return;
+    }
+
+    cghsLocationRef.current = location;
+    setError("");
+    setSaveMessage("");
+    setIsComparing(true);
+
+    try {
+      const response = await fetch(`${API_BASE}/compare-bill`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          line_items: validItems,
+          state_ut_name: location.state,
+          city: location.city,
+          hospital_type: hospitalType,
+          hospital_name: (metaOverride.hospitalName ?? hospitalNameEdit).trim() || null,
+          filename: metaOverride.filename ?? scanMeta?.filename,
+          file_type: metaOverride.file_type ?? scanMeta?.file_type,
+          pmjay_eligible: Boolean(selectedPatient?.ayushmanEligible),
+          patient_id: selectedPatient?.id || null,
+          patient_name: selectedPatient?.name || null,
+          patient_age: selectedPatient?.age ?? null,
+          patient_gender: selectedPatient?.gender || null,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        const detail = payload?.detail;
+        const message = Array.isArray(detail)
+          ? detail.map((entry) => entry.msg).join(", ")
+          : detail;
+        throw new Error(message || "Unable to compare this bill.");
+      }
+      setResult(payload);
+      setIsComparing(false);
+
+      if (user && selectedPatient?.savePastBills) {
+        const localId = persistLocalBill(user.uid, payload);
+        saveBill(user.uid, payload, {
+          localId,
+          patientId: selectedPatient?.id || null,
+        })
+          .then((firestoreId) => {
+            markLocalBillSynced(user.uid, localId, firestoreId);
+            setSaveMessage("Bill saved to your account.");
+          })
+          .catch((saveErr) => {
+            const offline = typeof navigator !== "undefined" && !navigator.onLine;
+            setSaveMessage(
+              saveErr.message ||
+                (offline
+                  ? "Comparison saved on this device. It will sync when you're back online."
+                  : "Comparison saved on this device. Open Past bills to retry syncing to your account.")
+            );
+          });
+      }
+    } catch (err) {
+      setError(err.message || "Something went wrong during comparison.");
+      setIsComparing(false);
+    }
   };
 
   useEffect(() => {
@@ -518,10 +759,14 @@ function CheckPage() {
       return;
     }
 
-    setCity("");
-    setResolvedTier(null);
-    setCities(getCities(stateUtName));
-  }, [stateUtName]);
+    const nextCities = getCities(stateUtName);
+    setCities(nextCities);
+    if (!cghsFromAarogya) {
+      setCity((current) =>
+        current && nextCities.includes(current) ? current : ""
+      );
+    }
+  }, [stateUtName, cghsFromAarogya]);
 
   useEffect(() => {
     if (!stateUtName || !city) {
@@ -586,6 +831,8 @@ function CheckPage() {
     setScanMeta(null);
     setEditableItems([]);
     setHospitalNameEdit("");
+    setCghsFromAarogya(false);
+    cghsLocationRef.current = { state: "", city: "" };
     setError("");
   };
 
@@ -622,69 +869,7 @@ function CheckPage() {
       return;
     }
 
-    if (!stateUtName || !city) {
-      setError("Location settings are missing. Please upload the bill again.");
-      return;
-    }
-
-    setError("");
-    setSaveMessage("");
-    setIsComparing(true);
-
-    try {
-      const response = await fetch(`${API_BASE}/compare-bill`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          line_items: validItems,
-          state_ut_name: stateUtName,
-          city,
-          hospital_type: hospitalType,
-          hospital_name: hospitalNameEdit.trim() || null,
-          filename: scanMeta?.filename,
-          file_type: scanMeta?.file_type,
-          pmjay_eligible: Boolean(selectedPatient?.ayushmanEligible),
-          patient_id: selectedPatient?.id || null,
-          patient_name: selectedPatient?.name || null,
-          patient_age: selectedPatient?.age ?? null,
-          patient_gender: selectedPatient?.gender || null,
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        const detail = payload?.detail;
-        const message = Array.isArray(detail)
-          ? detail.map((entry) => entry.msg).join(", ")
-          : detail;
-        throw new Error(message || "Unable to compare this bill.");
-      }
-      setResult(payload);
-      setIsComparing(false);
-
-      if (user && selectedPatient?.savePastBills) {
-        const localId = persistLocalBill(user.uid, payload);
-        saveBill(user.uid, payload, {
-          localId,
-          patientId: selectedPatient?.id || null,
-        })
-          .then((firestoreId) => {
-            markLocalBillSynced(user.uid, localId, firestoreId);
-            setSaveMessage("Bill saved to your account.");
-          })
-          .catch((saveErr) => {
-            const offline = typeof navigator !== "undefined" && !navigator.onLine;
-            setSaveMessage(
-              saveErr.message ||
-                (offline
-                  ? "Comparison saved on this device. It will sync when you're back online."
-                  : "Comparison saved on this device. Open Past bills to retry syncing to your account.")
-            );
-          });
-      }
-    } catch (err) {
-      setError(err.message || "Something went wrong during comparison.");
-      setIsComparing(false);
-    }
+    await runCghsComparison(validItems);
   };
 
   const handleAnalyze = async () => {
@@ -880,7 +1065,7 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {billStep === "bill" && aarogyaMode && (
+          {billStep === "bill" && showAarogyaFlow && (
             <motion.section
               key="aarogya-flow"
               initial={{ opacity: 0, y: 12 }}
@@ -892,11 +1077,12 @@ function CheckPage() {
                 patient={selectedPatient}
                 user={user}
                 onChangePatient={handleChangePatient}
+                onCompareWithCghs={handleAarogyaCghsFallback}
               />
             </motion.section>
           )}
 
-          {uiState === "upload" && billStep === "bill" && !aarogyaMode && (
+          {uiState === "upload" && billStep === "bill" && showCghsBillFlow && (
             <motion.section
               key="upload"
               className="upload-card"
@@ -1041,7 +1227,7 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {(uiState === "loading" || uiState === "comparing") && !aarogyaMode && (
+          {(uiState === "loading" || uiState === "comparing") && showCghsBillFlow && (
             <motion.section
               key={uiState === "comparing" ? "comparing" : "loading"}
               className="loading-card"
@@ -1064,7 +1250,7 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {uiState === "edit" && !aarogyaMode && (
+          {uiState === "edit" && showCghsBillFlow && (
             <motion.section
               key="edit"
               className="bill-editor-shell"
@@ -1073,6 +1259,54 @@ function CheckPage() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.25 }}
             >
+              {cghsFromAarogya && (
+                <p className="abh-cghs-fallback-note">
+                  Comparing against CGHS rates because{" "}
+                  <strong>{hospitalNameEdit || "this hospital"}</strong> is not
+                  empanelled under Aarogya Bhadratha.
+                  {city && stateUtName
+                    ? ` Location: ${city}, ${stateUtName}.`
+                    : " Using Hyderabad, Telangana for CGHS tier."}
+                </p>
+              )}
+
+              {cghsFromAarogya && (
+                <div className="comparison-settings-grid abh-cghs-location-grid">
+                  <LocationSearchPicker
+                    label="State/UT"
+                    items={states}
+                    value={stateUtName}
+                    onSelect={(value) => {
+                      const canonical = resolveCanonicalStateUtName(value);
+                      cghsLocationRef.current = {
+                        state: canonical,
+                        city: "",
+                      };
+                      setStateUtName(canonical);
+                      setCity("");
+                    }}
+                    placeholder="Select state/UT"
+                  />
+                  <LocationSearchPicker
+                    label="City (CGHS tier)"
+                    items={cities}
+                    value={city}
+                    onSelect={(value) => {
+                      cghsLocationRef.current = {
+                        state: stateUtName,
+                        city: value,
+                      };
+                      setCity(value);
+                    }}
+                    disabled={!stateUtName}
+                    placeholder="Select city"
+                    emptyLabel={
+                      stateUtName ? "No cities available" : "Select state/UT first"
+                    }
+                  />
+                </div>
+              )}
+
               <header className="bill-editor-header">
                 <div>
                   <h2>Review scanned items</h2>
@@ -1220,7 +1454,7 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {uiState === "results" && !aarogyaMode && (
+          {uiState === "results" && showCghsBillFlow && (
             <motion.section
               key="results"
               className="results-shell"
@@ -1265,6 +1499,9 @@ function AppRoutes() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
+        {import.meta.env.DEV && (
+          <Route path="/__dev/terms" element={<TermsDevPreview />} />
+        )}
         <Route
           path="/account"
           element={
@@ -1323,7 +1560,9 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <AppRoutes />
+        <TermsGate>
+          <AppRoutes />
+        </TermsGate>
       </BrowserRouter>
     </AuthProvider>
   );
