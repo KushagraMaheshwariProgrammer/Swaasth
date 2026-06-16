@@ -33,6 +33,41 @@ HOSPITAL_MULTIPLE_GAP = 0.12
 RATE_MATCH_THRESHOLD = 0.62
 RATE_STRONG_MATCH = 0.84
 
+# --------------------------------------------------------------------------- #
+# EHS Payment Rules - Ceiling Limits (G.O.Ms.No.101, 1-12-2015)               #
+# --------------------------------------------------------------------------- #
+CEILING_GENERAL = 500_000       # Rs. 5 lakh for general ailments
+CEILING_MAJOR = 750_000         # Rs. 7.5 lakh for major ailments
+ANNUAL_CAP_AUTO = 800_000       # Rs. 8 lakh automatic family limit per FY
+ANNUAL_CAP_DGP = 1_500_000      # Rs. 15 lakh with DGP approval
+
+# Major ailment categories (heart surgery, kidney transplant, cancer, neuro-surgery)
+MAJOR_AILMENT_CATEGORIES = frozenset({
+    "CARDIOTHORASIC SURGERY",   # heart surgery
+    "NEURO SURGERY",            # neuro-surgery
+    "MEDICAL ONCOLOGY",         # cancer
+    "SURGICAL ONCOLOGY",        # cancer
+    "RADIATION ONCOLOGY",       # cancer
+})
+
+# Keywords for kidney transplant procedures (checked separately within GENITO URINARY)
+KIDNEY_TRANSPLANT_KEYWORDS = frozenset({
+    "kidney transplant",
+    "renal transplant",
+    "transplant kidney",
+    "transplant renal",
+})
+
+# Hospital type constants
+HOSPITAL_TYPE_NON_NABH = "non_nabh"
+HOSPITAL_TYPE_NABH = "nabh"
+HOSPITAL_TYPE_NABH_SUPER = "nabh_super"
+
+# Payment basis constants
+PAYMENT_BASIS_PACKAGE = "package"
+PAYMENT_BASIS_PACKAGE_PLUS_CONSUMABLES = "package_plus_consumables"
+PAYMENT_BASIS_ACTUAL = "actual"
+
 _HOSPITAL_STRIP_TOKENS = frozenset(
     {
         "hospital",
@@ -113,6 +148,9 @@ def normalize_hospital_name(name: str) -> str:
     for pattern, repl in _HOSPITAL_ABBREVIATIONS:
         normalized = re.sub(pattern, repl, normalized)
     tokens = [t for t in normalized.split() if t not in _HOSPITAL_STRIP_TOKENS]
+    # Keep distinctive tokens when only generic suffixes remain (e.g. "Care Hospital").
+    if not tokens:
+        tokens = [t for t in normalized.split() if len(t) >= 2]
     return _clean_spaces(" ".join(tokens))
 
 
@@ -183,6 +221,32 @@ class HospitalRecord:
     normalized_name: str
     name_tokens: frozenset[str]
 
+    def get_hospital_type(self) -> str:
+        """Classify hospital by accreditation for payment rule selection.
+
+        Returns:
+            'non_nabh': Non-NABH hospitals - package rates only
+            'nabh': Regular NABH hospitals - package rates only
+            'nabh_super': NABH Super Specialty - package + consumables at actual
+        """
+        acc = (self.accreditation or "").upper()
+        if "SUPER" in acc:
+            return HOSPITAL_TYPE_NABH_SUPER
+        if "NABH" in acc and "NON" not in acc:
+            return HOSPITAL_TYPE_NABH
+        return HOSPITAL_TYPE_NON_NABH
+
+    def get_payment_basis(self) -> str:
+        """Determine payment basis for this hospital type.
+
+        Returns:
+            'package': All-inclusive package rates
+            'package_plus_consumables': Package + consumables at actual (NABH Super)
+        """
+        if self.get_hospital_type() == HOSPITAL_TYPE_NABH_SUPER:
+            return PAYMENT_BASIS_PACKAGE_PLUS_CONSUMABLES
+        return PAYMENT_BASIS_PACKAGE
+
     def to_public(self) -> dict[str, Any]:
         return {
             "id": self.id,
@@ -197,6 +261,8 @@ class HospitalRecord:
             "hospital_code": self.hospital_code,
             "empanelled_date": self.empanel_date,
             "dme_validity_upto": self.dme_validity,
+            "hospital_type": self.get_hospital_type(),
+            "payment_basis": self.get_payment_basis(),
         }
 
 
@@ -204,14 +270,24 @@ class HospitalRecord:
 class RateRecord:
     code: str
     name: str
-    rate: float | None
+    rate: float | None               # Legacy single rate (for backward compat)
+    rate_non_nabh: float | None      # Price_Private_Non_NABH from EHS
+    rate_nabh: float | None          # Price_Private_NABH from EHS
     rate_text: str
     unit: str
     department: str
     category: str
+    category_hierarchy: str          # e.g., "NEURO SURGERY", "GENERAL SURGERY"
     source: str
     normalized_name: str
     tokens: frozenset[str]
+    is_major_ailment: bool           # True if category_hierarchy in MAJOR_AILMENT_CATEGORIES
+
+    def get_rate_for_hospital_type(self, hospital_type: str) -> float | None:
+        """Get the appropriate rate based on hospital accreditation type."""
+        if hospital_type in (HOSPITAL_TYPE_NABH, HOSPITAL_TYPE_NABH_SUPER):
+            return self.rate_nabh if self.rate_nabh is not None else self.rate
+        return self.rate_non_nabh if self.rate_non_nabh is not None else self.rate
 
 
 def _split_specialities(text: str) -> list[str]:
@@ -465,27 +541,144 @@ def parse_rate_annexures(source: Path | None = None) -> dict[str, Any]:
     return {"rates": rates, "unparsed": unparsed}
 
 
+def _ehs_excel_path() -> Path | None:
+    """Find the EHS Excel file with category hierarchy and hospital-type rates."""
+    candidates = sorted(_DATA_DIR.glob("**/EHS*with*Category*.xlsx"))
+    if not candidates:
+        candidates = sorted(_DATA_DIR.glob("**/EHS*.xlsx"))
+    return candidates[0] if candidates else None
+
+
+def parse_ehs_excel(excel_path: Path | None = None) -> dict[str, Any]:
+    """Parse the EHS Excel file with hospital-type-specific package rates.
+
+    The EHS file contains 1,885 procedures with 4 price columns:
+    - Price_Semi_Private_Non_NABH
+    - Price_Private_Non_NABH (used for Non-NABH hospitals)
+    - Price_Semi_Private_NABH
+    - Price_Private_NABH (used for NABH and NABH Super Specialty)
+
+    Returns a dict with ``rates`` (list of rate dicts) and ``unparsed`` notes.
+    """
+    try:
+        import openpyxl
+    except ImportError:
+        return {"rates": [], "unparsed": ["openpyxl not installed - EHS parsing skipped"]}
+
+    path = excel_path or _ehs_excel_path()
+    if path is None or not path.exists():
+        return {"rates": [], "unparsed": ["EHS Excel file not found"]}
+
+    rates: list[dict[str, Any]] = []
+    unparsed: list[str] = []
+
+    try:
+        workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        sheet = workbook.active
+        if sheet is None:
+            return {"rates": [], "unparsed": ["EHS Excel has no active sheet"]}
+
+        # Read header row
+        rows = list(sheet.iter_rows(values_only=True))
+        if not rows:
+            return {"rates": [], "unparsed": ["EHS Excel is empty"]}
+
+        headers = [str(h or "").strip() for h in rows[0]]
+        header_map = {h.lower(): i for i, h in enumerate(headers)}
+
+        # Required columns
+        required = ["procedure_name", "price_private_non_nabh", "price_private_nabh"]
+        missing = [r for r in required if r not in header_map]
+        if missing:
+            unparsed.append(f"EHS missing columns: {missing}")
+            return {"rates": rates, "unparsed": unparsed}
+
+        # Column indices
+        cat_idx = header_map.get("category_hierarchy")
+        code_idx = header_map.get("procedure_icd_code")
+        name_idx = header_map.get("procedure_name")
+        non_nabh_idx = header_map.get("price_private_non_nabh")
+        nabh_idx = header_map.get("price_private_nabh")
+        spec_idx = header_map.get("applicable_speciality_code")
+
+        for row in rows[1:]:
+            if not row or len(row) <= max(name_idx, non_nabh_idx, nabh_idx):
+                continue
+
+            proc_name = str(row[name_idx] or "").strip()
+            if not proc_name:
+                continue
+
+            category_hierarchy = str(row[cat_idx] or "").strip().upper() if cat_idx is not None else ""
+            icd_code = str(row[code_idx] or "").strip() if code_idx is not None else ""
+            spec_code = str(row[spec_idx] or "").strip() if spec_idx is not None else ""
+
+            # Parse rates
+            rate_non_nabh, _ = parse_rate_amount(row[non_nabh_idx])
+            rate_nabh, _ = parse_rate_amount(row[nabh_idx])
+
+            # Use NABH rate as the legacy single rate for backward compat
+            legacy_rate = rate_nabh if rate_nabh is not None else rate_non_nabh
+
+            # Determine if major ailment
+            is_major = category_hierarchy in MAJOR_AILMENT_CATEGORIES
+            if not is_major:
+                name_lower = proc_name.lower()
+                is_major = any(kw in name_lower for kw in KIDNEY_TRANSPLANT_KEYWORDS)
+
+            rates.append(
+                _rate_dict(
+                    code=icd_code,
+                    name=proc_name,
+                    amount=legacy_rate,
+                    rate_non_nabh=rate_non_nabh,
+                    rate_nabh=rate_nabh,
+                    rate_text=str(rate_nabh) if rate_nabh else "",
+                    unit="",
+                    department=spec_code,
+                    category="procedure_package",
+                    category_hierarchy=category_hierarchy,
+                    source="EHS_2017",
+                    is_major_ailment=is_major,
+                )
+            )
+
+        workbook.close()
+    except Exception as exc:
+        unparsed.append(f"EHS Excel parse error: {exc}")
+
+    return {"rates": rates, "unparsed": unparsed}
+
+
 def _rate_dict(
     *,
     code: str,
     name: str,
-    amount: float | None,
+    amount: float | None = None,
+    rate_non_nabh: float | None = None,
+    rate_nabh: float | None = None,
     rate_text: str,
     unit: str,
     department: str,
     category: str,
+    category_hierarchy: str = "",
     source: str,
+    is_major_ailment: bool = False,
 ) -> dict[str, Any]:
     return {
         "code": (code or "").strip().upper(),
         "name": name.strip(),
         "rate": amount,
+        "rate_non_nabh": rate_non_nabh,
+        "rate_nabh": rate_nabh,
         "rate_text": rate_text,
         "unit": unit,
         "department": department.strip(),
         "category": category,
+        "category_hierarchy": category_hierarchy.strip().upper(),
         "source": source,
         "normalized_name": normalize_procedure_name(name),
+        "is_major_ailment": is_major_ailment,
     }
 
 
@@ -544,17 +737,31 @@ class AarogyaDataStore:
             normalized = r.get("normalized_name") or normalize_procedure_name(
                 r.get("name", "")
             )
+            category_hierarchy = r.get("category_hierarchy", "").upper()
+            # Determine major ailment status
+            is_major = r.get("is_major_ailment", False)
+            if not is_major and category_hierarchy:
+                is_major = category_hierarchy in MAJOR_AILMENT_CATEGORIES
+            # Also check for kidney transplant keywords
+            if not is_major:
+                name_lower = r.get("name", "").lower()
+                is_major = any(kw in name_lower for kw in KIDNEY_TRANSPLANT_KEYWORDS)
+
             record = RateRecord(
                 code=r.get("code", ""),
                 name=r.get("name", ""),
                 rate=r.get("rate"),
+                rate_non_nabh=r.get("rate_non_nabh"),
+                rate_nabh=r.get("rate_nabh"),
                 rate_text=r.get("rate_text", ""),
                 unit=r.get("unit", ""),
                 department=r.get("department", ""),
                 category=r.get("category", ""),
+                category_hierarchy=category_hierarchy,
                 source=r.get("source", ""),
                 normalized_name=normalized,
                 tokens=frozenset(t for t in normalized.split() if len(t) >= 3),
+                is_major_ailment=is_major,
             )
             store.rates.append(record)
             if record.code:
@@ -600,24 +807,42 @@ class AarogyaDataStore:
         district_norm = _clean_spaces((district or "").lower())
         speciality_norm = _clean_spaces((speciality or "").lower())
 
-        results: list[HospitalRecord] = []
+        query_terms = [
+            term
+            for term in query_norm.split()
+            if len(term) >= 2 and term not in _HOSPITAL_STRIP_TOKENS
+        ]
+        if query_norm and not query_terms:
+            query_terms = [term for term in query_norm.split() if term]
+
+        scored: list[tuple[float, HospitalRecord]] = []
         for hospital in self.hospitals:
             if district_norm and hospital.district.lower() != district_norm:
                 continue
             if speciality_norm and speciality_norm not in hospital.specialities_text.lower():
                 continue
-            if query_norm:
+            score = 1.0
+            if query_terms:
                 haystack = " ".join(
                     [
                         hospital.name_raw,
+                        hospital.name,
+                        hospital.normalized_name,
                         hospital.district,
                         hospital.address,
                         hospital.specialities_text,
                     ]
                 ).lower()
-                if not all(term in haystack for term in query_norm.split()):
+                matched = sum(1 for term in query_terms if term in haystack)
+                if matched == 0:
                     continue
-            results.append(hospital)
+                score = matched / len(query_terms)
+                if query_norm in haystack:
+                    score += 0.5
+            scored.append((score, hospital))
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        results = [record for _, record in scored]
 
         total = len(results)
         page = max(int(page or 1), 1)
@@ -642,13 +867,52 @@ class AarogyaDataStore:
     def _score_hospital(
         self, normalized: str, input_tokens: set[str], record: HospitalRecord
     ) -> float:
-        if not record.name_tokens or not input_tokens:
+        if not input_tokens:
             return 0.0
-        overlap = len(input_tokens & record.name_tokens) / len(
-            input_tokens | record.name_tokens
-        )
+        record_token_set = set(record.name_tokens)
+        matched_tokens = input_tokens & record_token_set
+        if not matched_tokens:
+            haystack = f"{record.normalized_name} {record.name_raw.lower()}"
+            matched_tokens = {t for t in input_tokens if t in haystack}
+        if not matched_tokens:
+            return 0.0
+
+        input_coverage = len(matched_tokens) / len(input_tokens)
+        union = input_tokens | record_token_set
+        overlap = len(matched_tokens) / len(union) if union else input_coverage
         sequence = SequenceMatcher(None, normalized, record.normalized_name).ratio()
-        return round((0.6 * overlap) + (0.4 * sequence), 4)
+
+        # Bill names often contain only a brand ("Apollo Hospital", "KIMS").
+        if len(input_tokens) <= 2:
+            return round(0.75 * input_coverage + 0.25 * max(sequence, overlap), 4)
+        return round((0.45 * input_coverage) + (0.25 * overlap) + (0.3 * sequence), 4)
+
+    def _gather_hospital_candidates(
+        self, input_tokens: set[str], *, district_norm: str = ""
+    ) -> dict[str, HospitalRecord]:
+        candidates: dict[str, HospitalRecord] = {}
+        for token in input_tokens:
+            for record in self._hospital_token.get(token, ()):
+                candidates[record.id] = record
+
+        if candidates:
+            return candidates
+
+        for record in self.hospitals:
+            if district_norm and record.district.lower() != district_norm:
+                continue
+            haystack = " ".join(
+                [
+                    record.name_raw,
+                    record.name,
+                    record.normalized_name,
+                    record.address,
+                    record.district,
+                ]
+            ).lower()
+            if any(token in haystack for token in input_tokens):
+                candidates[record.id] = record
+        return candidates
 
     def verify_hospital(
         self,
@@ -682,11 +946,16 @@ class AarogyaDataStore:
             chosen = exact[0]
             return self._empanelled(base, chosen, 1.0, "exact_name")
 
-        input_tokens = {t for t in normalized.split() if len(t) >= 3}
-        candidates: dict[str, HospitalRecord] = {}
-        for token in input_tokens:
-            for record in self._hospital_token.get(token, []):
-                candidates[record.id] = record
+        input_tokens = {
+            t
+            for t in normalized.split()
+            if len(t) >= 3 and t not in _HOSPITAL_STRIP_TOKENS
+        }
+        if not input_tokens:
+            input_tokens = {t for t in normalized.split() if len(t) >= 2}
+        candidates = self._gather_hospital_candidates(
+            input_tokens, district_norm=district_norm
+        )
 
         scored: list[tuple[float, HospitalRecord]] = []
         for record in candidates.values():
@@ -701,20 +970,34 @@ class AarogyaDataStore:
 
         scored.sort(key=lambda x: x[0], reverse=True)
 
+        if district_norm:
+            district_scored = [
+                (score, record)
+                for score, record in scored
+                if record.district.lower() == district_norm
+            ]
+            if district_scored:
+                scored = district_scored
+
         if not scored:
             return base
 
         # 2) name + district exact-ish (substring containment) with district agree
-        for score, record in scored:
-            if (
-                district_norm
-                and record.district.lower() == district_norm
-                and (
-                    record.normalized_name in normalized
-                    or normalized in record.normalized_name
-                )
-            ):
-                return self._empanelled(base, record, max(score, 0.9), "name_district")
+        # Skip for brand-only bill names (e.g. "Apollo") that match many branches.
+        has_specific_name = len(input_tokens) >= 2 or len(normalized) >= 12
+        if has_specific_name:
+            for score, record in scored:
+                if (
+                    district_norm
+                    and record.district.lower() == district_norm
+                    and (
+                        record.normalized_name in normalized
+                        or normalized in record.normalized_name
+                    )
+                ):
+                    return self._empanelled(
+                        base, record, max(score, 0.9), "name_district"
+                    )
 
         top_score, top_record = scored[0]
         strong = [s for s in scored if s[0] >= max(0.6, top_score - HOSPITAL_MULTIPLE_GAP)]
@@ -839,27 +1122,61 @@ class AarogyaDataStore:
             "matched_name": record.name,
             "code": record.code,
             "rate": record.rate,
+            "rate_non_nabh": record.rate_non_nabh,
+            "rate_nabh": record.rate_nabh,
             "rate_text": record.rate_text,
             "unit": record.unit,
             "department": record.department,
             "category": record.category,
+            "category_hierarchy": record.category_hierarchy,
             "source": record.source,
             "match_confidence": round(float(confidence), 4),
             "match_method": method,
+            "is_major_ailment": record.is_major_ailment,
         }
 
     # -- bill comparison ---------------------------------------------------- #
-    def compare_bill_items(self, line_items: list[dict[str, Any]]) -> dict[str, Any]:
+    def compare_bill_items(
+        self,
+        line_items: list[dict[str, Any]],
+        hospital: HospitalRecord | None = None,
+        consumable_indices: list[int] | None = None,
+    ) -> dict[str, Any]:
+        """Compare bill line items against scheme rates.
+
+        Args:
+            line_items: List of bill items with item_name, quantity, total_price, etc.
+            hospital: The empanelled hospital (for hospital-type-based rate selection).
+            consumable_indices: Indices of items marked as consumables by user
+                (for NABH Super Specialty: passed at actual cost instead of package rate).
+
+        Returns:
+            Comparison results with items, summary, ceiling info, and payment basis.
+        """
+        from app.medicine_comparison import (
+            compare_line_item_with_nppa,
+            pharma_to_aarogya_item,
+            should_use_nppa_result,
+        )
+
+        consumable_set = set(consumable_indices or [])
+        hospital_type = hospital.get_hospital_type() if hospital else HOSPITAL_TYPE_NON_NABH
+        payment_basis = hospital.get_payment_basis() if hospital else PAYMENT_BASIS_PACKAGE
+
         compared: list[dict[str, Any]] = []
         total_charged = 0.0
         total_approved = 0.0
         total_excess = 0.0
         total_below = 0.0
+        total_consumables_actual = 0.0
         matched_count = 0
         unmatched_count = 0
         manual_count = 0
+        consumables_at_actual: list[dict[str, Any]] = []
+        major_ailment_categories: set[str] = set()
+        has_major_ailment = False
 
-        for raw in line_items:
+        for idx, raw in enumerate(line_items):
             item_name = str(raw.get("item_name", "")).strip()
             quantity = max(_to_float(raw.get("quantity")), 0.0) or 1.0
             unit_price = max(_to_float(raw.get("unit_price")), 0.0)
@@ -868,6 +1185,7 @@ class AarogyaDataStore:
                 charged = round(quantity * unit_price, 2)
             total_charged += max(charged, 0.0)
 
+            is_consumable = idx in consumable_set
             entry: dict[str, Any] = {
                 "item_name": item_name,
                 "quantity": quantity,
@@ -886,10 +1204,48 @@ class AarogyaDataStore:
                 "rate_source": None,
                 "status": "Rate Not Found",
                 "note": "Rate not found in the Aarogya Bhadratha rates database.",
+                "is_consumable": is_consumable,
+                "category_hierarchy": "",
+                "is_major_ailment": False,
             }
+
+            # For NABH Super Specialty: consumables are passed at actual cost
+            if is_consumable and hospital_type == HOSPITAL_TYPE_NABH_SUPER:
+                entry["status"] = "Consumable At Actual"
+                entry["approved_amount"] = round(charged, 2)
+                entry["note"] = "Consumable (implant/stent/mesh) at actual cost for NABH Super Specialty."
+                total_consumables_actual += charged
+                total_approved += charged
+                matched_count += 1
+                consumables_at_actual.append({
+                    "item_name": item_name,
+                    "amount": round(charged, 2),
+                })
+                compared.append(entry)
+                continue
 
             if not item_name:
                 unmatched_count += 1
+                compared.append(entry)
+                continue
+
+            pharma_item = compare_line_item_with_nppa(raw)
+            if should_use_nppa_result(raw, pharma_item):
+                entry = pharma_to_aarogya_item(raw, pharma_item)
+                entry["is_consumable"] = is_consumable
+                entry["category_hierarchy"] = ""
+                entry["is_major_ailment"] = False
+                approved = entry.get("approved_amount")
+                if approved is not None:
+                    total_approved += approved
+                    matched_count += 1
+                    excess = _to_float(entry.get("excess_amount"))
+                    if entry["status"] == "Above Approved Rate":
+                        total_excess += excess
+                    elif entry["status"] == "Below Approved Rate":
+                        total_below += abs(_to_float(entry.get("difference")))
+                else:
+                    unmatched_count += 1
                 compared.append(entry)
                 continue
 
@@ -904,10 +1260,27 @@ class AarogyaDataStore:
             entry["match_confidence"] = match["match_confidence"]
             entry["match_method"] = match["match_method"]
             entry["rate_source"] = match["source"]
-            entry["approved_unit_rate"] = match["rate"]
             entry["matched_unit"] = match["unit"]
+            entry["category_hierarchy"] = match.get("category_hierarchy", "")
+            entry["is_major_ailment"] = match.get("is_major_ailment", False)
 
-            approved_rate = match["rate"]
+            # Track major ailment categories
+            if match.get("is_major_ailment"):
+                has_major_ailment = True
+                cat_hier = match.get("category_hierarchy", "")
+                if cat_hier:
+                    major_ailment_categories.add(cat_hier)
+
+            # Select rate based on hospital type
+            rate_nabh = match.get("rate_nabh")
+            rate_non_nabh = match.get("rate_non_nabh")
+            if hospital_type in (HOSPITAL_TYPE_NABH, HOSPITAL_TYPE_NABH_SUPER):
+                approved_rate = rate_nabh if rate_nabh is not None else match["rate"]
+            else:
+                approved_rate = rate_non_nabh if rate_non_nabh is not None else match["rate"]
+
+            entry["approved_unit_rate"] = approved_rate
+
             # Uncertain match or non-numeric (formula) rate -> manual verification.
             if approved_rate is None or match["match_confidence"] < RATE_MATCH_THRESHOLD:
                 entry["status"] = "Manual Verification Required"
@@ -951,6 +1324,12 @@ class AarogyaDataStore:
             entry["note"] = ""
             compared.append(entry)
 
+        # Determine per-case ceiling based on ailment type
+        per_case_ceiling = CEILING_MAJOR if has_major_ailment else CEILING_GENERAL
+        total_approved_capped = min(total_approved, per_case_ceiling)
+        ceiling_exceeded = total_approved > per_case_ceiling
+        ceiling_excess = max(0.0, total_approved - per_case_ceiling)
+
         pct_diff = (
             round((total_excess - total_below) / total_approved * 100, 2)
             if total_approved
@@ -966,6 +1345,20 @@ class AarogyaDataStore:
             "unmatched_items": unmatched_count,
             "manual_verification_items": manual_count,
             "total_items": len(line_items),
+            # EHS payment rule fields
+            "hospital_type": hospital_type,
+            "payment_basis": payment_basis,
+            "has_major_ailment": has_major_ailment,
+            "major_ailment_categories": sorted(major_ailment_categories),
+            "per_case_ceiling": per_case_ceiling,
+            "total_approved_capped": round(total_approved_capped, 2),
+            "ceiling_exceeded": ceiling_exceeded,
+            "ceiling_excess": round(ceiling_excess, 2),
+            "total_consumables_actual": round(total_consumables_actual, 2),
+            "consumables_at_actual": consumables_at_actual,
+            # Annual limits (advisory only)
+            "annual_cap_auto": ANNUAL_CAP_AUTO,
+            "annual_cap_dgp": ANNUAL_CAP_DGP,
         }
         return {"items": compared, "summary": summary}
 
@@ -987,11 +1380,58 @@ def _cache_paths() -> tuple[Path, Path]:
 
 
 def build_and_cache() -> dict[str, Any]:
-    """Parse raw sources and write JSON caches. Returns the parsed payloads."""
+    """Parse raw sources and write JSON caches. Returns the parsed payloads.
+
+    Parses both:
+    1. EHS Excel file (primary): Has hospital-type-specific rates and category hierarchy
+    2. Annexure CSVs (supplementary): Additional services, investigations, room rents
+
+    EHS rates are used as the primary source for procedure packages with
+    rate_non_nabh and rate_nabh fields populated.
+    """
     import json
 
     hospitals = parse_hospitals_pdf()
-    rate_payload = parse_rate_annexures()
+
+    # Parse EHS Excel first (primary source with hospital-type rates)
+    ehs_payload = parse_ehs_excel()
+    ehs_rates = ehs_payload.get("rates", [])
+    ehs_unparsed = ehs_payload.get("unparsed", [])
+
+    # Parse annexure CSVs (supplementary rates)
+    annexure_payload = parse_rate_annexures()
+    annexure_rates = annexure_payload.get("rates", [])
+    annexure_unparsed = annexure_payload.get("unparsed", [])
+
+    # Build a lookup of EHS rates by normalized name and code for deduplication
+    ehs_by_name: dict[str, dict[str, Any]] = {}
+    ehs_by_code: dict[str, dict[str, Any]] = {}
+    for rate in ehs_rates:
+        norm_name = rate.get("normalized_name", "")
+        code = rate.get("code", "")
+        if norm_name:
+            ehs_by_name[norm_name] = rate
+        if code:
+            ehs_by_code[code] = rate
+
+    # Merge rates: EHS first, then annexure rates not already in EHS
+    merged_rates: list[dict[str, Any]] = list(ehs_rates)
+    for rate in annexure_rates:
+        norm_name = rate.get("normalized_name", "")
+        code = rate.get("code", "")
+        # Skip if already covered by EHS
+        if norm_name and norm_name in ehs_by_name:
+            continue
+        if code and code in ehs_by_code:
+            continue
+        # Add annexure rate (will use legacy single rate field)
+        merged_rates.append(rate)
+
+    rate_payload = {
+        "rates": merged_rates,
+        "unparsed": ehs_unparsed + annexure_unparsed,
+    }
+
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
     hosp_path, rate_path = _cache_paths()
     hosp_path.write_text(
@@ -1001,6 +1441,11 @@ def build_and_cache() -> dict[str, Any]:
     rate_path.write_text(
         json.dumps(rate_payload, ensure_ascii=False), encoding="utf-8"
     )
+
+    print(f"  EHS rates: {len(ehs_rates)}")
+    print(f"  Annexure rates: {len(annexure_rates)}")
+    print(f"  Merged total: {len(merged_rates)}")
+
     return {"hospitals": hospitals, "rates": rate_payload}
 
 
@@ -1010,10 +1455,14 @@ def _load_payloads() -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, st
     hosp_path, rate_path = _cache_paths()
     sources: dict[str, str] = {}
     if hosp_path.exists() and rate_path.exists():
-        hospitals = json.loads(hosp_path.read_text(encoding="utf-8")).get(
-            "hospitals", []
-        )
-        rate_payload = json.loads(rate_path.read_text(encoding="utf-8"))
+        try:
+            hospitals = json.loads(hosp_path.read_text(encoding="utf-8")).get(
+                "hospitals", []
+            )
+            rate_payload = json.loads(rate_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            hospitals = []
+            rate_payload = {}
         sources = {"hospitals": "cache", "rates": "cache"}
         if hospitals and rate_payload.get("rates"):
             return hospitals, rate_payload, sources

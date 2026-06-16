@@ -1,10 +1,5 @@
-import { useState } from "react";
 import { formatCurrency } from "../billUtils";
-import {
-  downloadReportPdf,
-  openReportPdf,
-  shareReportPdf,
-} from "../services/aarogyaBhadratha";
+import ReportActions from "./ReportActions";
 
 const STATUS_META = {
   "Above Approved Rate": { cls: "status-pill status-red", card: "abh-item-card abh-item-above" },
@@ -15,6 +10,19 @@ const STATUS_META = {
     card: "abh-item-card abh-item-manual",
   },
   "Rate Not Found": { cls: "status-pill status-neutral", card: "abh-item-card abh-item-unverified" },
+  "Consumable At Actual": { cls: "status-pill status-blue", card: "abh-item-card abh-item-consumable" },
+};
+
+const HOSPITAL_TYPE_LABELS = {
+  non_nabh: "Non-NABH",
+  nabh: "NABH",
+  nabh_super: "NABH Super Specialty",
+};
+
+const PAYMENT_BASIS_LABELS = {
+  package: "EHS package rates",
+  package_plus_consumables: "Package rates + consumables at actual",
+  actual: "Actual claims with scrutiny",
 };
 
 function statusMeta(status) {
@@ -29,9 +37,6 @@ function confidenceLabel(value) {
 }
 
 export default function AarogyaResults({ report, toolbar = null }) {
-  const [pdfMessage, setPdfMessage] = useState("");
-  const [busy, setBusy] = useState("");
-
   if (!report?.comparison?.items) {
     return null;
   }
@@ -42,48 +47,7 @@ export default function AarogyaResults({ report, toolbar = null }) {
   const bill = report.bill || {};
   const summary = report.comparison.summary || {};
   const items = report.comparison.items || [];
-
-  const handleView = async () => {
-    setBusy("view");
-    setPdfMessage("");
-    try {
-      await openReportPdf(report);
-    } catch {
-      setPdfMessage("Could not open the report. Check your connection and try again.");
-    } finally {
-      setBusy("");
-    }
-  };
-
-  const handleDownload = async () => {
-    setBusy("download");
-    setPdfMessage("");
-    try {
-      await downloadReportPdf(
-        report,
-        `aarogya-bhadratha-${(patient.name || "report").replace(/\s+/g, "-")}.pdf`
-      );
-    } catch {
-      setPdfMessage("Could not download the report. Check your connection and try again.");
-    } finally {
-      setBusy("");
-    }
-  };
-
-  const handleShare = async () => {
-    setBusy("share");
-    setPdfMessage("");
-    try {
-      const shared = await shareReportPdf(report);
-      if (!shared) {
-        setPdfMessage("Sharing isn't supported here — opened the report instead.");
-      }
-    } catch {
-      setPdfMessage("Could not share the report.");
-    } finally {
-      setBusy("");
-    }
-  };
+  const janAushadhiMatches = report?.jan_aushadhi?.matches ?? [];
 
   const specialities = matched.specialities?.length
     ? matched.specialities.join(", ")
@@ -99,6 +63,49 @@ export default function AarogyaResults({ report, toolbar = null }) {
       </header>
 
       {toolbar && <div className="results-toolbar">{toolbar}</div>}
+
+      {janAushadhiMatches.length > 0 && (
+        <section className="jan-aushadhi-banner" aria-label="Jan Aushadhi scheme advisory">
+          <div className="jan-aushadhi-banner-header">
+            <h3>Jan Aushadhi — subsidized medicines available</h3>
+            <span className="jan-aushadhi-count">
+              {janAushadhiMatches.length} on your bill
+            </span>
+          </div>
+          <p className="jan-aushadhi-intro">
+            The Government of India sells the following medicine
+            {janAushadhiMatches.length === 1 ? "" : "s"} from your bill at
+            subsidized rates under the{" "}
+            <strong>
+              {report.jan_aushadhi?.scheme_name ||
+                "Pradhan Mantri Bhartiya Janaushadhi Pariyojana (PMBJP)"}
+            </strong>{" "}
+            (Jan Aushadhi scheme).
+          </p>
+          <ul className="jan-aushadhi-match-list">
+            {janAushadhiMatches.map((match, index) => (
+              <li key={`${match.bill_item_name || "item"}-${index}`}>
+                <strong>{match.bill_item_name}</strong>
+                {match.generic_name && match.generic_name !== match.bill_item_name && (
+                  <> · matched as {match.generic_name}</>
+                )}
+                {match.mrp != null && (
+                  <>
+                    {" "}
+                    · Jan Aushadhi MRP: <strong>{formatCurrency(match.mrp)}</strong>
+                    {match.unit_size ? ` per ${match.unit_size}` : ""}
+                  </>
+                )}
+                {match.approximate_match ? " · approximate match" : ""}
+              </li>
+            ))}
+          </ul>
+          <p className="jan-aushadhi-advisory">
+            {report.jan_aushadhi?.advisory ||
+              "Visit your nearest Jan Aushadhi Kendra (medical store) to purchase these medicines at the subsidized MRP."}
+          </p>
+        </section>
+      )}
 
       <section className="abh-info-card">
         <div className="abh-info-grid">
@@ -151,6 +158,32 @@ export default function AarogyaResults({ report, toolbar = null }) {
         </div>
       </section>
 
+      {/* Hospital Type & Payment Basis */}
+      {(summary.hospital_type || summary.payment_basis) && (
+        <section className="abh-payment-info">
+          <div className="abh-payment-grid">
+            {summary.hospital_type && (
+              <div>
+                <span className="abh-info-label">Hospital Type</span>
+                <strong>{HOSPITAL_TYPE_LABELS[summary.hospital_type] || summary.hospital_type}</strong>
+              </div>
+            )}
+            {summary.payment_basis && (
+              <div>
+                <span className="abh-info-label">Payment Basis</span>
+                <strong>{PAYMENT_BASIS_LABELS[summary.payment_basis] || summary.payment_basis}</strong>
+              </div>
+            )}
+          </div>
+          {summary.hospital_type === "nabh_super" && (
+            <p className="abh-payment-note">
+              For NABH Super Specialty hospitals, surgical procedures use package rates.
+              Consumables (implants, stents, mesh) are reimbursed at actual cost on top of the package.
+            </p>
+          )}
+        </section>
+      )}
+
       <article className="summary-banner abh-summary">
         <div className="summary-stat">
           <p>Total Charged</p>
@@ -165,6 +198,71 @@ export default function AarogyaResults({ report, toolbar = null }) {
           <h3>{formatCurrency(summary.total_possible_excess)}</h3>
         </div>
       </article>
+
+      {/* Per-Case Ceiling Information */}
+      {summary.per_case_ceiling && (
+        <section className={`abh-ceiling-info ${summary.ceiling_exceeded ? "abh-ceiling-exceeded" : "abh-ceiling-ok"}`}>
+          <div className="abh-ceiling-header">
+            <h4>Per-Case Ceiling (G.O.Ms.No.101)</h4>
+            {summary.has_major_ailment && (
+              <span className="abh-major-badge">Major Ailment</span>
+            )}
+          </div>
+          <div className="abh-ceiling-grid">
+            <div>
+              <span className="abh-info-label">Ceiling Limit</span>
+              <strong>{formatCurrency(summary.per_case_ceiling)}</strong>
+              <span className="abh-ceiling-type">
+                {summary.has_major_ailment
+                  ? "(Heart surgery, kidney transplant, cancer, or neuro-surgery)"
+                  : "(General ailments)"}
+              </span>
+            </div>
+            <div>
+              <span className="abh-info-label">Approved Total</span>
+              <strong>{formatCurrency(summary.total_approved_matched)}</strong>
+            </div>
+            <div>
+              <span className="abh-info-label">Status</span>
+              {summary.ceiling_exceeded ? (
+                <strong className="abh-ceiling-warn">
+                  Exceeds ceiling by {formatCurrency(summary.ceiling_excess)}
+                </strong>
+              ) : (
+                <strong className="abh-ceiling-pass">Within ceiling</strong>
+              )}
+            </div>
+          </div>
+          {summary.major_ailment_categories?.length > 0 && (
+            <p className="abh-major-categories">
+              Major ailment detected: {summary.major_ailment_categories.join(", ")}
+            </p>
+          )}
+          {summary.ceiling_exceeded && (
+            <p className="abh-ceiling-note">
+              The bill exceeds the per-case ceiling. The CEO of EHS may review
+              amounts above the package limit on a case-by-case basis.
+            </p>
+          )}
+        </section>
+      )}
+
+      {/* Consumables Summary (NABH Super Specialty) */}
+      {summary.consumables_at_actual?.length > 0 && (
+        <section className="abh-consumables-summary">
+          <h4>Consumables at Actual Cost</h4>
+          <ul>
+            {summary.consumables_at_actual.map((item, idx) => (
+              <li key={idx}>
+                {item.item_name}: <strong>{formatCurrency(item.amount)}</strong>
+              </li>
+            ))}
+          </ul>
+          <p className="abh-consumables-total">
+            Total consumables: <strong>{formatCurrency(summary.total_consumables_actual)}</strong>
+          </p>
+        </section>
+      )}
 
       <p className="abh-matched-note">
         The approved total only includes items that were reliably matched with
@@ -186,6 +284,8 @@ export default function AarogyaResults({ report, toolbar = null }) {
       <div className="abh-item-list">
         {items.map((item, index) => {
           const meta = statusMeta(item.status);
+          const isMedicine =
+            item.comparison_source === "pharma" || item.category === "medicine";
           return (
             <article key={`${item.item_name || "item"}-${index}`} className={meta.card}>
               <div className="abh-item-top">
@@ -196,13 +296,32 @@ export default function AarogyaResults({ report, toolbar = null }) {
                 <p className="matched-reference">
                   Matched: {item.matched_name}
                   {item.matched_code ? ` (${item.matched_code})` : ""}
-                  {item.match_confidence
+                  {isMedicine ? " · NPPA ceiling price" : ""}
+                  {item.pharma_database === "nppa_via_az" && item.resolved_generic_name
+                    ? ` · resolved from brand`
+                    : ""}
+                  {!isMedicine && item.match_confidence
                     ? ` · ${confidenceLabel(item.match_confidence)} ${item.match_method || ""}`
                     : ""}
                 </p>
               ) : (
                 <p className="matched-reference abh-unverified-note">
-                  {item.note || "Rate not found in the Aarogya Bhadratha rates database."}
+                  {item.note ||
+                    (isMedicine
+                      ? "Medicine not found in the NPPA ceiling price list."
+                      : "Rate not found in the Aarogya Bhadratha rates database.")}
+                </p>
+              )}
+              {item.jan_aushadhi_available && (
+                <p className="matched-reference jan-aushadhi-item-note">
+                  Jan Aushadhi available
+                  {item.jan_aushadhi_generic_name
+                    ? `: ${item.jan_aushadhi_generic_name}`
+                    : ""}
+                  {item.jan_aushadhi_mrp != null
+                    ? ` · MRP ${formatCurrency(item.jan_aushadhi_mrp)}`
+                    : ""}
+                  {item.jan_aushadhi_unit_size ? ` per ${item.jan_aushadhi_unit_size}` : ""}
                 </p>
               )}
               <div className="result-metrics">
@@ -215,8 +334,8 @@ export default function AarogyaResults({ report, toolbar = null }) {
                   <h5>{formatCurrency(item.total_price)}</h5>
                 </div>
                 <div>
-                  <p>Approved</p>
-                  <h5>{formatCurrency(item.approved_amount)}</h5>
+                  <p>{isMedicine ? "NPPA ceiling" : "Approved"}</p>
+                  <h5>{formatCurrency(isMedicine ? item.pharma_rate : item.approved_amount)}</h5>
                 </div>
                 <div>
                   <p>Excess</p>
@@ -231,35 +350,33 @@ export default function AarogyaResults({ report, toolbar = null }) {
         })}
       </div>
 
+      {/* Annual Family Limits Advisory */}
+      <section className="abh-annual-advisory">
+        <h4>Annual Family Limits (Advisory)</h4>
+        <p>
+          Under the Aarogya Bhadratha Scheme, the total reimbursement for a family
+          (member + spouse + up to 3 children under 25 + parents) in a financial year is:
+        </p>
+        <ul className="abh-annual-tiers">
+          <li>
+            <strong>Up to {formatCurrency(summary.annual_cap_auto || 800000)}</strong> — Automatic coverage
+          </li>
+          <li>
+            <strong>{formatCurrency(summary.annual_cap_auto || 800000)} to {formatCurrency(summary.annual_cap_dgp || 1500000)}</strong> — Requires DGP approval
+          </li>
+          <li>
+            <strong>Beyond {formatCurrency(summary.annual_cap_dgp || 1500000)}</strong> — Requires Trust Board approval
+          </li>
+        </ul>
+        <p className="abh-annual-note">
+          This app does not track cumulative family spending. Verify your family&apos;s
+          annual claim status with the EHS office for accurate coverage information.
+        </p>
+      </section>
+
       <p className="abh-disclaimer">{report.disclaimer}</p>
 
-      <div className="abh-report-actions">
-        <button
-          type="button"
-          className="bill-editor-secondary"
-          onClick={handleView}
-          disabled={busy === "view"}
-        >
-          {busy === "view" ? "Opening…" : "View Full Report"}
-        </button>
-        <button
-          type="button"
-          className="bill-editor-secondary"
-          onClick={handleDownload}
-          disabled={busy === "download"}
-        >
-          {busy === "download" ? "Preparing…" : "Download Report"}
-        </button>
-        <button
-          type="button"
-          className="analyze-btn abh-share-btn"
-          onClick={handleShare}
-          disabled={busy === "share"}
-        >
-          {busy === "share" ? "Sharing…" : "Share Report"}
-        </button>
-      </div>
-      {pdfMessage && <p className="auth-info">{pdfMessage}</p>}
+      <ReportActions report={report} className="abh-report-actions" />
     </div>
   );
 }

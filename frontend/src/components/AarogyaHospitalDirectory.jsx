@@ -48,6 +48,12 @@ export default function AarogyaHospitalDirectory({
     };
   }, []);
 
+  useEffect(() => {
+    if (initialDistrict) {
+      setDistrict(initialDistrict);
+    }
+  }, [initialDistrict]);
+
   const runSearch = useCallback(
     async (nextPage, { append } = { append: false }) => {
       const requestId = ++requestIdRef.current;
@@ -159,7 +165,7 @@ export default function AarogyaHospitalDirectory({
       {!loading && !error && hospitals.length === 0 && (
         <p className="auth-info">
           No Aarogya Bhadratha hospitals were found for the selected district or
-          search.
+          search. Try clearing filters or use a shorter hospital name.
         </p>
       )}
 

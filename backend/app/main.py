@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.aarogya_bhadratha import get_aarogya_store
 from app.aarogya_routes import router as aarogya_router
+from app.report_routes import router as report_router
 from app.cghs_rates import (
     get_cghs_store,
     resolve_hospital_type,
@@ -27,6 +28,7 @@ from app.hbp_rates import get_hbp_store
 from app.locations import get_location_store
 from app.nabh_registry import get_nabh_registry
 from app.jan_aushadhi_rates import enrich_line_items_with_jan_aushadhi, get_jan_aushadhi_store
+from app.medicine_comparison import enrich_scheme_line_items_with_jan_aushadhi
 from app.pharma_rates import get_pharma_store
 from app.services.claim_audit import analyze_claim_items
 
@@ -56,6 +58,7 @@ app.add_middleware(
 )
 
 app.include_router(aarogya_router)
+app.include_router(report_router)
 
 
 @app.on_event("startup")
@@ -571,13 +574,20 @@ def _add_price_comparison(
     tier_id: str | None = None,
     pmjay_eligible: bool = False,
 ) -> list[dict[str, Any]]:
+    from app.medicine_comparison import (
+        compare_line_item_with_nppa,
+        should_use_nppa_result,
+    )
+
     compared: list[dict[str, Any]] = []
     effective_tier_id = tier_id or "tier_3"
     for raw_item in line_items:
         item = dict(raw_item)
-        if item.get("category") == "medicine":
-            compared.extend(_add_pharma_comparison([item]))
-        elif pmjay_eligible:
+        pharma_item = compare_line_item_with_nppa(item)
+        if should_use_nppa_result(item, pharma_item):
+            compared.append(pharma_item)
+            continue
+        if pmjay_eligible:
             compared.extend(
                 _add_hbp_comparison([item], tier_id=effective_tier_id)
             )
@@ -739,7 +749,7 @@ def _build_comparison_response(
         tier_id=tier_id,
         pmjay_eligible=pmjay_eligible,
     )
-    compared_line_items, jan_aushadhi = enrich_line_items_with_jan_aushadhi(
+    compared_line_items, jan_aushadhi = enrich_scheme_line_items_with_jan_aushadhi(
         compared_line_items
     )
 

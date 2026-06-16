@@ -1878,6 +1878,17 @@ body {
   font-size: 0.88rem;
 }
 
+.scheme-card-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.scheme-card-buttons .eligibility-learn-btn {
+  flex: 1 1 auto;
+  min-width: 120px;
+}
+
 @media (max-width: 640px) {
   .scheme-card-list {
     grid-template-columns: 1fr;
@@ -2129,6 +2140,98 @@ body {
   padding: 1rem 1.25rem;
   border-top: none;
   box-shadow: inset 0 2px 6px rgba(184, 190, 200, 0.25);
+}
+
+.terms-modal-overlay {
+  z-index: 500;
+  background: rgba(30, 41, 59, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.terms-modal {
+  width: min(720px, 100%);
+  max-height: min(92vh, 900px);
+}
+
+.terms-modal-updated {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.terms-modal-lead {
+  margin: 0 0 1rem;
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+}
+
+.terms-modal-body .terms-section {
+  margin-bottom: 1.25rem;
+}
+
+.terms-modal-body h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.terms-modal-body p {
+  margin: 0 0 0.65rem;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+
+.terms-modal-body ul {
+  margin: 0 0 0.65rem;
+  padding-left: 1.2rem;
+}
+
+.terms-modal-body li {
+  margin-bottom: 0.35rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.terms-scroll-end {
+  height: 1px;
+}
+
+.terms-scroll-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.terms-checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.terms-checkbox-label input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.terms-checkbox-label-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.terms-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: flex-end;
+}
+
+.terms-modal-footer .error-text {
+  margin-bottom: 0.75rem;
 }
 
 .location-picker-field {
@@ -2409,6 +2512,72 @@ body {
   font-size: 0.92rem;
 }
 
+.abh-ineligible-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border-radius: var(--neu-radius-sm);
+  background: var(--neu-surface);
+  box-shadow: var(--neu-shadow-soft);
+}
+
+.abh-ineligible-lead {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+
+.abh-ineligible-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.abh-ineligible-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border-radius: var(--neu-radius-sm);
+  background: var(--neu-bg);
+  box-shadow: var(--neu-shadow-inset-sm);
+}
+
+.abh-ineligible-panel-alt {
+  background: rgba(107, 140, 255, 0.08);
+}
+
+.abh-ineligible-panel-title {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.abh-suggested-list {
+  margin: 0;
+}
+
+.abh-cghs-fallback-btn {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+}
+
+.abh-cghs-location-grid {
+  margin-bottom: 0.5rem;
+}
+
+.abh-cghs-fallback-note {
+  margin: 0 0 0.85rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--neu-radius-sm);
+  background: rgba(107, 140, 255, 0.12);
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
 .abh-edit,
 .abh-multiple,
 .abh-not-found,
@@ -2661,6 +2830,230 @@ body {
   color: #b9770e;
 }
 
+/* Payment Info Section */
+.abh-payment-info {
+  background: var(--neu-surface);
+  border-radius: var(--neu-radius);
+  padding: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+
+.abh-payment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.abh-payment-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+/* Per-Case Ceiling Section */
+.abh-ceiling-info {
+  background: var(--neu-surface);
+  border-radius: var(--neu-radius);
+  padding: 0.9rem;
+  margin-bottom: 0.75rem;
+  border-left: 4px solid var(--success);
+}
+
+.abh-ceiling-info.abh-ceiling-exceeded {
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 5%, var(--neu-surface));
+}
+
+.abh-ceiling-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.abh-ceiling-header h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.abh-major-badge {
+  background: var(--warning);
+  color: #000;
+  font-size: 0.72rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.3rem;
+  font-weight: 600;
+}
+
+.abh-ceiling-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.abh-ceiling-type {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: normal;
+}
+
+.abh-ceiling-warn {
+  color: var(--danger);
+}
+
+.abh-ceiling-pass {
+  color: var(--success);
+}
+
+.abh-major-categories {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.abh-ceiling-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  color: var(--danger);
+}
+
+/* Consumables Summary */
+.abh-consumables-summary {
+  background: var(--neu-surface);
+  border-radius: var(--neu-radius);
+  padding: 0.9rem;
+  margin-bottom: 0.75rem;
+  border-left: 4px solid var(--accent);
+}
+
+.abh-consumables-summary h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.abh-consumables-summary ul {
+  margin: 0;
+  padding: 0 0 0 1.2rem;
+  font-size: 0.88rem;
+}
+
+.abh-consumables-total {
+  margin: 0.5rem 0 0;
+  font-size: 0.88rem;
+}
+
+/* Consumable item card variant */
+.abh-item-consumable {
+  border-left: 3px solid var(--accent);
+}
+
+.status-pill.status-blue {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Annual Advisory Section */
+.abh-annual-advisory {
+  background: var(--neu-surface);
+  border-radius: var(--neu-radius);
+  padding: 0.9rem;
+  margin-bottom: 0.75rem;
+  border: 1px dashed var(--border-color);
+}
+
+.abh-annual-advisory h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+}
+
+.abh-annual-advisory > p {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.abh-annual-tiers {
+  margin: 0.5rem 0;
+  padding: 0 0 0 1.2rem;
+  font-size: 0.88rem;
+}
+
+.abh-annual-tiers li {
+  margin-bottom: 0.3rem;
+}
+
+.abh-annual-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Consumables Selection in Flow */
+.abh-consumables-section {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  background: var(--neu-surface);
+  border-radius: var(--neu-radius);
+  border-left: 3px solid var(--accent);
+}
+
+.abh-consumables-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+}
+
+.abh-consumables-list {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.abh-consumable-item {
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.abh-consumable-item:last-child {
+  border-bottom: none;
+}
+
+.abh-consumable-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.abh-consumable-label input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent);
+}
+
+.abh-consumable-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.abh-consumable-price {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.abh-consumables-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  color: var(--accent);
+  font-weight: 500;
+}
+
 .abh-disclaimer {
   margin: 0;
   font-size: 0.8rem;
@@ -2674,13 +3067,15 @@ body {
 }
 
 .abh-report-actions,
+.report-actions,
 .abh-toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
 }
 
-.abh-share-btn {
+.abh-share-btn,
+.report-share-btn {
   margin-top: 0;
   width: auto;
   flex: 1 1 140px;
@@ -2691,6 +3086,9 @@ body {
     grid-template-columns: 1fr;
   }
   .abh-filter-row {
+    grid-template-columns: 1fr;
+  }
+  .abh-ineligible-actions {
     grid-template-columns: 1fr;
   }
   .abh-hospital-card {

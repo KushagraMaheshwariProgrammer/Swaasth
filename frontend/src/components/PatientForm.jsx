@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import EligibilityCriteriaModal, {
   AAROGYA_BHADRATHA_ELIGIBILITY_SECTIONS,
+  AAROGYA_BHADRATHA_COVERAGE_LIMITS,
   PMJAY_ELIGIBILITY_SECTIONS,
 } from "./EligibilityCriteriaModal";
 import { getStateOptions, isTelanganaState } from "../services/locations";
@@ -156,13 +157,22 @@ export default function PatientForm({
                 />
                 <span>Patient is eligible for Aarogya Bhadratha Scheme</span>
               </label>
-              <button
-                type="button"
-                className="eligibility-learn-btn"
-                onClick={() => setActiveModal("aarogya")}
-              >
-                Learn eligibility criteria
-              </button>
+              <div className="scheme-card-buttons">
+                <button
+                  type="button"
+                  className="eligibility-learn-btn"
+                  onClick={() => setActiveModal("aarogya")}
+                >
+                  Eligibility criteria
+                </button>
+                <button
+                  type="button"
+                  className="eligibility-learn-btn"
+                  onClick={() => setActiveModal("aarogya-coverage")}
+                >
+                  Coverage limits
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -193,6 +203,12 @@ export default function PatientForm({
         onClose={() => setActiveModal(null)}
         title="Aarogya Bhadratha Scheme eligibility"
         sections={AAROGYA_BHADRATHA_ELIGIBILITY_SECTIONS}
+      />
+      <EligibilityCriteriaModal
+        open={activeModal === "aarogya-coverage"}
+        onClose={() => setActiveModal(null)}
+        title="Aarogya Bhadratha Coverage Limits"
+        sections={AAROGYA_BHADRATHA_COVERAGE_LIMITS}
       />
 
       {info && <p className="auth-info">{info}</p>}
