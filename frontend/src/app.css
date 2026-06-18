@@ -1889,6 +1889,256 @@ body {
   min-width: 120px;
 }
 
+.scheme-card-followup {
+  margin: 0.1rem 0 0;
+  padding: 0.85rem 0.95rem;
+  background: rgba(184, 190, 200, 0.14);
+  border: 1px solid rgba(184, 190, 200, 0.35);
+  border-radius: var(--neu-radius-sm);
+}
+
+.scheme-card-followup-question {
+  margin: 0 0 0.7rem;
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.scheme-card-choice-group {
+  display: flex;
+  width: 100%;
+  max-width: 220px;
+  border: 1px solid rgba(184, 190, 200, 0.45);
+  border-radius: var(--neu-radius-sm);
+  overflow: hidden;
+  background: var(--neu-surface);
+  box-shadow: var(--neu-shadow-soft);
+}
+
+.scheme-card-choice {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.scheme-card-choice input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  overflow: hidden;
+}
+
+.scheme-card-choice span {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  text-align: center;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.scheme-card-choice + .scheme-card-choice span {
+  border-left: 1px solid rgba(184, 190, 200, 0.45);
+}
+
+.scheme-card-choice:has(input:checked) span {
+  background: var(--primary);
+  color: #fff;
+}
+
+.scheme-card-choice:has(input:focus-visible) span {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.scheme-card-description {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.scheme-card-status {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--primary-dark);
+}
+
+.kcr-kit-questions-modal {
+  max-width: 520px;
+}
+
+.kcr-kit-questions-body {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.kcr-kit-questions-intro {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.kcr-kit-questions-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.kcr-kit-questions-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.scheme-card-followup-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.scheme-card-followup-compact {
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+}
+
+.scheme-card-followup-compact .scheme-card-followup-question {
+  margin-bottom: 0.55rem;
+  font-size: 0.84rem;
+}
+
+.scheme-question-optional {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.scheme-advisory,
+.hrs-advisory {
+  padding: 1rem 1.1rem;
+  background: linear-gradient(
+    135deg,
+    rgba(93, 138, 168, 0.12) 0%,
+    rgba(174, 214, 241, 0.1) 100%
+  );
+  border: 1px solid rgba(93, 138, 168, 0.28);
+  border-radius: var(--neu-radius);
+  box-shadow: var(--neu-shadow-soft);
+  margin-top: 0.85rem;
+}
+
+.scheme-advisory-header,
+.hrs-advisory-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.scheme-advisory-header h3,
+.hrs-advisory-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #1a5276;
+}
+
+.scheme-advisory-badge,
+.hrs-advisory-badge {
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  background: #5d8aa8;
+  color: #fff;
+}
+
+.scheme-advisory-badge-success {
+  background: #1e8449;
+}
+
+.scheme-advisory-badge-warning {
+  background: #c0392b;
+}
+
+.scheme-advisory-description {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.scheme-advisory-card,
+.hrs-advisory-card {
+  background: var(--neu-surface);
+  border-radius: var(--neu-radius-sm);
+  padding: 0.85rem 0.95rem;
+  margin-bottom: 0.65rem;
+  border-left: 3px solid #5d8aa8;
+  box-shadow: var(--neu-shadow-soft);
+}
+
+.scheme-advisory-card h4,
+.hrs-advisory-card h4 {
+  margin: 0 0 0.45rem;
+  font-size: 0.92rem;
+  color: #1a5276;
+}
+
+.scheme-advisory-card ul,
+.scheme-advisory-card ol,
+.hrs-advisory-card ul,
+.hrs-advisory-card ol {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.scheme-advisory-card li + li,
+.hrs-advisory-card li + li {
+  margin-top: 0.3rem;
+}
+
+.scheme-advisory-status p,
+.hrs-advisory-status p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.scheme-advisory-status ul,
+.scheme-advisory-status-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.scheme-advisory-status-list li + li {
+  margin-top: 0.35rem;
+}
+
+.scheme-advisory-note,
+.hrs-advisory-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  line-height: 1.45;
+}
+
 @media (max-width: 640px) {
   .scheme-card-list {
     grid-template-columns: 1fr;

@@ -65,3 +65,42 @@ def test_unified_render_pdf_pmjay() -> None:
 def test_unified_render_pdf_rejects_empty_report() -> None:
     res = client.post("/api/reports/render-pdf", json={})
     assert res.status_code == 400
+
+
+def test_unified_render_pdf_includes_hospitalisation_relief_advisory() -> None:
+    report = _sample_cghs_report()
+    report["hospitalisation_relief_advisory"] = {
+        "title": "Hospitalisation Relief Scheme Advisory",
+        "eligibility_summary": ["Eligible worker criteria."],
+        "benefit": {
+            "daily_relief": "₹300 per day of hospitalization.",
+            "monthly_maximum": "Maximum reimbursement/relief: ₹4,500 per month.",
+        },
+        "applicant_status": "Registered worker status message.",
+        "how_to_apply": ["Visit the official Telangana labour/board website."],
+        "documents_required": ["Passport-size photograph"],
+        "important_note": "Advisory disclaimer text.",
+    }
+    res = client.post("/api/reports/render-pdf", json=report)
+    assert res.status_code == 200, res.text
+    assert res.content[:5] == b"%PDF-"
+
+
+def test_unified_render_pdf_includes_kcr_kit_advisory() -> None:
+    report = _sample_cghs_report()
+    report["kcr_kit_advisory"] = {
+        "title": "KCR Kit / Pregnancy Nutrition Kit Advisory",
+        "description": "Advisory description.",
+        "status_badge": "May Be Eligible",
+        "eligibility_summary": ["Patient must be a pregnant woman."],
+        "exclusions": ["Non-residents of Telangana are not eligible."],
+        "applicant_status_messages": [
+            "Based on the information provided, the patient may be eligible."
+        ],
+        "application_process": ["Contact the nearest Anganwadi Centre."],
+        "documents_required": ["Aadhaar Card"],
+        "important_note": "Advisory disclaimer text.",
+    }
+    res = client.post("/api/reports/render-pdf", json=report)
+    assert res.status_code == 200, res.text
+    assert res.content[:5] == b"%PDF-"

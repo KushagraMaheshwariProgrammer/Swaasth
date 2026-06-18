@@ -37,15 +37,46 @@ export function persistLocalPatient(userId, patientData, localId = null) {
       : `local-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   const existing = entries.find((entry) => entry.localId === id);
+  const patientAge = Number(patientData.age) || 0;
+  const kcrKitAllowed =
+    Boolean(patientData.kcrKitSelected) && patientAge >= 18;
   const record = {
     localId: id,
     patientData: {
       name: patientData.name?.trim() || "",
-      age: Number(patientData.age) || 0,
+      age: patientAge,
       gender: patientData.gender || "",
       state: patientData.state?.trim() || "",
       ayushmanEligible: Boolean(patientData.ayushmanEligible),
       aarogyaBhadrathaEligible: Boolean(patientData.aarogyaBhadrathaEligible),
+      hospitalisationReliefSchemeSelected: Boolean(
+        patientData.hospitalisationReliefSchemeSelected
+      ),
+      isRegisteredConstructionWorker: Boolean(
+        patientData.hospitalisationReliefSchemeSelected &&
+          patientData.isRegisteredConstructionWorker
+      ),
+      kcrKitSelected: kcrKitAllowed,
+      kcrIsPregnant: Boolean(kcrKitAllowed && patientData.kcrIsPregnant),
+      kcrIsTelanganaResident: Boolean(
+        kcrKitAllowed && patientData.kcrIsTelanganaResident
+      ),
+      kcrAge18OrAbove: kcrKitAllowed,
+      kcrIncomeBelow10000: Boolean(
+        kcrKitAllowed && patientData.kcrIncomeBelow10000
+      ),
+      kcrGovernmentHospitalTreatment: Boolean(
+        kcrKitAllowed && patientData.kcrGovernmentHospitalTreatment
+      ),
+      kcrMoreThanTwoLiveChildren: Boolean(
+        kcrKitAllowed && patientData.kcrMoreThanTwoLiveChildren
+      ),
+      kcrAadhaarTelangana: Boolean(
+        kcrKitAllowed && patientData.kcrAadhaarTelangana
+      ),
+      kcrIdentifiedByAnganwadiWorker: Boolean(
+        kcrKitAllowed && patientData.kcrIdentifiedByAnganwadiWorker
+      ),
       savePastBills: Boolean(patientData.savePastBills),
     },
     synced: existing?.synced ?? false,

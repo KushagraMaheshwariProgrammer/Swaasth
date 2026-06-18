@@ -9,6 +9,8 @@ import {
   HOSPITAL_TYPE_OPTIONS,
 } from "../billUtils";
 import ReportActions from "./ReportActions";
+import HospitalisationReliefAdvisory from "./HospitalisationReliefAdvisory";
+import KcrKitAdvisory from "./KcrKitAdvisory";
 
 export default function BillResults({ result, toolbar = null }) {
   const summary = useMemo(() => computeBillSummary(result), [result]);
@@ -309,6 +311,12 @@ export default function BillResults({ result, toolbar = null }) {
           </p>
         )}
       </section>
+
+      <HospitalisationReliefAdvisory
+        advisory={result?.hospitalisation_relief_advisory}
+      />
+
+      <KcrKitAdvisory advisory={result?.kcr_kit_advisory} />
 
       <ReportActions report={result} />
     </>

@@ -57,6 +57,47 @@ export const AAROGYA_BHADRATHA_ELIGIBILITY_SECTIONS = [
   },
 ];
 
+export const HOSPITALISATION_RELIEF_ELIGIBILITY_SECTIONS = [
+  {
+    title: "Hospitalisation Relief Scheme – Eligibility",
+    items: [
+      "Available for registered building and other construction workers under the Telangana Building & Other Construction Workers Welfare Board.",
+      "The worker must have been hospitalized for at least 5 days due to an accident or disease.",
+      "Relief may be extended up to 3 months in severe or terminal conditions, subject to approval.",
+    ],
+  },
+  {
+    title: "Benefit",
+    items: [
+      "₹300 per day of hospitalization.",
+      "Maximum reimbursement/relief: ₹4,500 per month.",
+    ],
+  },
+];
+
+export const KCR_KIT_ELIGIBILITY_SECTIONS = [
+  {
+    title: "KCR Kit / Pregnancy Nutrition Kit – Eligibility",
+    items: [
+      "Patient must be a pregnant woman.",
+      "Patient must be at least 18 years old.",
+      "Patient must be a resident of Telangana.",
+      "Family monthly income should be below ₹10,000.",
+      "Patient should be identified/verified through Anganwadi Worker process where applicable.",
+      "Patient should preferably have Telangana-linked Aadhaar details as required by the scheme rules.",
+    ],
+  },
+  {
+    title: "Exclusions",
+    items: [
+      "Not eligible if the beneficiary has more than two live children.",
+      "Not eligible if treatment is taken from a non-government/private hospital.",
+      "Not eligible if Aadhaar does not belong to Telangana.",
+      "Non-residents of Telangana are not eligible.",
+    ],
+  },
+];
+
 export const AAROGYA_BHADRATHA_COVERAGE_LIMITS = [
   {
     title: "Per-Case Reimbursement Limits (G.O.Ms.No.101, 1-12-2015)",

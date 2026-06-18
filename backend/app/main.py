@@ -670,6 +670,17 @@ class CompareBillRequest(BaseModel):
     filename: str | None = None
     file_type: str | None = None
     pmjay_eligible: bool = False
+    hospitalisation_relief_scheme_selected: bool = False
+    is_registered_construction_worker: bool = False
+    kcr_kit_selected: bool = False
+    kcr_is_pregnant: bool = False
+    kcr_is_telangana_resident: bool = False
+    kcr_age_18_or_above: bool = False
+    kcr_income_below_10000: bool = False
+    kcr_government_hospital_treatment: bool = False
+    kcr_more_than_two_live_children: bool = False
+    kcr_aadhaar_telangana: bool = False
+    kcr_identified_by_anganwadi_worker: bool = False
     patient_id: str | None = None
     patient_name: str | None = None
     patient_age: int | None = None
@@ -723,6 +734,17 @@ def _build_comparison_response(
     filename: str = "edited-bill",
     file_type: str = "manual",
     pmjay_eligible: bool = False,
+    hospitalisation_relief_scheme_selected: bool = False,
+    is_registered_construction_worker: bool = False,
+    kcr_kit_selected: bool = False,
+    kcr_is_pregnant: bool = False,
+    kcr_is_telangana_resident: bool = False,
+    kcr_age_18_or_above: bool = False,
+    kcr_income_below_10000: bool = False,
+    kcr_government_hospital_treatment: bool = False,
+    kcr_more_than_two_live_children: bool = False,
+    kcr_aadhaar_telangana: bool = False,
+    kcr_identified_by_anganwadi_worker: bool = False,
     patient_id: str | None = None,
     patient_name: str | None = None,
     patient_age: int | None = None,
@@ -795,6 +817,9 @@ def _build_comparison_response(
         rates_source["jan_aushadhi_file"] = None
         rates_source["total_jan_aushadhi_products"] = 0
 
+    from app.hospitalisation_relief_scheme import build_hospitalisation_relief_advisory
+    from app.kcr_kit_scheme import build_kcr_kit_advisory
+
     patient_payload: dict[str, Any] | None = None
     if patient_id or patient_name:
         patient_payload = {
@@ -803,7 +828,36 @@ def _build_comparison_response(
             "age": patient_age,
             "gender": patient_gender,
             "ayushman_eligible": pmjay_eligible,
+            "hospitalisation_relief_scheme_selected": (
+                hospitalisation_relief_scheme_selected
+            ),
+            "is_registered_construction_worker": is_registered_construction_worker,
+            "kcr_kit_selected": kcr_kit_selected,
+            "kcr_is_pregnant": kcr_is_pregnant,
+            "kcr_is_telangana_resident": kcr_is_telangana_resident,
+            "kcr_age_18_or_above": kcr_age_18_or_above,
+            "kcr_income_below_10000": kcr_income_below_10000,
+            "kcr_government_hospital_treatment": kcr_government_hospital_treatment,
+            "kcr_more_than_two_live_children": kcr_more_than_two_live_children,
+            "kcr_aadhaar_telangana": kcr_aadhaar_telangana,
+            "kcr_identified_by_anganwadi_worker": kcr_identified_by_anganwadi_worker,
         }
+
+    hospitalisation_relief_advisory = build_hospitalisation_relief_advisory(
+        hospitalisation_relief_scheme_selected=hospitalisation_relief_scheme_selected,
+        is_registered_construction_worker=is_registered_construction_worker,
+    )
+    kcr_kit_advisory = build_kcr_kit_advisory(
+        kcr_kit_selected=kcr_kit_selected,
+        kcr_is_pregnant=kcr_is_pregnant,
+        kcr_is_telangana_resident=kcr_is_telangana_resident,
+        kcr_age_18_or_above=kcr_age_18_or_above,
+        kcr_income_below_10000=kcr_income_below_10000,
+        kcr_government_hospital_treatment=kcr_government_hospital_treatment,
+        kcr_more_than_two_live_children=kcr_more_than_two_live_children,
+        kcr_aadhaar_telangana=kcr_aadhaar_telangana,
+        kcr_identified_by_anganwadi_worker=kcr_identified_by_anganwadi_worker,
+    )
 
     return {
         "filename": filename,
@@ -833,6 +887,8 @@ def _build_comparison_response(
         "line_items": compared_line_items,
         "jan_aushadhi": jan_aushadhi,
         "audit_flags": audit_flags,
+        "hospitalisation_relief_advisory": hospitalisation_relief_advisory,
+        "kcr_kit_advisory": kcr_kit_advisory,
     }
 
 
@@ -854,6 +910,19 @@ def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
         filename=body.filename or "edited-bill",
         file_type=body.file_type or "manual",
         pmjay_eligible=body.pmjay_eligible,
+        hospitalisation_relief_scheme_selected=(
+            body.hospitalisation_relief_scheme_selected
+        ),
+        is_registered_construction_worker=body.is_registered_construction_worker,
+        kcr_kit_selected=body.kcr_kit_selected,
+        kcr_is_pregnant=body.kcr_is_pregnant,
+        kcr_is_telangana_resident=body.kcr_is_telangana_resident,
+        kcr_age_18_or_above=body.kcr_age_18_or_above,
+        kcr_income_below_10000=body.kcr_income_below_10000,
+        kcr_government_hospital_treatment=body.kcr_government_hospital_treatment,
+        kcr_more_than_two_live_children=body.kcr_more_than_two_live_children,
+        kcr_aadhaar_telangana=body.kcr_aadhaar_telangana,
+        kcr_identified_by_anganwadi_worker=body.kcr_identified_by_anganwadi_worker,
         patient_id=body.patient_id,
         patient_name=body.patient_name,
         patient_age=body.patient_age,
