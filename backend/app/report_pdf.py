@@ -13,6 +13,8 @@ from html import escape
 from typing import Any
 
 from app.aarogya_reports import render_report_html as render_aarogya_report_html
+from app.hospitalisation_relief_scheme import build_hospitalisation_relief_advisory
+from app.kcr_kit_scheme import build_kcr_kit_advisory
 
 RenderHtmlFn = Callable[[dict[str, Any]], str]
 
@@ -103,6 +105,148 @@ def _reference_rate(item: dict[str, Any]) -> tuple[Any, str]:
 def _scheme_title(scheme_id: str) -> str:
     label = _SCHEME_LABELS.get(scheme_id, scheme_id.replace("_", " ").title())
     return f"{label} Bill Comparison Report"
+
+
+def _render_hospitalisation_relief_advisory_html(report: dict[str, Any]) -> str:
+    advisory = report.get("hospitalisation_relief_advisory")
+    if not advisory:
+        patient = report.get("patient") or {}
+        advisory = build_hospitalisation_relief_advisory(
+            hospitalisation_relief_scheme_selected=bool(
+                patient.get("hospitalisation_relief_scheme_selected")
+            ),
+            is_registered_construction_worker=bool(
+                patient.get("is_registered_construction_worker")
+            ),
+        )
+    if not advisory:
+        return ""
+
+    eligibility_rows = "".join(
+        f"<li>{escape(str(item))}</li>"
+        for item in (advisory.get("eligibility_summary") or [])
+    )
+    benefit = advisory.get("benefit") or {}
+    benefit_rows = "".join(
+        f"<li>{escape(str(item))}</li>"
+        for item in (
+            benefit.get("daily_relief"),
+            benefit.get("monthly_maximum"),
+        )
+        if item
+    )
+    apply_rows = "".join(
+        f"<li>{escape(str(step))}</li>"
+        for step in (advisory.get("how_to_apply") or [])
+    )
+    document_rows = "".join(
+        f"<li>{escape(str(doc))}</li>"
+        for doc in (advisory.get("documents_required") or [])
+    )
+
+    return f"""
+  <h2>{escape(str(advisory.get('title', 'Hospitalisation Relief Scheme Advisory')))}</h2>
+  <div class='hrs-pdf-card'>
+    <h3>Eligibility Summary</h3>
+    <ul>{eligibility_rows}</ul>
+  </div>
+  <div class='hrs-pdf-card'>
+    <h3>Benefit</h3>
+    <ul>{benefit_rows}</ul>
+  </div>
+  <div class='hrs-pdf-card'>
+    <h3>Applicant Status</h3>
+    <p>{escape(str(advisory.get('applicant_status', '')))}</p>
+  </div>
+  <div class='hrs-pdf-card'>
+    <h3>How to Apply</h3>
+    <ol>{apply_rows}</ol>
+  </div>
+  <div class='hrs-pdf-card'>
+    <h3>Documents Required</h3>
+    <ul>{document_rows}</ul>
+  </div>
+  <p class='hrs-pdf-note'>{escape(str(advisory.get('important_note', '')))}</p>
+"""
+
+
+def _render_kcr_kit_advisory_html(report: dict[str, Any]) -> str:
+    advisory = report.get("kcr_kit_advisory")
+    if not advisory:
+        patient = report.get("patient") or {}
+        advisory = build_kcr_kit_advisory(
+            kcr_kit_selected=bool(patient.get("kcr_kit_selected")),
+            kcr_is_pregnant=bool(patient.get("kcr_is_pregnant")),
+            kcr_is_telangana_resident=bool(patient.get("kcr_is_telangana_resident")),
+            kcr_age_18_or_above=bool(patient.get("kcr_age_18_or_above")),
+            kcr_income_below_10000=bool(patient.get("kcr_income_below_10000")),
+            kcr_government_hospital_treatment=bool(
+                patient.get("kcr_government_hospital_treatment")
+            ),
+            kcr_more_than_two_live_children=bool(
+                patient.get("kcr_more_than_two_live_children")
+            ),
+            kcr_aadhaar_telangana=bool(patient.get("kcr_aadhaar_telangana")),
+            kcr_identified_by_anganwadi_worker=bool(
+                patient.get("kcr_identified_by_anganwadi_worker")
+            ),
+        )
+    if not advisory:
+        return ""
+
+    eligibility_rows = "".join(
+        f"<li>{escape(str(item))}</li>"
+        for item in (advisory.get("eligibility_summary") or [])
+    )
+    exclusion_rows = "".join(
+        f"<li>{escape(str(item))}</li>"
+        for item in (advisory.get("exclusions") or [])
+    )
+    status_messages = advisory.get("applicant_status_messages") or [
+        advisory.get("applicant_status", "")
+    ]
+    status_rows = "".join(
+        f"<li>{escape(str(message))}</li>"
+        for message in status_messages
+        if message
+    )
+    process_rows = "".join(
+        f"<li>{escape(str(step))}</li>"
+        for step in (advisory.get("application_process") or [])
+    )
+    document_rows = "".join(
+        f"<li>{escape(str(doc))}</li>"
+        for doc in (advisory.get("documents_required") or [])
+    )
+    description = advisory.get("description") or ""
+    status_badge = advisory.get("status_badge") or "Advisory"
+
+    return f"""
+  <h2>{escape(str(advisory.get('title', 'KCR Kit / Pregnancy Nutrition Kit Advisory')))}</h2>
+  <p><b>Status:</b> {escape(str(status_badge))}</p>
+  <p>{escape(str(description))}</p>
+  <div class='hrs-pdf-card'>
+    <h3>Eligibility Summary</h3>
+    <ul>{eligibility_rows}</ul>
+  </div>
+  <div class='hrs-pdf-card'>
+    <h3>Exclusions</h3>
+    <ul>{exclusion_rows}</ul>
+  </div>
+  <div class='hrs-pdf-card'>
+    <h3>Applicant Status</h3>
+    <ul>{status_rows}</ul>
+  </div>
+  <div class='hrs-pdf-card'>
+    <h3>Application Process</h3>
+    <ol>{process_rows}</ol>
+  </div>
+  <div class='hrs-pdf-card'>
+    <h3>Documents Required</h3>
+    <ul>{document_rows}</ul>
+  </div>
+  <p class='hrs-pdf-note'>{escape(str(advisory.get('important_note', '')))}</p>
+"""
 
 
 def render_bill_comparison_html(report: dict[str, Any]) -> str:
@@ -205,6 +349,9 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
         else:
             nabh_line = "NABH: Not found in NABH registry"
 
+    hrs_advisory_html = _render_hospitalisation_relief_advisory_html(report)
+    kcr_advisory_html = _render_kcr_kit_advisory_html(report)
+
     return f"""
 <html>
 <head><style>
@@ -219,6 +366,10 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
   .summary td {{ border: none; padding: 2px 4px; }}
   .disclaimer {{ margin-top: 14px; font-size: 8.5px; color: #7f8c8d; font-style: italic; }}
   ul {{ margin: 4px 0; padding-left: 16px; }}
+  ol {{ margin: 4px 0; padding-left: 16px; }}
+  .hrs-pdf-card {{ background: #f4f7fb; border-left: 3px solid #5d8aa8; border-radius: 6px; padding: 8px 10px; margin: 8px 0; }}
+  .hrs-pdf-card h3 {{ margin: 0 0 4px; font-size: 10px; color: #1a5276; }}
+  .hrs-pdf-note {{ margin-top: 8px; font-size: 8.5px; color: #566573; font-style: italic; }}
 </style></head>
 <body>
   <h1>{escape(title)}</h1>
@@ -261,6 +412,10 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
 
   <h2>Suspicious / Unnecessary Charges</h2>
   {"<table><tr><th>Item</th><th>Type</th><th>Severity</th><th>Reason</th><th>Recommendation</th></tr>" + ''.join(audit_rows) + "</table>" if audit_rows else "<p>No suspicious repetitions or unnecessary package-component charges detected.</p>"}
+
+  {hrs_advisory_html}
+
+  {kcr_advisory_html}
 
   <p class='disclaimer'>{escape(BILL_DISCLAIMER)}</p>
 </body>

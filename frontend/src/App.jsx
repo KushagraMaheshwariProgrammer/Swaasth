@@ -708,6 +708,35 @@ function CheckPage() {
           filename: metaOverride.filename ?? scanMeta?.filename,
           file_type: metaOverride.file_type ?? scanMeta?.file_type,
           pmjay_eligible: Boolean(selectedPatient?.ayushmanEligible),
+          hospitalisation_relief_scheme_selected: Boolean(
+            selectedPatient?.hospitalisationReliefSchemeSelected
+          ),
+          is_registered_construction_worker: Boolean(
+            selectedPatient?.isRegisteredConstructionWorker
+          ),
+          kcr_kit_selected: Boolean(
+            selectedPatient?.kcrKitSelected &&
+              Number(selectedPatient?.age) >= 18
+          ),
+          kcr_is_pregnant: Boolean(selectedPatient?.kcrIsPregnant),
+          kcr_is_telangana_resident: Boolean(
+            selectedPatient?.kcrIsTelanganaResident
+          ),
+          kcr_age_18_or_above: Boolean(
+            selectedPatient?.kcrKitSelected &&
+              Number(selectedPatient?.age) >= 18
+          ),
+          kcr_income_below_10000: Boolean(selectedPatient?.kcrIncomeBelow10000),
+          kcr_government_hospital_treatment: Boolean(
+            selectedPatient?.kcrGovernmentHospitalTreatment
+          ),
+          kcr_more_than_two_live_children: Boolean(
+            selectedPatient?.kcrMoreThanTwoLiveChildren
+          ),
+          kcr_aadhaar_telangana: Boolean(selectedPatient?.kcrAadhaarTelangana),
+          kcr_identified_by_anganwadi_worker: Boolean(
+            selectedPatient?.kcrIdentifiedByAnganwadiWorker
+          ),
           patient_id: selectedPatient?.id || null,
           patient_name: selectedPatient?.name || null,
           patient_age: selectedPatient?.age ?? null,

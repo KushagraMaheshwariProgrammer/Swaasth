@@ -55,6 +55,41 @@ function firebaseErrorMessage(error) {
   return error?.message || "Cloud save failed. Patient is saved on this device.";
 }
 
+function normalizeKcrKitFields(patientData, age = Number(patientData?.age)) {
+  const selected = Boolean(patientData?.kcrKitSelected);
+  const ageEligible = Number.isFinite(age) && age >= 18;
+  if (!selected || !ageEligible) {
+    return {
+      kcrKitSelected: false,
+      kcrIsPregnant: false,
+      kcrIsTelanganaResident: false,
+      kcrAge18OrAbove: false,
+      kcrIncomeBelow10000: false,
+      kcrGovernmentHospitalTreatment: false,
+      kcrMoreThanTwoLiveChildren: false,
+      kcrAadhaarTelangana: false,
+      kcrIdentifiedByAnganwadiWorker: false,
+    };
+  }
+  return {
+    kcrKitSelected: true,
+    kcrIsPregnant: Boolean(patientData?.kcrIsPregnant),
+    kcrIsTelanganaResident: Boolean(patientData?.kcrIsTelanganaResident),
+    kcrAge18OrAbove: true,
+    kcrIncomeBelow10000: Boolean(patientData?.kcrIncomeBelow10000),
+    kcrGovernmentHospitalTreatment: Boolean(
+      patientData?.kcrGovernmentHospitalTreatment
+    ),
+    kcrMoreThanTwoLiveChildren: Boolean(
+      patientData?.kcrMoreThanTwoLiveChildren
+    ),
+    kcrAadhaarTelangana: Boolean(patientData?.kcrAadhaarTelangana),
+    kcrIdentifiedByAnganwadiWorker: Boolean(
+      patientData?.kcrIdentifiedByAnganwadiWorker
+    ),
+  };
+}
+
 export function validatePatientInput(patientData) {
   const name = patientData?.name?.trim() || "";
   if (!name) {
@@ -69,6 +104,7 @@ export function validatePatientInput(patientData) {
     throw new Error("Please enter a valid age (0–150).");
   }
   const state = patientData?.state?.trim() || "";
+  const kcrFields = normalizeKcrKitFields(patientData, age);
   return {
     name,
     gender,
@@ -76,6 +112,14 @@ export function validatePatientInput(patientData) {
     state,
     ayushmanEligible: Boolean(patientData?.ayushmanEligible),
     aarogyaBhadrathaEligible: Boolean(patientData?.aarogyaBhadrathaEligible),
+    hospitalisationReliefSchemeSelected: Boolean(
+      patientData?.hospitalisationReliefSchemeSelected
+    ),
+    isRegisteredConstructionWorker: Boolean(
+      patientData?.hospitalisationReliefSchemeSelected &&
+        patientData?.isRegisteredConstructionWorker
+    ),
+    ...kcrFields,
     savePastBills: Boolean(patientData?.savePastBills),
   };
 }
@@ -110,6 +154,18 @@ function buildFirestorePayload(patientData) {
     state: validated.state,
     ayushmanEligible: validated.ayushmanEligible,
     aarogyaBhadrathaEligible: validated.aarogyaBhadrathaEligible,
+    hospitalisationReliefSchemeSelected:
+      validated.hospitalisationReliefSchemeSelected,
+    isRegisteredConstructionWorker: validated.isRegisteredConstructionWorker,
+    kcrKitSelected: validated.kcrKitSelected,
+    kcrIsPregnant: validated.kcrIsPregnant,
+    kcrIsTelanganaResident: validated.kcrIsTelanganaResident,
+    kcrAge18OrAbove: validated.kcrAge18OrAbove,
+    kcrIncomeBelow10000: validated.kcrIncomeBelow10000,
+    kcrGovernmentHospitalTreatment: validated.kcrGovernmentHospitalTreatment,
+    kcrMoreThanTwoLiveChildren: validated.kcrMoreThanTwoLiveChildren,
+    kcrAadhaarTelangana: validated.kcrAadhaarTelangana,
+    kcrIdentifiedByAnganwadiWorker: validated.kcrIdentifiedByAnganwadiWorker,
     savePastBills: validated.savePastBills,
     updatedAt: serverTimestamp(),
   };

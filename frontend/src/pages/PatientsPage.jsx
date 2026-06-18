@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import PatientForm, {
   emptyPatientForm,
   genderLabel,
+  patientToFormFields,
 } from "../components/PatientForm";
 import PatientList from "../components/PatientList";
 import {
@@ -96,17 +97,7 @@ export default function PatientsPage() {
       );
       if (localPatient) {
         setSelectedPatient(localPatient);
-        setForm({
-          name: localPatient.name || "",
-          age: localPatient.age != null ? String(localPatient.age) : "",
-          gender: localPatient.gender || "",
-          state: localPatient.state || "",
-          ayushmanEligible: Boolean(localPatient.ayushmanEligible),
-          aarogyaBhadrathaEligible: Boolean(
-            localPatient.aarogyaBhadrathaEligible
-          ),
-          savePastBills: Boolean(localPatient.savePastBills),
-        });
+        setForm(patientToFormFields(localPatient));
       } else {
         setLoading(true);
       }
@@ -126,15 +117,7 @@ export default function PatientsPage() {
           return;
         }
         setSelectedPatient(patient);
-        setForm({
-          name: patient.name || "",
-          age: patient.age != null ? String(patient.age) : "",
-          gender: patient.gender || "",
-          state: patient.state || "",
-          ayushmanEligible: Boolean(patient.ayushmanEligible),
-          aarogyaBhadrathaEligible: Boolean(patient.aarogyaBhadrathaEligible),
-          savePastBills: Boolean(patient.savePastBills),
-        });
+        setForm(patientToFormFields(patient));
         setPatientBills(bills);
         const pendingLocal = bills.filter((bill) => bill.localOnly).length;
         if (pendingLocal > 0) {
@@ -414,22 +397,7 @@ export default function PatientsPage() {
                       onSubmit={handleUpdate}
                       onCancel={() => {
                         setEditing(false);
-                        setForm({
-                          name: selectedPatient.name || "",
-                          age:
-                            selectedPatient.age != null
-                              ? String(selectedPatient.age)
-                              : "",
-                          gender: selectedPatient.gender || "",
-                          state: selectedPatient.state || "",
-                          ayushmanEligible: Boolean(
-                            selectedPatient.ayushmanEligible
-                          ),
-                          aarogyaBhadrathaEligible: Boolean(
-                            selectedPatient.aarogyaBhadrathaEligible
-                          ),
-                          savePastBills: Boolean(selectedPatient.savePastBills),
-                        });
+                        setForm(patientToFormFields(selectedPatient));
                       }}
                       submitLabel="Save changes"
                       saving={saving}
