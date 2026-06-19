@@ -90,6 +90,38 @@ function normalizeKcrKitFields(patientData, age = Number(patientData?.age)) {
   };
 }
 
+function normalizeRajivAarogyasriFields(patientData) {
+  const selected = Boolean(patientData?.rajivAarogyasriSelected);
+  if (!selected) {
+    return {
+      rajivAarogyasriSelected: false,
+      rajivIsTelanganaResident: false,
+      rajivHasEligibleCard: false,
+      rajivHasAadhaar: false,
+      rajivIsCancerRelated: false,
+      rajivFamilyCoverageUsedAmount: null,
+    };
+  }
+
+  const rawAmount = patientData?.rajivFamilyCoverageUsedAmount;
+  let familyAmount = null;
+  if (rawAmount !== "" && rawAmount != null) {
+    const parsed = Number(rawAmount);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      familyAmount = parsed;
+    }
+  }
+
+  return {
+    rajivAarogyasriSelected: true,
+    rajivIsTelanganaResident: Boolean(patientData?.rajivIsTelanganaResident),
+    rajivHasEligibleCard: Boolean(patientData?.rajivHasEligibleCard),
+    rajivHasAadhaar: Boolean(patientData?.rajivHasAadhaar),
+    rajivIsCancerRelated: Boolean(patientData?.rajivIsCancerRelated),
+    rajivFamilyCoverageUsedAmount: familyAmount,
+  };
+}
+
 export function validatePatientInput(patientData) {
   const name = patientData?.name?.trim() || "";
   if (!name) {
@@ -105,6 +137,7 @@ export function validatePatientInput(patientData) {
   }
   const state = patientData?.state?.trim() || "";
   const kcrFields = normalizeKcrKitFields(patientData, age);
+  const rajivFields = normalizeRajivAarogyasriFields(patientData);
   return {
     name,
     gender,
@@ -120,6 +153,7 @@ export function validatePatientInput(patientData) {
         patientData?.isRegisteredConstructionWorker
     ),
     ...kcrFields,
+    ...rajivFields,
     savePastBills: Boolean(patientData?.savePastBills),
   };
 }
@@ -166,6 +200,12 @@ function buildFirestorePayload(patientData) {
     kcrMoreThanTwoLiveChildren: validated.kcrMoreThanTwoLiveChildren,
     kcrAadhaarTelangana: validated.kcrAadhaarTelangana,
     kcrIdentifiedByAnganwadiWorker: validated.kcrIdentifiedByAnganwadiWorker,
+    rajivAarogyasriSelected: validated.rajivAarogyasriSelected,
+    rajivIsTelanganaResident: validated.rajivIsTelanganaResident,
+    rajivHasEligibleCard: validated.rajivHasEligibleCard,
+    rajivHasAadhaar: validated.rajivHasAadhaar,
+    rajivIsCancerRelated: validated.rajivIsCancerRelated,
+    rajivFamilyCoverageUsedAmount: validated.rajivFamilyCoverageUsedAmount,
     savePastBills: validated.savePastBills,
     updatedAt: serverTimestamp(),
   };

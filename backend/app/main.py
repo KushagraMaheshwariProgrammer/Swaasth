@@ -566,6 +566,63 @@ def _add_cghs_comparison(
     return compared_items
 
 
+def _add_rajiv_aarogyasri_comparison(
+    line_items: list[dict[str, Any]],
+    *,
+    tier: str,
+    rate_type: str,
+    bill_date: str | None = None,
+) -> list[dict[str, Any]]:
+    from app.rajiv_aarogyasri import get_rajiv_aarogyasri_store
+
+    try:
+        store = get_rajiv_aarogyasri_store()
+    except FileNotFoundError:
+        return _add_cghs_comparison(
+            line_items,
+            tier=tier,
+            rate_type=rate_type,
+        )
+
+    compared_items: list[dict[str, Any]] = []
+
+    for raw_item in line_items:
+        item = dict(raw_item)
+        item_name = str(item.get("item_name", "")).strip()
+        total_price = _to_float(item.get("total_price"))
+        package_match = store.match_aarogyasri_package(item_name, bill_date)
+
+        if package_match.get("matched_package") and package_match.get("approved_rate") is not None:
+            approved_rate = _to_float(package_match["approved_rate"])
+            price_difference = round(total_price - approved_rate, 2)
+            item["comparison_source"] = "aarogyasri"
+            item["aarogyasri_rate"] = approved_rate
+            item["price_difference"] = price_difference
+            item["flag"] = "overpriced" if price_difference > 0 else "acceptable"
+            item["matched_reference_item"] = package_match.get("package_name")
+            item["approximate_match"] = bool(
+                _to_float(package_match.get("confidence_score")) < 0.84
+            )
+            item["aarogyasri_package_code"] = package_match.get("package_code")
+            item["aarogyasri_package_name"] = package_match.get("package_name")
+            item["aarogyasri_specialty"] = package_match.get("specialty")
+            item["aarogyasri_source_file"] = package_match.get("source_file")
+            item["aarogyasri_match_confidence"] = package_match.get("confidence_score")
+            item["aarogyasri_fallback_used"] = False
+            item["cghs_rate"] = None
+            compared_items.append(item)
+            continue
+
+        cghs_items = _add_cghs_comparison([item], tier=tier, rate_type=rate_type)
+        fallback_item = cghs_items[0]
+        fallback_item["comparison_source"] = "cghs"
+        fallback_item["aarogyasri_fallback_used"] = True
+        fallback_item["aarogyasri_package_not_found"] = True
+        compared_items.append(fallback_item)
+
+    return compared_items
+
+
 def _add_price_comparison(
     line_items: list[dict[str, Any]],
     *,
@@ -573,6 +630,8 @@ def _add_price_comparison(
     rate_type: str,
     tier_id: str | None = None,
     pmjay_eligible: bool = False,
+    rajiv_aarogyasri_selected: bool = False,
+    bill_date: str | None = None,
 ) -> list[dict[str, Any]]:
     from app.medicine_comparison import (
         compare_line_item_with_nppa,
@@ -587,7 +646,16 @@ def _add_price_comparison(
         if should_use_nppa_result(item, pharma_item):
             compared.append(pharma_item)
             continue
-        if pmjay_eligible:
+        if rajiv_aarogyasri_selected:
+            compared.extend(
+                _add_rajiv_aarogyasri_comparison(
+                    [item],
+                    tier=tier,
+                    rate_type=rate_type,
+                    bill_date=bill_date,
+                )
+            )
+        elif pmjay_eligible:
             compared.extend(
                 _add_hbp_comparison([item], tier_id=effective_tier_id)
             )
@@ -681,6 +749,14 @@ class CompareBillRequest(BaseModel):
     kcr_more_than_two_live_children: bool = False
     kcr_aadhaar_telangana: bool = False
     kcr_identified_by_anganwadi_worker: bool = False
+    rajiv_aarogyasri_selected: bool = False
+    rajiv_is_telangana_resident: bool = False
+    rajiv_has_eligible_card: bool = False
+    rajiv_has_aadhaar: bool = False
+    rajiv_is_cancer_related: bool = False
+    rajiv_family_coverage_used_amount: float | None = None
+    bill_date: str | None = None
+    patient_district: str | None = None
     patient_id: str | None = None
     patient_name: str | None = None
     patient_age: int | None = None
@@ -745,6 +821,14 @@ def _build_comparison_response(
     kcr_more_than_two_live_children: bool = False,
     kcr_aadhaar_telangana: bool = False,
     kcr_identified_by_anganwadi_worker: bool = False,
+    rajiv_aarogyasri_selected: bool = False,
+    rajiv_is_telangana_resident: bool = False,
+    rajiv_has_eligible_card: bool = False,
+    rajiv_has_aadhaar: bool = False,
+    rajiv_is_cancer_related: bool = False,
+    rajiv_family_coverage_used_amount: float | None = None,
+    bill_date: str | None = None,
+    patient_district: str | None = None,
     patient_id: str | None = None,
     patient_name: str | None = None,
     patient_age: int | None = None,
@@ -770,6 +854,8 @@ def _build_comparison_response(
         rate_type=canonical_rate_type,
         tier_id=tier_id,
         pmjay_eligible=pmjay_eligible,
+        rajiv_aarogyasri_selected=rajiv_aarogyasri_selected,
+        bill_date=bill_date,
     )
     compared_line_items, jan_aushadhi = enrich_scheme_line_items_with_jan_aushadhi(
         compared_line_items
@@ -781,11 +867,28 @@ def _build_comparison_response(
     )
 
     store = get_cghs_store()
+    comparison_scheme = (
+        "rajiv_aarogyasri"
+        if rajiv_aarogyasri_selected
+        else "hbp_pmjay"
+        if pmjay_eligible
+        else "cghs"
+    )
     rates_source: dict[str, Any] = {
         "cghs_file": str(store.csv_path.name),
         "total_procedures_loaded": len(store.rows),
-        "comparison_scheme": "hbp_pmjay" if pmjay_eligible else "cghs",
+        "comparison_scheme": comparison_scheme,
     }
+    if rajiv_aarogyasri_selected:
+        try:
+            from app.rajiv_aarogyasri import get_rajiv_aarogyasri_store
+
+            rajiv_store = get_rajiv_aarogyasri_store()
+            rates_source["aarogyasri_hospitals_loaded"] = len(rajiv_store.hospitals)
+            rates_source["aarogyasri_packages_loaded"] = len(rajiv_store.packages)
+        except Exception:
+            rates_source["aarogyasri_hospitals_loaded"] = 0
+            rates_source["aarogyasri_packages_loaded"] = 0
     if pmjay_eligible:
         try:
             hbp_store = get_hbp_store()
@@ -819,6 +922,7 @@ def _build_comparison_response(
 
     from app.hospitalisation_relief_scheme import build_hospitalisation_relief_advisory
     from app.kcr_kit_scheme import build_kcr_kit_advisory
+    from app.rajiv_aarogyasri import build_rajiv_aarogyasri_report
 
     patient_payload: dict[str, Any] | None = None
     if patient_id or patient_name:
@@ -841,6 +945,12 @@ def _build_comparison_response(
             "kcr_more_than_two_live_children": kcr_more_than_two_live_children,
             "kcr_aadhaar_telangana": kcr_aadhaar_telangana,
             "kcr_identified_by_anganwadi_worker": kcr_identified_by_anganwadi_worker,
+            "rajiv_aarogyasri_selected": rajiv_aarogyasri_selected,
+            "rajiv_is_telangana_resident": rajiv_is_telangana_resident,
+            "rajiv_has_eligible_card": rajiv_has_eligible_card,
+            "rajiv_has_aadhaar": rajiv_has_aadhaar,
+            "rajiv_is_cancer_related": rajiv_is_cancer_related,
+            "rajiv_family_coverage_used_amount": rajiv_family_coverage_used_amount,
         }
 
     hospitalisation_relief_advisory = build_hospitalisation_relief_advisory(
@@ -857,6 +967,21 @@ def _build_comparison_response(
         kcr_more_than_two_live_children=kcr_more_than_two_live_children,
         kcr_aadhaar_telangana=kcr_aadhaar_telangana,
         kcr_identified_by_anganwadi_worker=kcr_identified_by_anganwadi_worker,
+    )
+    rajiv_aarogyasri_report = build_rajiv_aarogyasri_report(
+        rajiv_aarogyasri_selected=rajiv_aarogyasri_selected,
+        rajiv_is_telangana_resident=rajiv_is_telangana_resident,
+        rajiv_has_eligible_card=rajiv_has_eligible_card,
+        rajiv_has_aadhaar=rajiv_has_aadhaar,
+        rajiv_is_cancer_related=rajiv_is_cancer_related,
+        rajiv_family_coverage_used_amount=rajiv_family_coverage_used_amount,
+        ocr_hospital_name=hospital_name,
+        patient_state=location_meta.get("state_name", state_ut_name),
+        patient_district=patient_district or location_meta.get("city", city),
+        patient_city=location_meta.get("city", city),
+        bill_date=bill_date,
+        line_items=normalized_items,
+        compared_line_items=compared_line_items,
     )
 
     return {
@@ -880,7 +1005,8 @@ def _build_comparison_response(
             "rate_type": canonical_rate_type,
             "rate_type_label": _rate_type_label(canonical_rate_type),
             "pmjay_eligible": pmjay_eligible,
-            "comparison_scheme": "hbp_pmjay" if pmjay_eligible else "cghs",
+            "rajiv_aarogyasri_selected": rajiv_aarogyasri_selected,
+            "comparison_scheme": comparison_scheme,
         },
         "patient": patient_payload,
         "rates_source": rates_source,
@@ -889,6 +1015,7 @@ def _build_comparison_response(
         "audit_flags": audit_flags,
         "hospitalisation_relief_advisory": hospitalisation_relief_advisory,
         "kcr_kit_advisory": kcr_kit_advisory,
+        "rajiv_aarogyasri_report": rajiv_aarogyasri_report,
     }
 
 
@@ -923,6 +1050,14 @@ def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
         kcr_more_than_two_live_children=body.kcr_more_than_two_live_children,
         kcr_aadhaar_telangana=body.kcr_aadhaar_telangana,
         kcr_identified_by_anganwadi_worker=body.kcr_identified_by_anganwadi_worker,
+        rajiv_aarogyasri_selected=body.rajiv_aarogyasri_selected,
+        rajiv_is_telangana_resident=body.rajiv_is_telangana_resident,
+        rajiv_has_eligible_card=body.rajiv_has_eligible_card,
+        rajiv_has_aadhaar=body.rajiv_has_aadhaar,
+        rajiv_is_cancer_related=body.rajiv_is_cancer_related,
+        rajiv_family_coverage_used_amount=body.rajiv_family_coverage_used_amount,
+        bill_date=body.bill_date,
+        patient_district=body.patient_district,
         patient_id=body.patient_id,
         patient_name=body.patient_name,
         patient_age=body.patient_age,

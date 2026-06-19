@@ -5,10 +5,14 @@ import EligibilityCriteriaModal, {
   HOSPITALISATION_RELIEF_ELIGIBILITY_SECTIONS,
   KCR_KIT_ELIGIBILITY_SECTIONS,
   PMJAY_ELIGIBILITY_SECTIONS,
+  RAJIV_AAROGYASRI_ELIGIBILITY_SECTIONS,
 } from "./EligibilityCriteriaModal";
 import KcrKitQuestionsModal, {
   emptyKcrKitAnswers,
 } from "./KcrKitQuestionsModal";
+import RajivAarogyasriQuestionsModal, {
+  emptyRajivAarogyasriAnswers,
+} from "./RajivAarogyasriQuestionsModal";
 import SchemeYesNoQuestion from "./SchemeYesNoQuestion";
 import { getStateOptions, isTelanganaState } from "../services/locations";
 
@@ -31,6 +35,15 @@ export const emptyKcrKitFields = () => ({
   kcrIdentifiedByAnganwadiWorker: false,
 });
 
+export const emptyRajivAarogyasriFields = () => ({
+  rajivAarogyasriSelected: false,
+  rajivIsTelanganaResident: false,
+  rajivHasEligibleCard: false,
+  rajivHasAadhaar: false,
+  rajivIsCancerRelated: false,
+  rajivFamilyCoverageUsedAmount: "",
+});
+
 export const emptyPatientForm = () => ({
   name: "",
   age: "",
@@ -41,6 +54,7 @@ export const emptyPatientForm = () => ({
   hospitalisationReliefSchemeSelected: false,
   isRegisteredConstructionWorker: false,
   ...emptyKcrKitFields(),
+  ...emptyRajivAarogyasriFields(),
   savePastBills: false,
 });
 
@@ -71,6 +85,15 @@ export function patientToFormFields(patient) {
     kcrIdentifiedByAnganwadiWorker: Boolean(
       patient?.kcrIdentifiedByAnganwadiWorker
     ),
+    rajivAarogyasriSelected: Boolean(patient?.rajivAarogyasriSelected),
+    rajivIsTelanganaResident: Boolean(patient?.rajivIsTelanganaResident),
+    rajivHasEligibleCard: Boolean(patient?.rajivHasEligibleCard),
+    rajivHasAadhaar: Boolean(patient?.rajivHasAadhaar),
+    rajivIsCancerRelated: Boolean(patient?.rajivIsCancerRelated),
+    rajivFamilyCoverageUsedAmount:
+      patient?.rajivFamilyCoverageUsedAmount != null
+        ? String(patient.rajivFamilyCoverageUsedAmount)
+        : "",
     savePastBills: Boolean(patient?.savePastBills),
   };
 }
@@ -92,6 +115,16 @@ function getKcrAnswersFromForm(form) {
     kcrMoreThanTwoLiveChildren: Boolean(form.kcrMoreThanTwoLiveChildren),
     kcrAadhaarTelangana: Boolean(form.kcrAadhaarTelangana),
     kcrIdentifiedByAnganwadiWorker: Boolean(form.kcrIdentifiedByAnganwadiWorker),
+  };
+}
+
+function getRajivAnswersFromForm(form) {
+  return {
+    rajivIsTelanganaResident: Boolean(form.rajivIsTelanganaResident),
+    rajivHasEligibleCard: Boolean(form.rajivHasEligibleCard),
+    rajivHasAadhaar: Boolean(form.rajivHasAadhaar),
+    rajivIsCancerRelated: Boolean(form.rajivIsCancerRelated),
+    rajivFamilyCoverageUsedAmount: form.rajivFamilyCoverageUsedAmount ?? "",
   };
 }
 
@@ -135,6 +168,12 @@ export default function PatientForm({
       setForm((prev) => ({ ...prev, ...emptyKcrKitFields() }));
     }
   }, [showKcrKitCard, form.kcrKitSelected, setForm]);
+
+  useEffect(() => {
+    if (!showAarogyaCard && form.rajivAarogyasriSelected) {
+      setForm((prev) => ({ ...prev, ...emptyRajivAarogyasriFields() }));
+    }
+  }, [showAarogyaCard, form.rajivAarogyasriSelected, setForm]);
 
   return (
     <form className="patient-form" onSubmit={onSubmit}>
@@ -319,6 +358,54 @@ export default function PatientForm({
               <label className="scheme-card-checkbox">
                 <input
                   type="checkbox"
+                  checked={form.rajivAarogyasriSelected}
+                  onChange={(event) => {
+                    if (!event.target.checked) {
+                      setForm((prev) => ({ ...prev, ...emptyRajivAarogyasriFields() }));
+                    }
+                  }}
+                  onClick={(event) => {
+                    if (!form.rajivAarogyasriSelected) {
+                      event.preventDefault();
+                      setActiveModal("rajiv-aarogyasri-questions");
+                    }
+                  }}
+                />
+                <span>Rajiv Aarogyasri / Aarogyasri Cheyutha</span>
+              </label>
+              <p className="scheme-card-description">
+                Cashless package-based healthcare for eligible Telangana
+                beneficiaries with approved Aarogyasri hospital and package rates.
+              </p>
+              {form.rajivAarogyasriSelected && (
+                <p className="scheme-card-status">Eligibility answers saved.</p>
+              )}
+              <div className="scheme-card-buttons">
+                <button
+                  type="button"
+                  className="eligibility-learn-btn"
+                  onClick={() => setActiveModal("rajiv-aarogyasri-questions")}
+                >
+                  {form.rajivAarogyasriSelected
+                    ? "Update eligibility answers"
+                    : "Answer eligibility questions"}
+                </button>
+                <button
+                  type="button"
+                  className="eligibility-learn-btn"
+                  onClick={() => setActiveModal("rajiv-aarogyasri")}
+                >
+                  Learn eligibility criteria
+                </button>
+              </div>
+            </div>
+          )}
+
+          {showAarogyaCard && (
+            <div className="scheme-card">
+              <label className="scheme-card-checkbox">
+                <input
+                  type="checkbox"
                   checked={form.aarogyaBhadrathaEligible}
                   onChange={(event) =>
                     setForm((prev) => ({
@@ -382,6 +469,24 @@ export default function PatientForm({
         }
       />
 
+      <RajivAarogyasriQuestionsModal
+        open={activeModal === "rajiv-aarogyasri-questions"}
+        onClose={() => setActiveModal(null)}
+        onSave={(answers) => {
+          setForm((prev) => ({
+            ...prev,
+            rajivAarogyasriSelected: true,
+            ...answers,
+          }));
+          setActiveModal(null);
+        }}
+        initialValues={
+          form.rajivAarogyasriSelected
+            ? getRajivAnswersFromForm(form)
+            : emptyRajivAarogyasriAnswers()
+        }
+      />
+
       <EligibilityCriteriaModal
         open={activeModal === "ayushman"}
         onClose={() => setActiveModal(null)}
@@ -413,6 +518,13 @@ export default function PatientForm({
         onClose={() => setActiveModal(null)}
         title="KCR Kit / Pregnancy Nutrition Kit eligibility"
         sections={KCR_KIT_ELIGIBILITY_SECTIONS}
+      />
+
+      <EligibilityCriteriaModal
+        open={activeModal === "rajiv-aarogyasri"}
+        onClose={() => setActiveModal(null)}
+        title="Rajiv Aarogyasri / Aarogyasri Cheyutha eligibility"
+        sections={RAJIV_AAROGYASRI_ELIGIBILITY_SECTIONS}
       />
 
       {info && <p className="auth-info">{info}</p>}

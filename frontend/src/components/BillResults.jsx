@@ -11,6 +11,7 @@ import {
 import ReportActions from "./ReportActions";
 import HospitalisationReliefAdvisory from "./HospitalisationReliefAdvisory";
 import KcrKitAdvisory from "./KcrKitAdvisory";
+import RajivAarogyasriReport from "./RajivAarogyasriReport";
 
 export default function BillResults({ result, toolbar = null }) {
   const summary = useMemo(() => computeBillSummary(result), [result]);
@@ -122,19 +123,23 @@ export default function BillResults({ result, toolbar = null }) {
               (option) => option.id === result.comparison_settings.hospital_type
             )?.label || result.comparison_settings.hospital_type}
           </strong>
-          {result.comparison_settings.comparison_scheme !== "hbp_pmjay" && (
+          {result.comparison_settings.comparison_scheme === "hbp_pmjay" ? (
+            <>
+              {" · "}
+              <strong>PM-JAY HBP 2022 benchmark</strong>
+            </>
+          ) : result.comparison_settings.comparison_scheme === "rajiv_aarogyasri" ? (
+            <>
+              {" · "}
+              <strong>Rajiv Aarogyasri package benchmark</strong>
+            </>
+          ) : (
             <>
               {" · "}
               <strong>
                 {result.comparison_settings.rate_type_label ||
                   result.comparison_settings.rate_type}
               </strong>
-            </>
-          )}
-          {result.comparison_settings.comparison_scheme === "hbp_pmjay" && (
-            <>
-              {" · "}
-              <strong>PM-JAY HBP 2022 benchmark</strong>
             </>
           )}
         </p>
@@ -169,15 +174,20 @@ export default function BillResults({ result, toolbar = null }) {
           const isMedicine =
             item.comparison_source === "pharma" || item.category === "medicine";
           const isHbp = item.comparison_source === "hbp";
+          const isAarogyasri = item.comparison_source === "aarogyasri";
           const referenceRate = isMedicine
             ? item.pharma_rate
             : isHbp
             ? item.hbp_rate
+            : isAarogyasri
+            ? item.aarogyasri_rate
             : item.cghs_rate;
           const referenceLabel = isMedicine
             ? "NPPA Ceiling"
             : isHbp
             ? "PM-JAY HBP Rate"
+            : isAarogyasri
+            ? "Aarogyasri Package Rate"
             : "CGHS Rate";
           return (
             <article
@@ -191,7 +201,9 @@ export default function BillResults({ result, toolbar = null }) {
               {item.matched_reference_item && (
                 <p className="matched-reference">
                   Matched: {item.matched_reference_item}
-                  {item.hbp_procedure_code
+                  {item.aarogyasri_package_code
+                    ? ` (${item.aarogyasri_package_code})`
+                    : item.hbp_procedure_code
                     ? ` (${item.hbp_procedure_code})`
                     : item.cghs_code
                     ? ` (${item.cghs_code})`
@@ -217,6 +229,11 @@ export default function BillResults({ result, toolbar = null }) {
                   <h5>{formatCurrency(item.price_difference)}</h5>
                 </div>
               </div>
+              {item.aarogyasri_fallback_used && (
+                <p className="rajiv-fallback-note">
+                  CGHS fallback used because Aarogyasri package was not matched.
+                </p>
+              )}
               {item.jan_aushadhi_available && (
                 <p className="jan-aushadhi-item-note">
                   Available under Jan Aushadhi at subsidized rates
@@ -248,8 +265,17 @@ export default function BillResults({ result, toolbar = null }) {
                     {formatCurrency(item.hbp_tier_3_rate)}
                   </p>
                 )}
+              {isAarogyasri && item.aarogyasri_source_file && (
+                <p className="rate-breakdown">
+                  Source: {item.aarogyasri_source_file}
+                  {item.aarogyasri_specialty
+                    ? ` · ${item.aarogyasri_specialty}`
+                    : ""}
+                </p>
+              )}
               {!isMedicine &&
                 !isHbp &&
+                !isAarogyasri &&
                 (item.non_nabh_rate != null || item.nabh_rate != null) && (
                   <p className="rate-breakdown">
                     Non-NABH {formatCurrency(item.non_nabh_rate)} · NABH{" "}
@@ -317,6 +343,8 @@ export default function BillResults({ result, toolbar = null }) {
       />
 
       <KcrKitAdvisory advisory={result?.kcr_kit_advisory} />
+
+      <RajivAarogyasriReport report={result?.rajiv_aarogyasri_report} />
 
       <ReportActions report={result} />
     </>
