@@ -10,7 +10,11 @@ import {
   useNavigate,
 } from "react-router-dom";
 import BillResults from "./components/BillResults";
-import { HOSPITAL_TYPE_OPTIONS } from "./billUtils";
+import {
+  getBillComparisonScheme,
+  getComparisonSchemeCopy,
+  HOSPITAL_TYPE_OPTIONS,
+} from "./billUtils";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import HistoryPage from "./pages/HistoryPage";
@@ -533,6 +537,8 @@ function CheckPage() {
   }, [user, reloadPatients]);
 
   const selectedPatient = patients.find((p) => p.id === selectedPatientId);
+  const comparisonScheme = getBillComparisonScheme(selectedPatient);
+  const comparisonCopy = getComparisonSchemeCopy(comparisonScheme);
   const aarogyaMode =
     isTelanganaState(selectedPatient?.state) &&
     Boolean(selectedPatient?.aarogyaBhadrathaEligible);
@@ -737,6 +743,22 @@ function CheckPage() {
           kcr_identified_by_anganwadi_worker: Boolean(
             selectedPatient?.kcrIdentifiedByAnganwadiWorker
           ),
+          rajiv_aarogyasri_selected: Boolean(
+            selectedPatient?.rajivAarogyasriSelected
+          ),
+          rajiv_is_telangana_resident: Boolean(
+            selectedPatient?.rajivIsTelanganaResident
+          ),
+          rajiv_has_eligible_card: Boolean(selectedPatient?.rajivHasEligibleCard),
+          rajiv_has_aadhaar: Boolean(selectedPatient?.rajivHasAadhaar),
+          rajiv_is_cancer_related: Boolean(selectedPatient?.rajivIsCancerRelated),
+          rajiv_family_coverage_used_amount:
+            selectedPatient?.rajivFamilyCoverageUsedAmount ?? null,
+          bill_date: scanMeta?.bill_date || null,
+          patient_district:
+            scanMeta?.comparison_settings?.aarogya_district ||
+            location.city ||
+            null,
           patient_id: selectedPatient?.id || null,
           patient_name: selectedPatient?.name || null,
           patient_age: selectedPatient?.age ?? null,
@@ -1268,9 +1290,7 @@ function CheckPage() {
               <div className="spinner-conic" aria-hidden="true" />
               <p className="loading-message">
                 {uiState === "comparing"
-                  ? selectedPatient?.ayushmanEligible
-                    ? "Comparing with Ayushman Bharat HBP 2022 rates..."
-                    : "Comparing with CGHS rates..."
+                  ? comparisonCopy.loading
                   : LOADING_MESSAGES[loadingMessageIndex]}
               </p>
               <div className="loading-bar">
@@ -1339,10 +1359,7 @@ function CheckPage() {
               <header className="bill-editor-header">
                 <div>
                   <h2>Review scanned items</h2>
-                  <p>
-                    Correct anything the scan missed, then compare against CGHS
-                    rates.
-                  </p>
+                  <p>{comparisonCopy.editHint}</p>
                 </div>
                 <span className="bill-editor-count">
                   {editableItems.length} item{editableItems.length === 1 ? "" : "s"}
@@ -1474,9 +1491,7 @@ function CheckPage() {
                   className="analyze-btn bill-editor-primary"
                   onClick={handleCompare}
                 >
-                  {selectedPatient?.ayushmanEligible
-                    ? "Compare with PM-JAY HBP →"
-                    : "Compare with CGHS →"}
+                  {comparisonCopy.compareButton}
                 </button>
               </div>
               {error && <p className="error-text">{error}</p>}

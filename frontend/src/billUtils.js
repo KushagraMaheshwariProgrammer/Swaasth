@@ -70,6 +70,49 @@ export const getAuditRiskMeta = (riskLevel) => {
   return { label: "Low Risk", className: "audit-risk audit-risk-low" };
 };
 
+export function getBillComparisonScheme(patient, comparisonSettings = null) {
+  if (comparisonSettings?.comparison_scheme) {
+    return comparisonSettings.comparison_scheme;
+  }
+  if (patient?.rajivAarogyasriSelected) {
+    return "rajiv_aarogyasri";
+  }
+  if (patient?.ayushmanEligible) {
+    return "hbp_pmjay";
+  }
+  return "cghs";
+}
+
+export function getComparisonSchemeCopy(scheme) {
+  if (scheme === "rajiv_aarogyasri") {
+    return {
+      compareButton: "Compare with Aarogyasri package rates →",
+      loading: "Comparing with Aarogyasri package rates...",
+      editHint:
+        "Correct anything the scan missed, then compare against approved Aarogyasri package rates.",
+      rateLabel: "Aarogyasri Package Rate",
+      benchmarkLabel: "Rajiv Aarogyasri package benchmark",
+    };
+  }
+  if (scheme === "hbp_pmjay") {
+    return {
+      compareButton: "Compare with PM-JAY HBP →",
+      loading: "Comparing with Ayushman Bharat HBP 2022 rates...",
+      editHint:
+        "Correct anything the scan missed, then compare against PM-JAY HBP rates.",
+      rateLabel: "PM-JAY HBP Rate",
+      benchmarkLabel: "PM-JAY HBP 2022 benchmark",
+    };
+  }
+  return {
+    compareButton: "Compare with CGHS →",
+    loading: "Comparing with CGHS rates...",
+    editHint: "Correct anything the scan missed, then compare against CGHS rates.",
+    rateLabel: "CGHS Rate",
+    benchmarkLabel: "CGHS benchmark",
+  };
+}
+
 export function CountUp({ value, isCurrency = false, duration = 1200 }) {
   const [displayValue, setDisplayValue] = useState(0);
 

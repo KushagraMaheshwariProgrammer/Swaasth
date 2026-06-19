@@ -77,6 +77,25 @@ export function persistLocalPatient(userId, patientData, localId = null) {
       kcrIdentifiedByAnganwadiWorker: Boolean(
         kcrKitAllowed && patientData.kcrIdentifiedByAnganwadiWorker
       ),
+      rajivAarogyasriSelected: Boolean(patientData.rajivAarogyasriSelected),
+      rajivIsTelanganaResident: Boolean(
+        patientData.rajivAarogyasriSelected && patientData.rajivIsTelanganaResident
+      ),
+      rajivHasEligibleCard: Boolean(
+        patientData.rajivAarogyasriSelected && patientData.rajivHasEligibleCard
+      ),
+      rajivHasAadhaar: Boolean(
+        patientData.rajivAarogyasriSelected && patientData.rajivHasAadhaar
+      ),
+      rajivIsCancerRelated: Boolean(
+        patientData.rajivAarogyasriSelected && patientData.rajivIsCancerRelated
+      ),
+      rajivFamilyCoverageUsedAmount:
+        patientData.rajivAarogyasriSelected &&
+        patientData.rajivFamilyCoverageUsedAmount != null &&
+        patientData.rajivFamilyCoverageUsedAmount !== ""
+          ? Number(patientData.rajivFamilyCoverageUsedAmount)
+          : null,
       savePastBills: Boolean(patientData.savePastBills),
     },
     synced: existing?.synced ?? false,

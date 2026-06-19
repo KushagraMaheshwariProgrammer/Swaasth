@@ -2000,6 +2000,33 @@ body {
   gap: 0.65rem;
 }
 
+.rajiv-aarogyasri-questions-modal {
+  max-width: 520px;
+}
+
+.rajiv-aarogyasri-questions-body {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.rajiv-aarogyasri-questions-intro {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.rajiv-aarogyasri-questions-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.rajiv-aarogyasri-questions-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
 .scheme-card-followup-list {
   display: grid;
   gap: 0.55rem;
@@ -2137,6 +2164,187 @@ body {
   color: var(--text-secondary);
   font-style: italic;
   line-height: 1.45;
+}
+
+.rajiv-aarogyasri-report {
+  padding: 1rem 1.1rem;
+  background: linear-gradient(
+    135deg,
+    rgba(93, 138, 168, 0.12) 0%,
+    rgba(174, 214, 241, 0.1) 100%
+  );
+  border: 1px solid rgba(93, 138, 168, 0.28);
+  border-radius: var(--neu-radius);
+  box-shadow: var(--neu-shadow-soft);
+  margin-top: 0.85rem;
+}
+
+.rajiv-aarogyasri-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.rajiv-aarogyasri-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #1a5276;
+}
+
+.rajiv-aarogyasri-badge {
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  background: #5d8aa8;
+  color: #fff;
+}
+
+.rajiv-aarogyasri-card {
+  background: var(--neu-surface);
+  border-radius: var(--neu-radius-sm);
+  padding: 0.85rem 0.95rem;
+  margin-bottom: 0.65rem;
+  border-left: 3px solid #5d8aa8;
+  box-shadow: var(--neu-shadow-soft);
+}
+
+.rajiv-aarogyasri-card h4 {
+  margin: 0 0 0.45rem;
+  font-size: 0.92rem;
+  color: #1a5276;
+}
+
+.rajiv-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.45rem;
+}
+
+.rajiv-meta-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.rajiv-meta-list li + li {
+  margin-top: 0.25rem;
+}
+
+.rajiv-eligibility-preview p {
+  margin: 0.55rem 0 0;
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+}
+
+.rajiv-comparison-grid {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.rajiv-comparison-item {
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: var(--neu-radius-sm);
+  padding: 0.75rem 0.85rem;
+}
+
+.rajiv-comparison-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.45rem;
+}
+
+.rajiv-comparison-metrics p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.rajiv-comparison-metrics h5 {
+  margin: 0.15rem 0 0;
+  font-size: 0.95rem;
+}
+
+.rajiv-package-match,
+.rajiv-package-meta,
+.rajiv-match-reason,
+.rajiv-fallback-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+}
+
+.rajiv-fallback-note {
+  color: #1a5276;
+  font-weight: 600;
+}
+
+.rajiv-advisory-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.rajiv-advisory-list li + li {
+  margin-top: 0.55rem;
+}
+
+.rajiv-advisory-list p {
+  margin: 0.25rem 0 0;
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+}
+
+.rajiv-advisory-date {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.rajiv-status-badge {
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #5d8aa8;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.rajiv-status-success {
+  background: #1e8449;
+}
+
+.rajiv-status-warning {
+  background: #c0392b;
+}
+
+.rajiv-status-info {
+  background: #2874a6;
+}
+
+.rajiv-status-muted {
+  background: #7f8c8d;
+}
+
+.rajiv-disclaimer {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .rajiv-comparison-metrics {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {

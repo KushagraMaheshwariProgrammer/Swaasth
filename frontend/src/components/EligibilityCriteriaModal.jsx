@@ -98,6 +98,26 @@ export const KCR_KIT_ELIGIBILITY_SECTIONS = [
   },
 ];
 
+export const RAJIV_AAROGYASRI_ELIGIBILITY_SECTIONS = [
+  {
+    title: "Rajiv Aarogyasri / Aarogyasri Cheyutha – Eligibility",
+    items: [
+      "Beneficiary should be a resident of Telangana.",
+      "Beneficiary should hold an Aarogyasri / eligible ration card or otherwise qualify under the scheme.",
+      "Aadhaar is commonly required for beneficiary verification.",
+      "Treatment should be at an empanelled hospital and for an approved Aarogyasri package where applicable.",
+    ],
+  },
+  {
+    title: "Coverage notes",
+    items: [
+      "Rajiv Aarogyasri is a cashless package-based scheme for eligible beneficiaries.",
+      "Approved package rates are used for comparison; final approval depends on hospital empanelment and package eligibility.",
+      "Cancer-related treatment may require verification with approved oncology centres.",
+    ],
+  },
+];
+
 export const AAROGYA_BHADRATHA_COVERAGE_LIMITS = [
   {
     title: "Per-Case Reimbursement Limits (G.O.Ms.No.101, 1-12-2015)",
