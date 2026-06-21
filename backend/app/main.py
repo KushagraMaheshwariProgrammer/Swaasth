@@ -1,17 +1,12 @@
 import json
 import os
 import re
-from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-import fitz
-import pytesseract
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from groq import Groq
-from PIL import Image
 from pydantic import BaseModel, Field, model_validator
 
 from app.aarogya_bhadratha import get_aarogya_store
@@ -30,14 +25,18 @@ from app.nabh_registry import get_nabh_registry
 from app.jan_aushadhi_rates import enrich_line_items_with_jan_aushadhi, get_jan_aushadhi_store
 from app.medicine_comparison import enrich_scheme_line_items_with_jan_aushadhi
 from app.pharma_rates import get_pharma_store
+from app.prescription_routes import router as prescription_router
 from app.services.claim_audit import analyze_claim_items
+from app.services.document_extraction import (
+    extract_bill_with_groq,
+    extract_document_text,
+    extract_json_from_text,
+)
+from app.services.treatment_audit import analyze_treatment
 
 
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(_BACKEND_ROOT / ".env")
-
-TESSERACT_PATH = "/opt/homebrew/bin/tesseract"
-pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
 
 app = FastAPI(title="MedBill Backend")
 
@@ -59,6 +58,7 @@ app.add_middleware(
 
 app.include_router(aarogya_router)
 app.include_router(report_router)
+app.include_router(prescription_router)
 
 
 @app.on_event("startup")
@@ -294,122 +294,19 @@ def _resolve_comparison_tier(
 
 
 def _extract_text_from_pdf(file_bytes: bytes) -> str:
-    try:
-        doc = fitz.open(stream=file_bytes, filetype="pdf")
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail="Invalid PDF file.") from exc
-
-    pages_text: list[str] = []
-    for page in doc:
-        pages_text.append(page.get_text("text"))
-
-    return "\n".join(pages_text).strip()
+    return extract_document_text(file_bytes, "pdf")
 
 
 def _extract_text_from_image(file_bytes: bytes) -> str:
-    try:
-        image = Image.open(BytesIO(file_bytes))
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail="Invalid image file.") from exc
-
-    try:
-        return pytesseract.image_to_string(image).strip()
-    except pytesseract.TesseractNotFoundError as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Tesseract is not installed on this machine. "
-                "Please install Tesseract OCR and try again."
-            ),
-        ) from exc
+    return extract_document_text(file_bytes, "jpeg")
 
 
 def _extract_json_from_text(raw_text: str) -> dict[str, Any]:
-    cleaned_text = raw_text.strip()
-
-    try:
-        return json.loads(cleaned_text)
-    except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", cleaned_text, re.DOTALL)
-        if not match:
-            raise HTTPException(
-                status_code=500,
-                detail="Groq returned an invalid response format.",
-            )
-
-        try:
-            return json.loads(match.group(0))
-        except json.JSONDecodeError as exc:
-            raise HTTPException(
-                status_code=500,
-                detail="Groq returned malformed JSON.",
-            ) from exc
+    return extract_json_from_text(raw_text)
 
 
 def _analyze_bill_text_with_groq(extracted_text: str) -> dict[str, Any]:
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="GROQ_API_KEY is not set in the environment.",
-        )
-
-    client = Groq(api_key=api_key)
-
-    prompt = f"""
-You are helping extract hospital bill line items for Indian patients.
-
-Task:
-1) Decide if the text looks like a medical/hospital bill.
-2) If yes, extract line items into structured JSON.
-3) If no, return an error message.
-
-Return ONLY valid JSON with this exact shape:
-{{
-  "is_medical_bill": true or false,
-  "error": null or "reason text",
-  "hospital_name": null or "string",
-  "line_items": [
-    {{
-      "item_name": "string",
-      "quantity": number,
-      "unit_price": number,
-      "total_price": number,
-      "category": "medicine" | "test" | "procedure" | "other"
-    }}
-  ]
-}}
-
-Rules:
-- Extract the hospital or healthcare provider name from the bill header if present.
-- If unsure quantity/unit_price, infer reasonably from bill text.
-- Keep numeric fields as numbers (not strings).
-- category must be one of: medicine, test, procedure, other.
-- If text is not a medical bill, set is_medical_bill=false and provide error.
-
-Bill text:
-{extracted_text}
-"""
-
-    try:
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            temperature=0,
-            max_tokens=2000,
-            messages=[{"role": "user", "content": prompt}],
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Groq API request failed: {str(exc)}",
-        ) from exc
-
-    response_text = (response.choices[0].message.content or "").strip()
-    if not response_text:
-        raise HTTPException(status_code=502, detail="Groq returned an empty response.")
-
-    parsed = _extract_json_from_text(response_text)
-    return parsed
+    return extract_bill_with_groq(extracted_text)
 
 
 def _rate_type_label(rate_type: str) -> str:
@@ -727,6 +624,14 @@ def _resolve_state_ut_name(
     )
 
 
+class PrescriptionItemInput(BaseModel):
+    name: str = ""
+    dose: str | None = None
+    frequency: str | None = None
+    duration: str | None = None
+    category: str | None = None
+
+
 class CompareBillRequest(BaseModel):
     line_items: list[BillLineItemInput]
     state_ut_name: str | None = None
@@ -761,6 +666,11 @@ class CompareBillRequest(BaseModel):
     patient_name: str | None = None
     patient_age: int | None = None
     patient_gender: str | None = None
+    diagnosis: str | None = None
+    diagnosis_user_provided: bool = False
+    prescription_medicines: list[PrescriptionItemInput] = Field(default_factory=list)
+    prescription_tests: list[PrescriptionItemInput] = Field(default_factory=list)
+    prescription_procedures: list[PrescriptionItemInput] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def resolve_state(self) -> "CompareBillRequest":
@@ -799,6 +709,27 @@ def _normalize_line_items(line_items: list[dict[str, Any]]) -> list[dict[str, An
     return normalized
 
 
+def _prescription_items_from_request(
+    medicines: list[PrescriptionItemInput],
+    tests: list[PrescriptionItemInput],
+    procedures: list[PrescriptionItemInput],
+) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for entry in medicines:
+        name = entry.name.strip()
+        if name:
+            items.append({"name": name, "category": "medicine"})
+    for entry in tests:
+        name = entry.name.strip()
+        if name:
+            items.append({"name": name, "category": "test"})
+    for entry in procedures:
+        name = entry.name.strip()
+        if name:
+            items.append({"name": name, "category": "procedure"})
+    return items
+
+
 def _build_comparison_response(
     *,
     line_items: list[dict[str, Any]],
@@ -833,6 +764,10 @@ def _build_comparison_response(
     patient_name: str | None = None,
     patient_age: int | None = None,
     patient_gender: str | None = None,
+    diagnosis: str | None = None,
+    diagnosis_user_provided: bool = False,
+    prescription_items: list[dict[str, Any]] | None = None,
+    report_kind: str = "bill",
 ) -> dict[str, Any]:
     if not line_items:
         raise HTTPException(status_code=400, detail="Add at least one line item.")
@@ -865,6 +800,32 @@ def _build_comparison_response(
         compared_line_items,
         city=location_meta.get("city", city),
     )
+
+    treatment_audit_flags: dict[str, Any] | None = None
+    prescription_payload: dict[str, Any] | None = None
+    if diagnosis and diagnosis.strip():
+        prescription_items = prescription_items or []
+        treatment_audit_flags = analyze_treatment(
+            diagnosis=diagnosis.strip(),
+            prescription_items=prescription_items,
+            bill_items=compared_line_items,
+        )
+        if prescription_items:
+            prescription_payload = {
+                "diagnosis": diagnosis.strip(),
+                "diagnosis_user_provided": diagnosis_user_provided,
+                "medicines": [
+                    item for item in prescription_items if item.get("category") == "medicine"
+                ],
+                "tests": [
+                    item for item in prescription_items if item.get("category") == "test"
+                ],
+                "procedures": [
+                    item
+                    for item in prescription_items
+                    if item.get("category") == "procedure"
+                ],
+            }
 
     store = get_cghs_store()
     comparison_scheme = (
@@ -1013,6 +974,9 @@ def _build_comparison_response(
         "line_items": compared_line_items,
         "jan_aushadhi": jan_aushadhi,
         "audit_flags": audit_flags,
+        "treatment_audit_flags": treatment_audit_flags,
+        "prescription": prescription_payload,
+        "report_kind": report_kind,
         "hospitalisation_relief_advisory": hospitalisation_relief_advisory,
         "kcr_kit_advisory": kcr_kit_advisory,
         "rajiv_aarogyasri_report": rajiv_aarogyasri_report,
@@ -1027,6 +991,12 @@ def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     line_items = [item.model_dump() for item in body.line_items]
+    prescription_items = _prescription_items_from_request(
+        body.prescription_medicines,
+        body.prescription_tests,
+        body.prescription_procedures,
+    )
+    report_kind = "combined" if body.diagnosis and prescription_items else "bill"
     return _build_comparison_response(
         line_items=line_items,
         state_ut_name=body.state_ut_name,
@@ -1062,6 +1032,10 @@ def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
         patient_name=body.patient_name,
         patient_age=body.patient_age,
         patient_gender=body.patient_gender,
+        diagnosis=body.diagnosis,
+        diagnosis_user_provided=body.diagnosis_user_provided,
+        prescription_items=prescription_items,
+        report_kind=report_kind,
     )
 
 

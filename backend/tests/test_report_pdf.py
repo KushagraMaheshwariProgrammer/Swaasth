@@ -104,3 +104,39 @@ def test_unified_render_pdf_includes_kcr_kit_advisory() -> None:
     res = client.post("/api/reports/render-pdf", json=report)
     assert res.status_code == 200, res.text
     assert res.content[:5] == b"%PDF-"
+
+
+def test_unified_render_pdf_prescription_report() -> None:
+    report = {
+        "report_kind": "prescription",
+        "filename": "prescription.pdf",
+        "diagnosis": "Malaria",
+        "patient": {"name": "Test Patient"},
+        "prescription": {
+            "medicines": [{"name": "Artemether-Lumefantrine"}],
+            "tests": [{"name": "Malaria smear"}],
+            "procedures": [],
+        },
+        "treatment_audit_flags": {
+            "flags_count": 1,
+            "risk_level": "MEDIUM",
+            "matched_stg_conditions": ["Malaria"],
+            "flags": [
+                {
+                    "type": "UNNECESSARY_TEST",
+                    "severity": "MEDIUM",
+                    "item": "MRI Brain",
+                    "reason": "Not indicated for malaria in STG excerpts.",
+                    "recommendation": "Ask the doctor to justify the test.",
+                    "stg_reference": {
+                        "condition": "Malaria",
+                        "section": "Diagnostic tests",
+                        "page": 58,
+                    },
+                }
+            ],
+        },
+    }
+    res = client.post("/api/reports/render-pdf", json=report)
+    assert res.status_code == 200, res.text
+    assert res.content[:5] == b"%PDF-"

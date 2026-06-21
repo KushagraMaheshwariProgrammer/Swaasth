@@ -3,16 +3,24 @@ import react from "@vitejs/plugin-react";
 
 const backendTarget = "http://127.0.0.1:8000";
 
+const proxyCommon = {
+  target: backendTarget,
+  timeout: 120000,
+  proxyTimeout: 120000,
+};
+
 export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      "/api": backendTarget,
-      "/locations": backendTarget,
-      "/compare-bill": backendTarget,
-      "/upload-bill": backendTarget,
-      "/cghs": backendTarget,
-      "/health": backendTarget,
+      "/api": proxyCommon,
+      "/locations": proxyCommon,
+      "/compare-bill": proxyCommon,
+      "/upload-bill": proxyCommon,
+      "/upload-prescription": proxyCommon,
+      "/analyze-treatment": proxyCommon,
+      "/cghs": proxyCommon,
+      "/health": proxyCommon,
     },
   },
 });

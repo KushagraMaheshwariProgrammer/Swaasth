@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import BillResults from "../components/BillResults";
+import PrescriptionResults from "../components/PrescriptionResults";
 import AarogyaResults from "../components/AarogyaResults";
 import {
   buildPatientNameMap,
@@ -215,13 +216,28 @@ export default function HistoryPage() {
                         ? `${bill.comparison_settings.city}, ${bill.comparison_settings.state_name}`
                         : "Location not recorded"}
                       {" · "}
-                      {bill.line_items?.length || 0} items
+                      {bill.report_kind === "prescription"
+                        ? "Prescription review"
+                        : bill.report_kind === "combined"
+                        ? "Bill + prescription review"
+                        : `${bill.line_items?.length || 0} items`}
                     </p>
                     <div className="history-card-stats">
-                      <span>Charged {formatCurrency(summary.totalCharged)}</span>
-                      <span className="history-overcharge">
-                        Overcharged {formatCurrency(summary.totalOvercharged)}
-                      </span>
+                      {bill.report_kind === "prescription" ? (
+                        <span>
+                          {bill.treatment_audit_flags?.flags_count ?? 0} STG flag
+                          {(bill.treatment_audit_flags?.flags_count ?? 0) === 1
+                            ? ""
+                            : "s"}
+                        </span>
+                      ) : (
+                        <>
+                          <span>Charged {formatCurrency(summary.totalCharged)}</span>
+                          <span className="history-overcharge">
+                            Overcharged {formatCurrency(summary.totalOvercharged)}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </button>
                   <button
@@ -256,6 +272,8 @@ export default function HistoryPage() {
             <section className="results-shell">
               {selectedBill.report_kind === "aarogya_bhadratha" ? (
                 <AarogyaResults report={selectedBill} />
+              ) : selectedBill.report_kind === "prescription" ? (
+                <PrescriptionResults result={selectedBill} />
               ) : (
                 <BillResults result={selectedBill} />
               )}

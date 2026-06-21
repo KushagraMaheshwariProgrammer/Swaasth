@@ -25,7 +25,7 @@ Firebase **client** API keys in `google-services.json` are designed to be bundle
 
 | File | Purpose |
 |------|---------|
-| `backend/.env` | `GROQ_API_KEY` for AI bill parsing |
+| `backend/.env` | `GROQ_API_KEY` for AI bill/prescription parsing |
 | `frontend/.env` | Optional overrides only (usually empty) |
 | `backend/firebase-service-account.json` | Firebase Admin SDK (only if added later) |
 
@@ -45,3 +45,17 @@ git reset --hard origin/main
 ```
 
 Then run `npm run setup:env` if you are missing local `.env` files.
+
+## STG index (prescription appropriateness)
+
+Place the CRC Standard Treatment Guidelines PDF at:
+
+`backend/data/Standard Treatment Guidelines/STG.pdf`
+
+Then build the local vector index once:
+
+```bash
+cd backend && python scripts/build_stg_index.py
+```
+
+This writes `backend/data/stg_index/` (gitignored). No extra API key is required for embeddings.
