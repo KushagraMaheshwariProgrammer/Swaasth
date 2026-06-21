@@ -1,0 +1,27 @@
+{
+  "conditions": [
+    { "condition": "Acute Fever", "book_page": 1, "chapter": "Common Diseases" },
+    { "condition": "Malaria", "book_page": 58, "chapter": "Common Diseases" },
+    { "condition": "Dengue", "book_page": 64, "chapter": "Common Diseases" }
+  ],
+  "chunks": [
+    {
+      "chunk_id": "fixture-001",
+      "condition": "Malaria",
+      "chapter": "Common Diseases",
+      "section_type": "Diagnostic tests",
+      "page_start": 58,
+      "page_end": 58,
+      "text": "Smear for malarial parasite and rapid diagnostic test are indicated for suspected malaria."
+    },
+    {
+      "chunk_id": "fixture-002",
+      "condition": "Malaria",
+      "chapter": "Common Diseases",
+      "section_type": "Treatment",
+      "page_start": 58,
+      "page_end": 58,
+      "text": "Treat uncomplicated malaria with artemisinin-based combination therapy."
+    }
+  ]
+}

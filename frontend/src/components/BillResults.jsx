@@ -12,6 +12,7 @@ import ReportActions from "./ReportActions";
 import HospitalisationReliefAdvisory from "./HospitalisationReliefAdvisory";
 import KcrKitAdvisory from "./KcrKitAdvisory";
 import RajivAarogyasriReport from "./RajivAarogyasriReport";
+import TreatmentAuditSection from "./TreatmentAuditSection";
 
 export default function BillResults({ result, toolbar = null }) {
   const summary = useMemo(() => computeBillSummary(result), [result]);
@@ -337,6 +338,8 @@ export default function BillResults({ result, toolbar = null }) {
           </p>
         )}
       </section>
+
+      <TreatmentAuditSection treatmentAuditFlags={result?.treatment_audit_flags} />
 
       <HospitalisationReliefAdvisory
         advisory={result?.hospitalisation_relief_advisory}

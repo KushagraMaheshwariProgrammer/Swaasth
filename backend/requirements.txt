@@ -6,3 +6,5 @@ pytesseract
 Pillow
 groq
 python-dotenv
+fastembed
+chromadb

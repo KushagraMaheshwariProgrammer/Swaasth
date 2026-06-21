@@ -3556,3 +3556,73 @@ body {
     width: 100%;
   }
 }
+
+.document-mode-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.document-mode-btn {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.document-mode-btn-active {
+  background: #1a5276;
+  border-color: #1a5276;
+  color: #fff;
+}
+
+.diagnosis-prompt-card {
+  margin-top: 0.5rem;
+}
+
+.diagnosis-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.diagnosis-suggestion-chip {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.prescription-summary-card,
+.prescription-review-panel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.prescription-item-group ul,
+.prescription-inline-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.treatment-audit-disclaimer,
+.audit-flag-reference {
+  font-size: 0.86rem;
+  color: #64748b;
+  margin: 0.5rem 0 0.75rem;
+}
+
+.prescription-editor-groups {
+  display: grid;
+  gap: 1rem;
+}

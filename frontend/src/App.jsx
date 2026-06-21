@@ -26,10 +26,18 @@ import PatientForm, { emptyPatientForm } from "./components/PatientForm";
 import PatientList from "./components/PatientList";
 import LocationSearchPicker from "./components/LocationSearchPicker";
 import AarogyaFlow from "./components/AarogyaFlow";
+import DiagnosisPrompt from "./components/DiagnosisPrompt";
+import PrescriptionResults from "./components/PrescriptionResults";
 import TermsAndConditionsModal from "./components/TermsAndConditionsModal";
 import { Capacitor } from "@capacitor/core";
 import { createPatient, getPatients, getPatientsLocalSnapshot } from "./services/patients";
 import { markLocalBillSynced, persistLocalBill, saveBill } from "./services/bills";
+import {
+  analyzeTreatment,
+  normalizePrescriptionPayload,
+  uploadPrescription,
+} from "./services/prescriptions";
+import { parseJsonResponse } from "./services/httpUtils";
 import {
   getCities,
   getStateOptions,
@@ -107,6 +115,17 @@ const LOADING_MESSAGES = [
   "Extracting line items...",
   "Comparing with CGHS rates...",
   "Preparing your report...",
+];
+const PRESCRIPTION_LOADING_MESSAGES = [
+  "Reading your prescription...",
+  "Extracting medicines and tests...",
+  "Checking against treatment guidelines...",
+  "Preparing your report...",
+];
+const DOCUMENT_MODES = [
+  { id: "bill", label: "Bill only" },
+  { id: "prescription", label: "Prescription only" },
+  { id: "combined", label: "Bill + prescription" },
 ];
 
 const pageTransition = {
@@ -475,6 +494,16 @@ function CheckPage() {
   const [patientSaving, setPatientSaving] = useState(false);
   const [patientInfo, setPatientInfo] = useState("");
   const [cghsFromAarogya, setCghsFromAarogya] = useState(false);
+  const [documentMode, setDocumentMode] = useState("bill");
+  const [selectedPrescriptionFile, setSelectedPrescriptionFile] = useState(null);
+  const [prescriptionMeta, setPrescriptionMeta] = useState(null);
+  const [prescriptionMedicines, setPrescriptionMedicines] = useState([]);
+  const [prescriptionTests, setPrescriptionTests] = useState([]);
+  const [prescriptionProcedures, setPrescriptionProcedures] = useState([]);
+  const [diagnosis, setDiagnosis] = useState("");
+  const [diagnosisUserProvided, setDiagnosisUserProvided] = useState(false);
+  const [needsDiagnosisStep, setNeedsDiagnosisStep] = useState(false);
+  const prescriptionInputRef = useRef(null);
 
   const reloadPatients = useCallback(async () => {
     if (!user) {
@@ -542,8 +571,19 @@ function CheckPage() {
   const aarogyaMode =
     isTelanganaState(selectedPatient?.state) &&
     Boolean(selectedPatient?.aarogyaBhadrathaEligible);
-  const showAarogyaFlow = aarogyaMode && !cghsFromAarogya;
+  const showAarogyaFlow =
+    aarogyaMode && !cghsFromAarogya && documentMode === "bill";
   const showCghsBillFlow = !aarogyaMode || cghsFromAarogya;
+  const showPrescriptionFlow =
+    documentMode === "prescription" && billStep === "bill";
+  const showBillUploadFlow =
+    (documentMode === "bill" || documentMode === "combined") &&
+    billStep === "bill" &&
+    showCghsBillFlow;
+  const activeLoadingMessages =
+    documentMode === "prescription"
+      ? PRESCRIPTION_LOADING_MESSAGES
+      : LOADING_MESSAGES;
 
   const handleSaveNewPatient = async (event) => {
     event.preventDefault();
@@ -593,6 +633,15 @@ function CheckPage() {
     setScanMeta(null);
     setEditableItems([]);
     setCghsFromAarogya(false);
+    setDocumentMode("bill");
+    setSelectedPrescriptionFile(null);
+    setPrescriptionMeta(null);
+    setPrescriptionMedicines([]);
+    setPrescriptionTests([]);
+    setPrescriptionProcedures([]);
+    setDiagnosis("");
+    setDiagnosisUserProvided(false);
+    setNeedsDiagnosisStep(false);
     cghsLocationRef.current = { state: "", city: "" };
   };
 
@@ -763,16 +812,14 @@ function CheckPage() {
           patient_name: selectedPatient?.name || null,
           patient_age: selectedPatient?.age ?? null,
           patient_gender: selectedPatient?.gender || null,
+          diagnosis: diagnosis.trim() || null,
+          diagnosis_user_provided: diagnosisUserProvided,
+          prescription_medicines: buildPrescriptionRequestItems().medicines,
+          prescription_tests: buildPrescriptionRequestItems().tests,
+          prescription_procedures: buildPrescriptionRequestItems().procedures,
         }),
       });
-      const payload = await response.json();
-      if (!response.ok) {
-        const detail = payload?.detail;
-        const message = Array.isArray(detail)
-          ? detail.map((entry) => entry.msg).join(", ")
-          : detail;
-        throw new Error(message || "Unable to compare this bill.");
-      }
+      const payload = await parseJsonResponse(response);
       setResult(payload);
       setIsComparing(false);
 
@@ -836,7 +883,9 @@ function CheckPage() {
     }
     const messageTimer = isLoading
       ? window.setInterval(() => {
-          setLoadingMessageIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
+          setLoadingMessageIndex(
+            (prev) => (prev + 1) % activeLoadingMessages.length
+          );
         }, 2000)
       : undefined;
     const progressTimer = window.setInterval(() => {
@@ -848,15 +897,17 @@ function CheckPage() {
       }
       window.clearInterval(progressTimer);
     };
-  }, [isLoading, isComparing]);
+  }, [isLoading, isComparing, activeLoadingMessages.length]);
 
   const uiState = isLoading
     ? "loading"
     : isComparing
     ? "comparing"
-    : result?.line_items?.length
+    : needsDiagnosisStep
+    ? "diagnosis"
+    : result?.line_items?.length || result?.treatment_audit_flags
     ? "results"
-    : editableItems.length
+    : editableItems.length || prescriptionMedicines.length || prescriptionTests.length
     ? "edit"
     : "upload";
 
@@ -870,11 +921,97 @@ function CheckPage() {
       return;
     }
     setError("");
-    setResult(null);
-    setScanMeta(null);
-    setEditableItems([]);
-    setHospitalNameEdit("");
+    if (documentMode !== "combined") {
+      setResult(null);
+      setScanMeta(null);
+      setEditableItems([]);
+      setHospitalNameEdit("");
+    }
     setSelectedFile(file);
+  };
+
+  const handlePrescriptionFileSelection = (file) => {
+    if (!file) {
+      return;
+    }
+    if (!isSupportedFile(file)) {
+      setError("Please upload a valid PDF, JPG, JPEG, or PNG file.");
+      setSelectedPrescriptionFile(null);
+      return;
+    }
+    setError("");
+    if (documentMode !== "combined") {
+      setResult(null);
+      setPrescriptionMeta(null);
+      setPrescriptionMedicines([]);
+      setPrescriptionTests([]);
+      setPrescriptionProcedures([]);
+      setDiagnosis("");
+      setDiagnosisUserProvided(false);
+      setNeedsDiagnosisStep(false);
+    }
+    setSelectedPrescriptionFile(file);
+  };
+
+  const applyPrescriptionPayload = (payload, userProvidedDiagnosis = false) => {
+    const normalized = normalizePrescriptionPayload(payload);
+    setPrescriptionMeta({
+      filename: payload.filename,
+      file_type: payload.file_type,
+      prescriber: normalized.prescriber,
+      prescriptionDate: normalized.prescriptionDate,
+    });
+    setPrescriptionMedicines(normalized.medicines.filter((item) => item.name));
+    setPrescriptionTests(normalized.tests.filter((item) => item.name));
+    setPrescriptionProcedures(normalized.procedures.filter((item) => item.name));
+    if (normalized.diagnosis) {
+      setDiagnosis(normalized.diagnosis);
+      setDiagnosisUserProvided(userProvidedDiagnosis);
+      setNeedsDiagnosisStep(false);
+    } else {
+      setDiagnosis("");
+      setDiagnosisUserProvided(false);
+      setNeedsDiagnosisStep(true);
+    }
+  };
+
+  const buildPrescriptionRequestItems = () => ({
+    medicines: prescriptionMedicines.filter((item) => item.name?.trim()),
+    tests: prescriptionTests.filter((item) => item.name?.trim()),
+    procedures: prescriptionProcedures.filter((item) => item.name?.trim()),
+  });
+
+  const savePrescriptionReport = async (payload) => {
+    if (!user || !selectedPatient?.savePastBills) {
+      return;
+    }
+    const reportPayload = {
+      ...payload,
+      report_kind: payload.report_kind || "prescription",
+      patientId: selectedPatient?.id || null,
+      patient: selectedPatient
+        ? {
+            id: selectedPatient.id,
+            name: selectedPatient.name,
+            age: selectedPatient.age,
+            gender: selectedPatient.gender,
+          }
+        : null,
+    };
+    const localId = persistLocalBill(user.uid, reportPayload);
+    try {
+      const firestoreId = await saveBill(user.uid, reportPayload, {
+        localId,
+        patientId: selectedPatient?.id || null,
+      });
+      markLocalBillSynced(user.uid, localId, firestoreId);
+      setSaveMessage("Report saved to your account.");
+    } catch (saveErr) {
+      setSaveMessage(
+        saveErr.message ||
+          "Report saved on this device. Cloud sync will retry when online."
+      );
+    }
   };
 
   const resetToUpload = () => {
@@ -883,6 +1020,13 @@ function CheckPage() {
     setEditableItems([]);
     setHospitalNameEdit("");
     setCghsFromAarogya(false);
+    setPrescriptionMeta(null);
+    setPrescriptionMedicines([]);
+    setPrescriptionTests([]);
+    setPrescriptionProcedures([]);
+    setDiagnosis("");
+    setDiagnosisUserProvided(false);
+    setNeedsDiagnosisStep(false);
     cghsLocationRef.current = { state: "", city: "" };
     setError("");
   };
@@ -915,12 +1059,162 @@ function CheckPage() {
       .map(normalizeLineItem)
       .filter((item) => item.item_name.trim());
 
-    if (!validItems.length) {
+    if (documentMode === "combined") {
+      const rxItems = buildPrescriptionRequestItems();
+      const hasPrescriptionItems =
+        rxItems.medicines.length ||
+        rxItems.tests.length ||
+        rxItems.procedures.length;
+      if (hasPrescriptionItems && !diagnosis.trim()) {
+        setNeedsDiagnosisStep(true);
+        setError("Enter a diagnosis before comparing bill and prescription.");
+        return;
+      }
+    }
+
+    if (documentMode !== "prescription" && !validItems.length) {
       setError("Add at least one line item with a name.");
       return;
     }
 
     await runCghsComparison(validItems);
+  };
+
+  const runPrescriptionAnalysis = async (resolvedDiagnosis, userProvided) => {
+    const items = buildPrescriptionRequestItems();
+    if (
+      !items.medicines.length &&
+      !items.tests.length &&
+      !items.procedures.length
+    ) {
+      setError("Add at least one medicine, test, or procedure.");
+      return;
+    }
+    setError("");
+    setIsComparing(true);
+    setResult(null);
+    try {
+      const payload = await analyzeTreatment({
+        diagnosis: resolvedDiagnosis,
+        diagnosisUserProvided: userProvided,
+        ...items,
+        patient: selectedPatient,
+      });
+      const report = {
+        ...payload,
+        prescription: {
+          diagnosis: resolvedDiagnosis,
+          diagnosis_user_provided: userProvided,
+          prescriber: prescriptionMeta?.prescriber || null,
+          prescription_date: prescriptionMeta?.prescriptionDate || null,
+          medicines: items.medicines,
+          tests: items.tests,
+          procedures: items.procedures,
+        },
+        filename: prescriptionMeta?.filename || "prescription",
+        file_type: prescriptionMeta?.file_type || "manual",
+        report_kind: "prescription",
+      };
+      setResult(report);
+      await savePrescriptionReport(report);
+    } catch (err) {
+      setError(formatFetchError(err, "Unable to analyze this prescription."));
+    } finally {
+      setIsComparing(false);
+    }
+  };
+
+  const handleDiagnosisSubmit = (value) => {
+    setDiagnosis(value);
+    setDiagnosisUserProvided(true);
+    setNeedsDiagnosisStep(false);
+    setError("");
+    if (documentMode === "prescription") {
+      runPrescriptionAnalysis(value, true);
+    }
+  };
+
+  const handleAnalyzePrescription = async () => {
+    if (!selectedPatient) {
+      setError("Save a patient profile before uploading a prescription.");
+      setBillStep("patient");
+      return;
+    }
+    if (!selectedPrescriptionFile) {
+      setError("Please select your prescription first.");
+      return;
+    }
+    setError("");
+    setIsLoading(true);
+    setResult(null);
+    try {
+      const payload = await uploadPrescription(selectedPrescriptionFile);
+      setLoadingProgress(100);
+      applyPrescriptionPayload(payload);
+    } catch (err) {
+      setError(formatFetchError(err, "Something went wrong during analysis."));
+    } finally {
+      setTimeout(() => setIsLoading(false), 250);
+    }
+  };
+
+  const handleAnalyzeCombined = async () => {
+    if (!selectedPatient) {
+      setError("Save a patient profile before uploading documents.");
+      setBillStep("patient");
+      return;
+    }
+    if (!selectedFile) {
+      setError("Please select your hospital bill first.");
+      return;
+    }
+    if (!selectedPrescriptionFile) {
+      setError("Please select your prescription as well.");
+      return;
+    }
+    if (!stateUtName || !city) {
+      setError("Please select the state/UT and city where the hospital is located.");
+      return;
+    }
+    setError("");
+    setIsLoading(true);
+    setResult(null);
+    setScanMeta(null);
+    setEditableItems([]);
+    try {
+      const billFormData = new FormData();
+      billFormData.append("file", selectedFile);
+      const params = new URLSearchParams({
+        state_ut_name: stateUtName,
+        city,
+        hospital_type: hospitalType,
+      });
+      const [billResponse, prescriptionPayload] = await Promise.all([
+        fetch(`${API_BASE}/upload-bill?${params}`, {
+          method: "POST",
+          body: billFormData,
+        }).then((response) => parseJsonResponse(response)),
+        uploadPrescription(selectedPrescriptionFile),
+      ]);
+      setLoadingProgress(100);
+      const items = (billResponse.line_items ?? []).map(normalizeLineItem);
+      if (!items.length) {
+        throw new Error("No line items were found on this bill.");
+      }
+      setScanMeta({
+        filename: billResponse.filename,
+        file_type: billResponse.file_type,
+        hospital: billResponse.hospital,
+        comparison_settings: billResponse.comparison_settings,
+      });
+      setHospitalNameEdit(billResponse.hospital?.name_from_bill ?? "");
+      setEditableItems(items);
+      applyPrescriptionPayload(prescriptionPayload);
+    } catch (err) {
+      setError(formatFetchError(err, "Something went wrong during analysis."));
+    } finally {
+      setTimeout(() => setIsLoading(false), 250);
+    }
   };
 
   const handleAnalyze = async () => {
@@ -955,10 +1249,7 @@ function CheckPage() {
         method: "POST",
         body: formData,
       });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload?.detail || "Unable to analyze this bill.");
-      }
+      const payload = await parseJsonResponse(response);
       setLoadingProgress(100);
       const items = (payload.line_items ?? []).map(normalizeLineItem);
       if (!items.length) {
@@ -993,13 +1284,19 @@ function CheckPage() {
           <h1>
             {billStep === "patient"
               ? "Set up patient"
+              : documentMode === "prescription"
+              ? "Upload your prescription"
+              : documentMode === "combined"
+              ? "Upload bill and prescription"
               : "Upload your hospital bill"}
           </h1>
           <p>
             {billStep === "patient"
-              ? "Add or select a patient before uploading a medical bill."
+              ? "Add or select a patient before uploading documents."
               : selectedPatient
-              ? `Checking bill for ${selectedPatient.name}.`
+              ? documentMode === "prescription"
+                ? `Checking prescription for ${selectedPatient.name}.`
+                : `Checking bill for ${selectedPatient.name}.`
               : "We'll analyze it in seconds."}
           </p>
         </header>
@@ -1044,7 +1341,7 @@ function CheckPage() {
                     className="analyze-btn"
                     onClick={handleContinueWithPatient}
                   >
-                    Continue to upload bill →
+                    Continue to upload {documentMode === "prescription" ? "prescription" : "documents"} →
                   </button>
                 </div>
               )}
@@ -1133,7 +1430,7 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {uiState === "upload" && billStep === "bill" && showCghsBillFlow && (
+          {uiState === "upload" && billStep === "bill" && showBillUploadFlow && (
             <motion.section
               key="upload"
               className="upload-card"
@@ -1159,7 +1456,38 @@ function CheckPage() {
                 </div>
               )}
 
-              <p className="comparison-settings-title">Step 2 — Upload bill</p>
+              <div className="document-mode-toggle">
+                {DOCUMENT_MODES.map((mode) => (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    className={`document-mode-btn ${
+                      documentMode === mode.id ? "document-mode-btn-active" : ""
+                    }`}
+                    onClick={() => {
+                      setDocumentMode(mode.id);
+                      setError("");
+                      setResult(null);
+                      setScanMeta(null);
+                      setEditableItems([]);
+                      setSelectedFile(null);
+                      setSelectedPrescriptionFile(null);
+                      setPrescriptionMeta(null);
+                      setPrescriptionMedicines([]);
+                      setPrescriptionTests([]);
+                      setPrescriptionProcedures([]);
+                      setDiagnosis("");
+                      setNeedsDiagnosisStep(false);
+                    }}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+
+              <p className="comparison-settings-title">
+                Step 2 — Upload {documentMode === "combined" ? "documents" : "bill"}
+              </p>
 
               <button
                 type="button"
@@ -1194,6 +1522,36 @@ function CheckPage() {
                   event.target.value = "";
                 }}
               />
+
+              {documentMode === "combined" && (
+                <>
+                  <p className="comparison-settings-title">Prescription</p>
+                  <button
+                    type="button"
+                    className={`upload-zone ${isDragging ? "upload-zone-dragging" : ""}`}
+                    onClick={() => prescriptionInputRef.current?.click()}
+                  >
+                    <div className="upload-icon">Rx</div>
+                    <p className="upload-title">
+                      Drop your prescription here or click to browse
+                    </p>
+                    <p className="upload-subtitle">Supports PDF, JPG, PNG</p>
+                    {selectedPrescriptionFile && (
+                      <p className="file-name">{selectedPrescriptionFile.name}</p>
+                    )}
+                  </button>
+                  <input
+                    ref={prescriptionInputRef}
+                    className="hidden-input"
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                    onChange={(event) => {
+                      handlePrescriptionFileSelection(event.target.files?.[0]);
+                      event.target.value = "";
+                    }}
+                  />
+                </>
+              )}
 
               {selectedPatient?.ayushmanEligible && (
                 <p className="comparison-settings-hint pmjay-hint">
@@ -1271,14 +1629,121 @@ function CheckPage() {
                 )}
               </div>
 
-              <button type="button" className="analyze-btn" onClick={handleAnalyze}>
-                Analyze Bill
+              <button
+                type="button"
+                className="analyze-btn"
+                onClick={
+                  documentMode === "combined" ? handleAnalyzeCombined : handleAnalyze
+                }
+              >
+                {documentMode === "combined" ? "Analyze Documents" : "Analyze Bill"}
               </button>
               {error && <p className="error-text">{error}</p>}
             </motion.section>
           )}
 
-          {(uiState === "loading" || uiState === "comparing") && showCghsBillFlow && (
+          {uiState === "upload" && showPrescriptionFlow && (
+            <motion.section
+              key="prescription-upload"
+              className="upload-card"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25 }}
+            >
+              {selectedPatient && (
+                <div className="patient-selected-banner patient-selected-banner-compact">
+                  <p>
+                    Patient: <strong>{selectedPatient.name}</strong> ·{" "}
+                    {selectedPatient.age} yrs
+                  </p>
+                  <button
+                    type="button"
+                    className="bill-editor-secondary patient-change-btn"
+                    onClick={handleChangePatient}
+                  >
+                    Change patient
+                  </button>
+                </div>
+              )}
+
+              <div className="document-mode-toggle">
+                {DOCUMENT_MODES.map((mode) => (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    className={`document-mode-btn ${
+                      documentMode === mode.id ? "document-mode-btn-active" : ""
+                    }`}
+                    onClick={() => {
+                      setDocumentMode(mode.id);
+                      setError("");
+                    }}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+
+              <p className="comparison-settings-title">Step 2 — Upload prescription</p>
+              <button
+                type="button"
+                className="upload-zone"
+                onClick={() => prescriptionInputRef.current?.click()}
+              >
+                <div className="upload-icon">Rx</div>
+                <p className="upload-title">
+                  Drop your prescription here or click to browse
+                </p>
+                <p className="upload-subtitle">Supports PDF, JPG, PNG</p>
+                {selectedPrescriptionFile && (
+                  <p className="file-name">{selectedPrescriptionFile.name}</p>
+                )}
+              </button>
+              <input
+                ref={prescriptionInputRef}
+                className="hidden-input"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                onChange={(event) => {
+                  handlePrescriptionFileSelection(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
+
+              <button
+                type="button"
+                className="analyze-btn"
+                onClick={handleAnalyzePrescription}
+              >
+                Analyze Prescription
+              </button>
+              {error && <p className="error-text">{error}</p>}
+            </motion.section>
+          )}
+
+          {uiState === "diagnosis" && (
+            <motion.section
+              key="diagnosis"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25 }}
+            >
+              <DiagnosisPrompt
+                initialDiagnosis={diagnosis}
+                onSubmit={handleDiagnosisSubmit}
+                onCancel={() => {
+                  setNeedsDiagnosisStep(false);
+                  setError("");
+                }}
+                error={error}
+              />
+            </motion.section>
+          )}
+
+          {(uiState === "loading" || uiState === "comparing") &&
+            (showCghsBillFlow || showPrescriptionFlow) && (
             <motion.section
               key={uiState === "comparing" ? "comparing" : "loading"}
               className="loading-card"
@@ -1290,8 +1755,10 @@ function CheckPage() {
               <div className="spinner-conic" aria-hidden="true" />
               <p className="loading-message">
                 {uiState === "comparing"
-                  ? comparisonCopy.loading
-                  : LOADING_MESSAGES[loadingMessageIndex]}
+                  ? documentMode === "prescription"
+                    ? "Checking against treatment guidelines..."
+                    : comparisonCopy.loading
+                  : activeLoadingMessages[loadingMessageIndex]}
               </p>
               <div className="loading-bar">
                 <div className="loading-bar-fill" style={{ width: `${loadingProgress}%` }} />
@@ -1299,7 +1766,7 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {uiState === "edit" && showCghsBillFlow && (
+          {uiState === "edit" && showCghsBillFlow && editableItems.length > 0 && (
             <motion.section
               key="edit"
               className="bill-editor-shell"
@@ -1365,6 +1832,35 @@ function CheckPage() {
                   {editableItems.length} item{editableItems.length === 1 ? "" : "s"}
                 </span>
               </header>
+
+              {(documentMode === "combined" || diagnosis) && (
+                <div className="prescription-review-panel">
+                  <h3>Prescription summary</h3>
+                  {diagnosis ? (
+                    <p className="comparison-context">
+                      Diagnosis: <strong>{diagnosis}</strong>
+                    </p>
+                  ) : (
+                    <p className="comparison-settings-hint">
+                      Diagnosis will be requested before comparison.
+                    </p>
+                  )}
+                  {[...prescriptionMedicines, ...prescriptionTests, ...prescriptionProcedures]
+                    .length > 0 && (
+                    <ul className="prescription-inline-list">
+                      {prescriptionMedicines.map((item, index) => (
+                        <li key={`med-${index}`}>Medicine: {item.name}</li>
+                      ))}
+                      {prescriptionTests.map((item, index) => (
+                        <li key={`test-${index}`}>Test: {item.name}</li>
+                      ))}
+                      {prescriptionProcedures.map((item, index) => (
+                        <li key={`proc-${index}`}>Procedure: {item.name}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
 
               <label className="setting-field setting-field-full bill-editor-hospital">
                 <span>Hospital name (optional)</span>
@@ -1491,14 +1987,101 @@ function CheckPage() {
                   className="analyze-btn bill-editor-primary"
                   onClick={handleCompare}
                 >
-                  {comparisonCopy.compareButton}
+                  {documentMode === "combined"
+                    ? "Compare bill & check treatment"
+                    : comparisonCopy.compareButton}
                 </button>
               </div>
               {error && <p className="error-text">{error}</p>}
             </motion.section>
           )}
 
-          {uiState === "results" && showCghsBillFlow && (
+          {uiState === "edit" && showPrescriptionFlow && (
+            <motion.section
+              key="prescription-edit"
+              className="bill-editor-shell"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25 }}
+            >
+              <header className="bill-editor-header">
+                <div>
+                  <h2>Review prescription items</h2>
+                  <p>
+                    Confirm medicines, tests, and procedures before checking against
+                    Standard Treatment Guidelines.
+                  </p>
+                </div>
+              </header>
+
+              {diagnosis && (
+                <p className="comparison-context">
+                  Diagnosis: <strong>{diagnosis}</strong>
+                </p>
+              )}
+
+              <div className="prescription-editor-groups">
+                {[
+                  ["Medicines", prescriptionMedicines, setPrescriptionMedicines],
+                  ["Tests", prescriptionTests, setPrescriptionTests],
+                  ["Procedures", prescriptionProcedures, setPrescriptionProcedures],
+                ].map(([label, items, setter]) => (
+                  <div key={label} className="prescription-editor-group">
+                    <h3>{label}</h3>
+                    <ul className="bill-editor-list">
+                      {items.map((item, index) => (
+                        <li key={`${label}-${index}`} className="bill-editor-row">
+                          <label className="bill-editor-field bill-editor-field-grow">
+                            <span>Name</span>
+                            <input
+                              type="text"
+                              value={item.name}
+                              onChange={(event) => {
+                                setter((prev) =>
+                                  prev.map((entry, entryIndex) =>
+                                    entryIndex === index
+                                      ? { ...entry, name: event.target.value }
+                                      : entry
+                                  )
+                                );
+                              }}
+                            />
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bill-editor-actions">
+                <button
+                  type="button"
+                  className="bill-editor-secondary"
+                  onClick={resetToUpload}
+                >
+                  Upload different prescription
+                </button>
+                <button
+                  type="button"
+                  className="analyze-btn bill-editor-primary"
+                  onClick={() => {
+                    if (!diagnosis.trim()) {
+                      setNeedsDiagnosisStep(true);
+                      return;
+                    }
+                    runPrescriptionAnalysis(diagnosis.trim(), diagnosisUserProvided);
+                  }}
+                >
+                  Check treatment appropriateness
+                </button>
+              </div>
+              {error && <p className="error-text">{error}</p>}
+            </motion.section>
+          )}
+
+          {uiState === "results" && showCghsBillFlow && result?.line_items?.length && (
             <motion.section
               key="results"
               className="results-shell"
@@ -1524,6 +2107,35 @@ function CheckPage() {
                     }}
                   >
                     ← Edit bill items
+                  </button>
+                }
+              />
+            </motion.section>
+          )}
+
+          {uiState === "results" && showPrescriptionFlow && result?.treatment_audit_flags && (
+            <motion.section
+              key="prescription-results"
+              className="results-shell"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              {saveMessage && <p className="save-message">{saveMessage}</p>}
+              <PrescriptionResults
+                result={result}
+                toolbar={
+                  <button
+                    type="button"
+                    className="bill-editor-secondary"
+                    onClick={() => {
+                      setResult(null);
+                      setSaveMessage("");
+                      setError("");
+                    }}
+                  >
+                    ← Review prescription
                   </button>
                 }
               />

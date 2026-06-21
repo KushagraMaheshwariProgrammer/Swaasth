@@ -57,6 +57,9 @@ def resolve_scheme_id(report: dict[str, Any]) -> str:
     if report.get("line_items"):
         return "cghs"
 
+    if report.get("treatment_audit_flags"):
+        return "prescription"
+
     raise ValueError("Could not determine report scheme.")
 
 
@@ -64,6 +67,11 @@ def validate_report(report: dict[str, Any], scheme_id: str) -> None:
     if scheme_id == "aarogya_bhadratha":
         if not report.get("comparison"):
             raise ValueError("Invalid Aarogya Bhadratha report payload.")
+        return
+
+    if scheme_id == "prescription":
+        if not report.get("treatment_audit_flags"):
+            raise ValueError("Invalid prescription report payload.")
         return
 
     if not report.get("line_items"):
@@ -428,6 +436,27 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
             "</tr>"
         )
 
+    treatment_audit = report.get("treatment_audit_flags") or {}
+    treatment_flags = treatment_audit.get("flags") or []
+    treatment_rows = []
+    for flag in treatment_flags:
+        reference = flag.get("stg_reference") or {}
+        ref_text = reference.get("condition") or ""
+        if reference.get("section"):
+            ref_text = f"{ref_text} · {reference.get('section')}"
+        if reference.get("page") is not None:
+            ref_text = f"{ref_text} · p.{reference.get('page')}"
+        treatment_rows.append(
+            "<tr>"
+            f"<td>{escape(str(flag.get('item', '')))}</td>"
+            f"<td>{escape(str(flag.get('type', '')).replace('_', ' '))}</td>"
+            f"<td>{escape(str(flag.get('severity', '')))}</td>"
+            f"<td>{escape(str(flag.get('reason', '')))}</td>"
+            f"<td>{escape(str(flag.get('recommendation', '')))}</td>"
+            f"<td>{escape(ref_text)}</td>"
+            "</tr>"
+        )
+
     nabh_line = ""
     if hospital.get("is_accredited") is not None:
         if hospital.get("is_accredited"):
@@ -502,6 +531,11 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
   <h2>Suspicious / Unnecessary Charges</h2>
   {"<table><tr><th>Item</th><th>Type</th><th>Severity</th><th>Reason</th><th>Recommendation</th></tr>" + ''.join(audit_rows) + "</table>" if audit_rows else "<p>No suspicious repetitions or unnecessary package-component charges detected.</p>"}
 
+  <h2>Treatment Appropriateness (STG)</h2>
+  {"<p><b>Matched STG conditions:</b> " + escape(', '.join(treatment_audit.get('matched_stg_conditions') or [])) + "</p>" if treatment_audit.get('matched_stg_conditions') else ""}
+  {"<table><tr><th>Item</th><th>Type</th><th>Severity</th><th>Reason</th><th>Recommendation</th><th>STG reference</th></tr>" + ''.join(treatment_rows) + "</table>" if treatment_rows else "<p>No treatment appropriateness flags for the supplied diagnosis.</p>"}
+  <p class='disclaimer'>Guideline-based indication check using CRC Standard Treatment Guidelines, 7th ed. Not a substitute for clinical judgment.</p>
+
   {hrs_advisory_html}
 
   {kcr_advisory_html}
@@ -509,6 +543,74 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
   {rajiv_report_html}
 
   <p class='disclaimer'>{escape(BILL_DISCLAIMER)}</p>
+</body>
+</html>
+"""
+
+
+def render_prescription_report_html(report: dict[str, Any]) -> str:
+    patient = report.get("patient") or {}
+    prescription = report.get("prescription") or {}
+    treatment_audit = report.get("treatment_audit_flags") or {}
+    treatment_flags = treatment_audit.get("flags") or []
+
+    medicine_rows = [
+        f"<li>{escape(str(item.get('name', '')))}</li>"
+        for item in prescription.get("medicines") or []
+    ]
+    test_rows = [
+        f"<li>{escape(str(item.get('name', '')))}</li>"
+        for item in prescription.get("tests") or []
+    ]
+    procedure_rows = [
+        f"<li>{escape(str(item.get('name', '')))}</li>"
+        for item in prescription.get("procedures") or []
+    ]
+
+    treatment_rows = []
+    for flag in treatment_flags:
+        reference = flag.get("stg_reference") or {}
+        ref_text = reference.get("condition") or ""
+        if reference.get("section"):
+            ref_text = f"{ref_text} · {reference.get('section')}"
+        treatment_rows.append(
+            "<tr>"
+            f"<td>{escape(str(flag.get('item', '')))}</td>"
+            f"<td>{escape(str(flag.get('type', '')).replace('_', ' '))}</td>"
+            f"<td>{escape(str(flag.get('severity', '')))}</td>"
+            f"<td>{escape(str(flag.get('reason', '')))}</td>"
+            f"<td>{escape(str(flag.get('recommendation', '')))}</td>"
+            f"<td>{escape(ref_text)}</td>"
+            "</tr>"
+        )
+
+    return f"""
+<html>
+<head><style>
+  body {{ font-family: Helvetica, Arial, sans-serif; color: #2c3e50; font-size: 10px; }}
+  h1 {{ font-size: 16px; color: #1a5276; margin-bottom: 2px; }}
+  h2 {{ font-size: 12px; color: #1a5276; border-bottom: 1px solid #aed6f1; padding-bottom: 2px; margin-top: 14px; }}
+  table {{ width: 100%; border-collapse: collapse; margin-top: 6px; }}
+  th, td {{ border: 1px solid #d5dbdb; padding: 4px 5px; text-align: left; vertical-align: top; }}
+  th {{ background: #eaf2f8; font-size: 9px; }}
+  .disclaimer {{ margin-top: 14px; font-size: 8.5px; color: #7f8c8d; font-style: italic; }}
+  ul {{ margin: 4px 0; padding-left: 16px; }}
+</style></head>
+<body>
+  <h1>Prescription Treatment Appropriateness Report</h1>
+  <p><b>Patient:</b> {escape(str(patient.get('name', '—')))}</p>
+  <p><b>Diagnosis:</b> {escape(str(report.get('diagnosis') or prescription.get('diagnosis') or '—'))}</p>
+  <p><b>Source file:</b> {escape(str(report.get('filename', '—')))}</p>
+
+  {"<h2>Medicines</h2><ul>" + ''.join(medicine_rows) + "</ul>" if medicine_rows else ""}
+  {"<h2>Tests</h2><ul>" + ''.join(test_rows) + "</ul>" if test_rows else ""}
+  {"<h2>Procedures</h2><ul>" + ''.join(procedure_rows) + "</ul>" if procedure_rows else ""}
+
+  <h2>Treatment Appropriateness (STG)</h2>
+  {"<p><b>Matched STG conditions:</b> " + escape(', '.join(treatment_audit.get('matched_stg_conditions') or [])) + "</p>" if treatment_audit.get('matched_stg_conditions') else ""}
+  {"<table><tr><th>Item</th><th>Type</th><th>Severity</th><th>Reason</th><th>Recommendation</th><th>STG reference</th></tr>" + ''.join(treatment_rows) + "</table>" if treatment_rows else "<p>No treatment appropriateness flags for the supplied diagnosis.</p>"}
+
+  <p class='disclaimer'>Guideline-based indication check using CRC Standard Treatment Guidelines, 7th ed. Not a substitute for clinical judgment.</p>
 </body>
 </html>
 """
@@ -550,3 +652,4 @@ def scheme_filename_prefix(scheme_id: str) -> str:
 register_scheme("aarogya_bhadratha", render_aarogya_report_html)
 register_scheme("cghs", render_bill_comparison_html)
 register_scheme("hbp_pmjay", render_bill_comparison_html)
+register_scheme("prescription", render_prescription_report_html)
