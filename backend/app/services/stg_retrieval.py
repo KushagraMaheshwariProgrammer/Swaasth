@@ -13,7 +13,19 @@ from app.services.document_extraction import extract_json_from_text
 from app.services.stg_index import get_stg_index_store
 
 GROQ_MODEL = "llama-3.3-70b-versatile"
-MAX_CONTEXT_CHARS = 6000
+MAX_CONTEXT_CHARS = 8000
+
+PRIORITY_SECTIONS = {
+    "diagnosis",
+    "diagnostic tests",
+    "investigations",
+    "salient features",
+    "clinical features",
+    "signs and symptoms",
+    "case definition",
+    "criteria",
+    "indications",
+}
 
 
 def _groq_json(prompt: str) -> dict[str, Any]:
@@ -98,6 +110,18 @@ def _dedupe_chunks(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return merged
 
 
+def _prioritize_chunks(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    priority: list[dict[str, Any]] = []
+    other: list[dict[str, Any]] = []
+    for chunk in chunks:
+        section = str(chunk.get("section_type") or "general").lower()
+        if section in PRIORITY_SECTIONS:
+            priority.append(chunk)
+        else:
+            other.append(chunk)
+    return priority + other
+
+
 def _build_context_text(chunks: list[dict[str, Any]]) -> str:
     parts: list[str] = []
     total = 0
@@ -115,11 +139,47 @@ def _build_context_text(chunks: list[dict[str, Any]]) -> str:
     return "\n\n---\n\n".join(parts)
 
 
+def _symptom_names(symptoms: list[Any] | None) -> list[str]:
+    names: list[str] = []
+    for item in symptoms or []:
+        if isinstance(item, dict):
+            name = str(item.get("name") or "").strip()
+        else:
+            name = str(item).strip()
+        if name:
+            names.append(name)
+    return names
+
+
+def _test_result_summary(test_results: list[dict[str, Any]] | None) -> list[str]:
+    summaries: list[str] = []
+    for item in test_results or []:
+        if not isinstance(item, dict):
+            continue
+        test_name = str(item.get("test_name") or "").strip()
+        if not test_name:
+            continue
+        value = item.get("value")
+        result = item.get("result")
+        unit = item.get("unit")
+        parts = [test_name]
+        if value:
+            parts.append(f"value {value}")
+        if unit:
+            parts.append(str(unit))
+        if result:
+            parts.append(str(result))
+        summaries.append(" ".join(parts))
+    return summaries
+
+
 def retrieve_stg_context(
     diagnosis: str,
     items: list[str],
     *,
-    top_k: int = 8,
+    symptoms: list[Any] | None = None,
+    test_results: list[dict[str, Any]] | None = None,
+    top_k: int = 10,
 ) -> dict[str, Any]:
     store = get_stg_index_store()
     if not store.is_ready:
@@ -131,12 +191,16 @@ def retrieve_stg_context(
         )
 
     matched_conditions = map_diagnosis_to_stg_conditions(diagnosis)
-    toc_chunks = store.get_chunks_for_conditions(matched_conditions)
+    toc_chunks = store.get_chunks_for_conditions(matched_conditions, limit_per_condition=16)
 
-    item_summary = ", ".join(item for item in items if item.strip())[:500]
+    symptom_text = ", ".join(_symptom_names(symptoms))[:400]
+    test_text = ", ".join(_test_result_summary(test_results))[:400]
+    item_summary = ", ".join(item for item in items if item.strip())[:400]
     semantic_query = (
-        f"{diagnosis}. Recommended investigations, diagnostic tests, treatment, "
-        f"medicines, procedures. Items to evaluate: {item_summary}"
+        f"{diagnosis}. Diagnostic criteria, salient features, signs and symptoms, "
+        f"investigations, test interpretation, treatment. "
+        f"Symptoms: {symptom_text}. Test results: {test_text}. "
+        f"Items to evaluate: {item_summary}"
     )
     semantic_chunks = store.semantic_search(
         semantic_query,
@@ -146,7 +210,7 @@ def retrieve_stg_context(
     if not semantic_chunks:
         semantic_chunks = store.semantic_search(semantic_query, top_k=top_k)
 
-    chunks = _dedupe_chunks(toc_chunks + semantic_chunks)
+    chunks = _prioritize_chunks(_dedupe_chunks(toc_chunks + semantic_chunks))
     return {
         "matched_conditions": matched_conditions,
         "chunks": chunks,

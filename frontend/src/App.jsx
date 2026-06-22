@@ -26,6 +26,7 @@ import PatientForm, { emptyPatientForm } from "./components/PatientForm";
 import PatientList from "./components/PatientList";
 import LocationSearchPicker from "./components/LocationSearchPicker";
 import AarogyaFlow from "./components/AarogyaFlow";
+import ClinicalContextForm from "./components/ClinicalContextForm";
 import DiagnosisPrompt from "./components/DiagnosisPrompt";
 import PrescriptionResults from "./components/PrescriptionResults";
 import TermsAndConditionsModal from "./components/TermsAndConditionsModal";
@@ -34,6 +35,9 @@ import { createPatient, getPatients, getPatientsLocalSnapshot } from "./services
 import { markLocalBillSynced, persistLocalBill, saveBill } from "./services/bills";
 import {
   analyzeTreatment,
+  clinicalContextToApiPayload,
+  emptyClinicalContext,
+  mergeClinicalContext,
   normalizePrescriptionPayload,
   uploadPrescription,
 } from "./services/prescriptions";
@@ -502,7 +506,8 @@ function CheckPage() {
   const [prescriptionProcedures, setPrescriptionProcedures] = useState([]);
   const [diagnosis, setDiagnosis] = useState("");
   const [diagnosisUserProvided, setDiagnosisUserProvided] = useState(false);
-  const [needsDiagnosisStep, setNeedsDiagnosisStep] = useState(false);
+  const [clinicalStep, setClinicalStep] = useState(null);
+  const [clinicalContext, setClinicalContext] = useState(emptyClinicalContext);
   const prescriptionInputRef = useRef(null);
 
   const reloadPatients = useCallback(async () => {
@@ -641,7 +646,8 @@ function CheckPage() {
     setPrescriptionProcedures([]);
     setDiagnosis("");
     setDiagnosisUserProvided(false);
-    setNeedsDiagnosisStep(false);
+    setClinicalStep(null);
+    setClinicalContext(emptyClinicalContext());
     cghsLocationRef.current = { state: "", city: "" };
   };
 
@@ -817,6 +823,7 @@ function CheckPage() {
           prescription_medicines: buildPrescriptionRequestItems().medicines,
           prescription_tests: buildPrescriptionRequestItems().tests,
           prescription_procedures: buildPrescriptionRequestItems().procedures,
+          ...clinicalContextToApiPayload(clinicalContext),
         }),
       });
       const payload = await parseJsonResponse(response);
@@ -903,11 +910,17 @@ function CheckPage() {
     ? "loading"
     : isComparing
     ? "comparing"
-    : needsDiagnosisStep
+    : clinicalStep === "diagnosis"
     ? "diagnosis"
+    : clinicalStep === "clinical"
+    ? "clinical"
     : result?.line_items?.length || result?.treatment_audit_flags
     ? "results"
-    : editableItems.length || prescriptionMedicines.length || prescriptionTests.length
+    : editableItems.length ||
+      ((prescriptionMedicines.length ||
+        prescriptionTests.length ||
+        prescriptionProcedures.length) &&
+        !clinicalStep)
     ? "edit"
     : "upload";
 
@@ -948,7 +961,8 @@ function CheckPage() {
       setPrescriptionProcedures([]);
       setDiagnosis("");
       setDiagnosisUserProvided(false);
-      setNeedsDiagnosisStep(false);
+      setClinicalStep(null);
+      setClinicalContext(emptyClinicalContext());
     }
     setSelectedPrescriptionFile(file);
   };
@@ -964,15 +978,17 @@ function CheckPage() {
     setPrescriptionMedicines(normalized.medicines.filter((item) => item.name));
     setPrescriptionTests(normalized.tests.filter((item) => item.name));
     setPrescriptionProcedures(normalized.procedures.filter((item) => item.name));
+    setClinicalContext((current) =>
+      mergeClinicalContext(current, normalized.clinicalContext)
+    );
     if (normalized.diagnosis) {
       setDiagnosis(normalized.diagnosis);
       setDiagnosisUserProvided(userProvidedDiagnosis);
-      setNeedsDiagnosisStep(false);
     } else {
       setDiagnosis("");
       setDiagnosisUserProvided(false);
-      setNeedsDiagnosisStep(true);
     }
+    setClinicalStep("clinical");
   };
 
   const buildPrescriptionRequestItems = () => ({
@@ -1026,8 +1042,32 @@ function CheckPage() {
     setPrescriptionProcedures([]);
     setDiagnosis("");
     setDiagnosisUserProvided(false);
-    setNeedsDiagnosisStep(false);
+    setClinicalStep(null);
+    setClinicalContext(emptyClinicalContext());
     cghsLocationRef.current = { state: "", city: "" };
+    setError("");
+  };
+
+  const handleClinicalContinue = () => {
+    setError("");
+    if (!diagnosis.trim()) {
+      setClinicalStep("diagnosis");
+      return;
+    }
+    setClinicalStep(null);
+  };
+
+  const handleClinicalBack = () => {
+    setClinicalStep(null);
+    setClinicalContext(emptyClinicalContext());
+    setPrescriptionMeta(null);
+    setPrescriptionMedicines([]);
+    setPrescriptionTests([]);
+    setPrescriptionProcedures([]);
+    setEditableItems([]);
+    setScanMeta(null);
+    setDiagnosis("");
+    setDiagnosisUserProvided(false);
     setError("");
   };
 
@@ -1066,7 +1106,7 @@ function CheckPage() {
         rxItems.tests.length ||
         rxItems.procedures.length;
       if (hasPrescriptionItems && !diagnosis.trim()) {
-        setNeedsDiagnosisStep(true);
+        setClinicalStep("diagnosis");
         setError("Enter a diagnosis before comparing bill and prescription.");
         return;
       }
@@ -1093,11 +1133,14 @@ function CheckPage() {
     setError("");
     setIsComparing(true);
     setResult(null);
+    const clinicalPayload = clinicalContextToApiPayload(clinicalContext);
     try {
       const payload = await analyzeTreatment({
         diagnosis: resolvedDiagnosis,
         diagnosisUserProvided: userProvided,
         ...items,
+        symptoms: clinicalPayload.symptoms,
+        testResults: clinicalPayload.test_results,
         patient: selectedPatient,
       });
       const report = {
@@ -1111,6 +1154,7 @@ function CheckPage() {
           tests: items.tests,
           procedures: items.procedures,
         },
+        clinical_context: payload.clinical_context || clinicalContext,
         filename: prescriptionMeta?.filename || "prescription",
         file_type: prescriptionMeta?.file_type || "manual",
         report_kind: "prescription",
@@ -1127,11 +1171,8 @@ function CheckPage() {
   const handleDiagnosisSubmit = (value) => {
     setDiagnosis(value);
     setDiagnosisUserProvided(true);
-    setNeedsDiagnosisStep(false);
+    setClinicalStep(null);
     setError("");
-    if (documentMode === "prescription") {
-      runPrescriptionAnalysis(value, true);
-    }
   };
 
   const handleAnalyzePrescription = async () => {
@@ -1477,7 +1518,8 @@ function CheckPage() {
                       setPrescriptionTests([]);
                       setPrescriptionProcedures([]);
                       setDiagnosis("");
-                      setNeedsDiagnosisStep(false);
+                      setClinicalStep(null);
+                      setClinicalContext(emptyClinicalContext());
                     }}
                   >
                     {mode.label}
@@ -1722,6 +1764,34 @@ function CheckPage() {
             </motion.section>
           )}
 
+          {uiState === "clinical" && (
+            <motion.section
+              key="clinical"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25 }}
+            >
+              <ClinicalContextForm
+                clinicalContext={clinicalContext}
+                onChange={setClinicalContext}
+                onContinue={handleClinicalContinue}
+                onDiagnosisExtracted={(value) => {
+                  if (!diagnosis.trim() && value) {
+                    setDiagnosis(value);
+                    setDiagnosisUserProvided(false);
+                  }
+                }}
+                onBack={
+                  documentMode === "combined" || editableItems.length
+                    ? handleClinicalBack
+                    : null
+                }
+                error={error}
+              />
+            </motion.section>
+          )}
+
           {uiState === "diagnosis" && (
             <motion.section
               key="diagnosis"
@@ -1734,7 +1804,7 @@ function CheckPage() {
                 initialDiagnosis={diagnosis}
                 onSubmit={handleDiagnosisSubmit}
                 onCancel={() => {
-                  setNeedsDiagnosisStep(false);
+                  setClinicalStep("clinical");
                   setError("");
                 }}
                 error={error}
@@ -2068,7 +2138,7 @@ function CheckPage() {
                   className="analyze-btn bill-editor-primary"
                   onClick={() => {
                     if (!diagnosis.trim()) {
-                      setNeedsDiagnosisStep(true);
+                      setClinicalStep("diagnosis");
                       return;
                     }
                     runPrescriptionAnalysis(diagnosis.trim(), diagnosisUserProvided);

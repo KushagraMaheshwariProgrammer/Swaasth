@@ -1,0 +1,34 @@
+[
+  {
+    "chunk_id": "malaria-salient-1",
+    "condition": "Malaria",
+    "section_type": "Salient features",
+    "page_start": 100,
+    "page_end": 101,
+    "text": "Salient features: fever with chills, headache, sweating. Suspect malaria in endemic areas with fever lasting more than 48 hours."
+  },
+  {
+    "chunk_id": "malaria-diagnostic-1",
+    "condition": "Malaria",
+    "section_type": "Diagnostic tests",
+    "page_start": 101,
+    "page_end": 102,
+    "text": "Diagnostic tests: peripheral blood smear and malaria rapid diagnostic test (RDT). A negative smear or RDT does not rule out malaria in early illness but repeat testing may be needed."
+  },
+  {
+    "chunk_id": "dengue-salient-1",
+    "condition": "Dengue",
+    "section_type": "Salient features",
+    "page_start": 120,
+    "page_end": 121,
+    "text": "Salient features: high fever, retro-orbital pain, rash, and thrombocytopenia. Avoid unnecessary antibiotics in uncomplicated dengue."
+  },
+  {
+    "chunk_id": "dengue-diagnostic-1",
+    "condition": "Dengue",
+    "section_type": "Diagnostic tests",
+    "page_start": 121,
+    "page_end": 122,
+    "text": "Diagnostic tests: NS1 antigen, dengue IgM/IgG, and platelet count monitoring."
+  }
+]

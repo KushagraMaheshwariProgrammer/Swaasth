@@ -31,6 +31,7 @@ from app.services.document_extraction import (
     extract_bill_with_groq,
     extract_document_text,
     extract_json_from_text,
+    normalize_clinical_context,
 )
 from app.services.treatment_audit import analyze_treatment
 
@@ -632,6 +633,20 @@ class PrescriptionItemInput(BaseModel):
     category: str | None = None
 
 
+class SymptomInput(BaseModel):
+    name: str = ""
+    duration: str | None = None
+    severity: str | None = None
+
+
+class TestResultInput(BaseModel):
+    test_name: str = ""
+    value: str | None = None
+    unit: str | None = None
+    result: str | None = None
+    reference_range: str | None = None
+
+
 class CompareBillRequest(BaseModel):
     line_items: list[BillLineItemInput]
     state_ut_name: str | None = None
@@ -671,6 +686,8 @@ class CompareBillRequest(BaseModel):
     prescription_medicines: list[PrescriptionItemInput] = Field(default_factory=list)
     prescription_tests: list[PrescriptionItemInput] = Field(default_factory=list)
     prescription_procedures: list[PrescriptionItemInput] = Field(default_factory=list)
+    symptoms: list[SymptomInput] = Field(default_factory=list)
+    test_results: list[TestResultInput] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def resolve_state(self) -> "CompareBillRequest":
@@ -730,6 +747,28 @@ def _prescription_items_from_request(
     return items
 
 
+def _clinical_context_from_request(
+    symptoms: list[SymptomInput],
+    test_results: list[TestResultInput],
+) -> dict[str, Any]:
+    return normalize_clinical_context(
+        symptoms=[item.model_dump() for item in symptoms if item.name.strip()],
+        test_results=[
+            {
+                "test_name": item.test_name,
+                "value": item.value,
+                "unit": item.unit,
+                "result": item.result,
+                "reference_range": item.reference_range,
+            }
+            for item in test_results
+            if item.test_name.strip()
+        ],
+        symptoms_source="manual",
+        test_results_source="manual",
+    )
+
+
 def _build_comparison_response(
     *,
     line_items: list[dict[str, Any]],
@@ -767,6 +806,7 @@ def _build_comparison_response(
     diagnosis: str | None = None,
     diagnosis_user_provided: bool = False,
     prescription_items: list[dict[str, Any]] | None = None,
+    clinical_context: dict[str, Any] | None = None,
     report_kind: str = "bill",
 ) -> dict[str, Any]:
     if not line_items:
@@ -803,14 +843,17 @@ def _build_comparison_response(
 
     treatment_audit_flags: dict[str, Any] | None = None
     prescription_payload: dict[str, Any] | None = None
+    clinical_context = clinical_context or {}
     if diagnosis and diagnosis.strip():
         prescription_items = prescription_items or []
         treatment_audit_flags = analyze_treatment(
             diagnosis=diagnosis.strip(),
             prescription_items=prescription_items,
             bill_items=compared_line_items,
+            clinical_context=clinical_context,
+            diagnosis_user_provided=diagnosis_user_provided,
         )
-        if prescription_items:
+        if prescription_items or clinical_context:
             prescription_payload = {
                 "diagnosis": diagnosis.strip(),
                 "diagnosis_user_provided": diagnosis_user_provided,
@@ -976,6 +1019,7 @@ def _build_comparison_response(
         "audit_flags": audit_flags,
         "treatment_audit_flags": treatment_audit_flags,
         "prescription": prescription_payload,
+        "clinical_context": clinical_context if clinical_context else None,
         "report_kind": report_kind,
         "hospitalisation_relief_advisory": hospitalisation_relief_advisory,
         "kcr_kit_advisory": kcr_kit_advisory,
@@ -996,7 +1040,12 @@ def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
         body.prescription_tests,
         body.prescription_procedures,
     )
-    report_kind = "combined" if body.diagnosis and prescription_items else "bill"
+    report_kind = (
+        "combined"
+        if body.diagnosis and (prescription_items or body.symptoms or body.test_results)
+        else "bill"
+    )
+    clinical_context = _clinical_context_from_request(body.symptoms, body.test_results)
     return _build_comparison_response(
         line_items=line_items,
         state_ut_name=body.state_ut_name,
@@ -1035,6 +1084,7 @@ def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
         diagnosis=body.diagnosis,
         diagnosis_user_provided=body.diagnosis_user_provided,
         prescription_items=prescription_items,
+        clinical_context=clinical_context,
         report_kind=report_kind,
     )
 

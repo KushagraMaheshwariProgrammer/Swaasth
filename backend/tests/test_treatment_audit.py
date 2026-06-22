@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.services.treatment_audit import (
     _compute_risk_level,
     _rule_based_bill_prescription_flags,
+    _rule_based_clinical_flags,
     analyze_treatment,
 )
 
@@ -25,6 +26,20 @@ def test_compute_risk_level_high_for_multiple_flags() -> None:
         {"severity": "MEDIUM"},
     ]
     assert _compute_risk_level(flags) == "HIGH"
+
+
+def test_rule_based_clinical_flags_malaria_negative_rdt() -> None:
+    flags = _rule_based_clinical_flags(
+        "Malaria",
+        {
+            "test_results": [
+                {"test_name": "Malaria RDT", "result": "negative"},
+            ]
+        },
+    )
+    assert len(flags) == 1
+    assert flags[0]["type"] == "DIAGNOSIS_TEST_MISMATCH"
+    assert flags[0]["category"] == "diagnosis"
 
 
 def test_analyze_treatment_requires_diagnosis(monkeypatch) -> None:

@@ -121,6 +121,11 @@ def test_unified_render_pdf_prescription_report() -> None:
             "flags_count": 1,
             "risk_level": "MEDIUM",
             "matched_stg_conditions": ["Malaria"],
+            "clinical_alignment": {
+                "diagnosis_supported": False,
+                "supporting_evidence": ["Fever reported"],
+                "missing_evidence": ["Positive malaria smear or RDT"],
+            },
             "flags": [
                 {
                     "type": "UNNECESSARY_TEST",
@@ -136,7 +141,18 @@ def test_unified_render_pdf_prescription_report() -> None:
                 }
             ],
         },
+        "clinical_context": {
+            "symptoms": [{"name": "fever", "duration": "3 days"}],
+            "test_results": [{"test_name": "Malaria RDT", "result": "negative"}],
+        },
     }
     res = client.post("/api/reports/render-pdf", json=report)
     assert res.status_code == 200, res.text
     assert res.content[:5] == b"%PDF-"
+
+    from app.report_pdf import _render_clinical_evidence_html
+
+    html = _render_clinical_evidence_html(report)
+    assert "Clinical Evidence" in html
+    assert "fever" in html
+    assert "Malaria RDT" in html
