@@ -5,10 +5,110 @@ const API_BASE =
   import.meta.env.VITE_API_BASE ??
   (Capacitor.isNativePlatform() ? "http://10.0.2.2:8000" : "");
 
+export function emptyClinicalContext() {
+  return {
+    symptoms: [],
+    test_results: [],
+    symptoms_source: "manual",
+    test_results_source: "manual",
+  };
+}
+
+export function mergeClinicalContext(manual, extracted) {
+  const base = emptyClinicalContext();
+  const manualCtx = manual || base;
+  const extractedCtx = extracted || base;
+
+  const symptoms = [];
+  const seenSymptoms = new Set();
+  for (const item of [...(manualCtx.symptoms || []), ...(extractedCtx.symptoms || [])]) {
+    const name = String(item?.name || "").trim();
+    if (!name) {
+      continue;
+    }
+    const key = name.toLowerCase();
+    if (seenSymptoms.has(key)) {
+      continue;
+    }
+    seenSymptoms.add(key);
+    symptoms.push({
+      name,
+      duration: item.duration || "",
+      severity: item.severity || "",
+    });
+  }
+
+  const testResults = [];
+  const testIndex = new Map();
+  for (const item of [...(extractedCtx.test_results || []), ...(manualCtx.test_results || [])]) {
+    const testName = String(item?.test_name || "").trim();
+    if (!testName) {
+      continue;
+    }
+    const key = testName.toLowerCase();
+    const normalized = {
+      test_name: testName,
+      value: item.value || "",
+      unit: item.unit || "",
+      result: item.result || "",
+      reference_range: item.reference_range || "",
+    };
+    if (testIndex.has(key)) {
+      testResults[testIndex.get(key)] = normalized;
+    } else {
+      testIndex.set(key, testResults.length);
+      testResults.push(normalized);
+    }
+  }
+
+  return {
+    symptoms,
+    test_results: testResults,
+    symptoms_source: manualCtx.symptoms?.length
+      ? "manual"
+      : extractedCtx.symptoms_source || "manual",
+    test_results_source: manualCtx.test_results?.length
+      ? "manual"
+      : extractedCtx.test_results_source || "manual",
+  };
+}
+
+export function clinicalContextToApiPayload(clinicalContext) {
+  const ctx = clinicalContext || emptyClinicalContext();
+  return {
+    symptoms: (ctx.symptoms || [])
+      .filter((item) => String(item?.name || "").trim())
+      .map((item) => ({
+        name: String(item.name).trim(),
+        duration: item.duration?.trim() || null,
+        severity: item.severity?.trim() || null,
+      })),
+    test_results: (ctx.test_results || [])
+      .filter((item) => String(item?.test_name || "").trim())
+      .map((item) => ({
+        test_name: String(item.test_name).trim(),
+        value: item.value?.trim() || null,
+        unit: item.unit?.trim() || null,
+        result: item.result?.trim() || null,
+        reference_range: item.reference_range?.trim() || null,
+      })),
+  };
+}
+
 export async function uploadPrescription(file) {
   const formData = new FormData();
   formData.append("file", file);
   return fetchJson(`${API_BASE}/upload-prescription`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function uploadClinicalDocument(file, documentType) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("document_type", documentType);
+  return fetchJson(`${API_BASE}/upload-clinical-document`, {
     method: "POST",
     body: formData,
   });
@@ -26,6 +126,8 @@ export async function analyzeTreatment({
   tests = [],
   procedures = [],
   billItems = [],
+  symptoms = [],
+  testResults = [],
   patient = null,
 }) {
   return fetchJson(`${API_BASE}/analyze-treatment`, {
@@ -38,6 +140,8 @@ export async function analyzeTreatment({
       tests,
       procedures,
       bill_items: billItems,
+      symptoms,
+      test_results: testResults,
       patient_id: patient?.id || null,
       patient_name: patient?.name || null,
     }),
@@ -45,11 +149,20 @@ export async function analyzeTreatment({
 }
 
 export function normalizePrescriptionPayload(payload) {
+  const clinicalContext = mergeClinicalContext(
+    emptyClinicalContext(),
+    payload?.clinical_context || {
+      symptoms: payload?.symptoms || [],
+      test_results: [],
+      symptoms_source: "prescription",
+    }
+  );
   return {
     diagnosis: payload?.diagnosis || "",
     diagnosisConfidence: payload?.diagnosis_confidence || "missing",
     prescriber: payload?.prescriber || "",
     prescriptionDate: payload?.prescription_date || "",
+    clinicalContext,
     medicines: (payload?.medicines || []).map((item) => ({
       name: String(item?.name || "").trim(),
       dose: item?.dose || "",

@@ -221,6 +221,10 @@ export default function HistoryPage() {
                         : bill.report_kind === "combined"
                         ? "Bill + prescription review"
                         : `${bill.line_items?.length || 0} items`}
+                      {(bill.clinical_context?.symptoms?.length ||
+                        bill.clinical_context?.test_results?.length) > 0 && (
+                        <span className="history-clinical-badge">Clinical review</span>
+                      )}
                     </p>
                     <div className="history-card-stats">
                       {bill.report_kind === "prescription" ? (

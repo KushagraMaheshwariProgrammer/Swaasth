@@ -18,6 +18,7 @@ export default defineConfig({
       "/compare-bill": proxyCommon,
       "/upload-bill": proxyCommon,
       "/upload-prescription": proxyCommon,
+      "/upload-clinical-document": proxyCommon,
       "/analyze-treatment": proxyCommon,
       "/cghs": proxyCommon,
       "/health": proxyCommon,

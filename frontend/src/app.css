@@ -3626,3 +3626,82 @@ body {
   display: grid;
   gap: 1rem;
 }
+
+.clinical-context-shell .clinical-section {
+  margin-bottom: 1.25rem;
+}
+
+.clinical-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.5rem 0 0.75rem;
+}
+
+.clinical-chip {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.clinical-symptom-grid,
+.clinical-test-grid {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.clinical-upload-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.clinical-alignment-panel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.clinical-alignment-label {
+  font-size: 0.86rem;
+  color: #64748b;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.clinical-alignment-list {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.clinical-align-yes {
+  color: #166534;
+}
+
+.clinical-align-no {
+  color: #b91c1c;
+}
+
+.clinical-align-unknown {
+  color: #92400e;
+}
+
+.treatment-audit-group h4 {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.95rem;
+  color: #334155;
+}
+
+.history-clinical-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 0.72rem;
+  font-weight: 600;
+}

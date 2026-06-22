@@ -166,13 +166,21 @@ Return ONLY valid JSON with this exact shape:
     }}
   ],
   "tests": [{{ "name": "string" }}],
-  "procedures": [{{ "name": "string" }}]
+  "procedures": [{{ "name": "string" }}],
+  "symptoms": [
+    {{
+      "name": "string",
+      "duration": null or "string",
+      "severity": null or "string"
+    }}
+  ]
 }}
 
 Rules:
 - If diagnosis is absent, unclear, or only implied, set diagnosis=null and diagnosis_confidence="missing".
 - If diagnosis is explicit, set diagnosis_confidence="high" or "low".
 - Include advised lab tests, imaging, and procedures separately in tests/procedures arrays.
+- Extract symptoms if mentioned on the prescription (chief complaints, clinical notes).
 - Keep medicine names as written on the prescription.
 - If text is not a prescription, set is_prescription=false and provide error.
 
@@ -180,6 +188,210 @@ Prescription text:
 {extracted_text}
 """
     return _groq_chat(prompt)
+
+
+    return _groq_chat(prompt)
+
+
+def extract_lab_report_with_groq(extracted_text: str) -> dict[str, Any]:
+    prompt = f"""
+You are helping extract laboratory test results for Indian patients.
+
+Task:
+1) Decide if the text looks like a medical lab report or investigation report.
+2) If yes, extract structured test results.
+3) If no, return an error message.
+
+Return ONLY valid JSON with this exact shape:
+{{
+  "is_lab_report": true or false,
+  "error": null or "reason text",
+  "lab_name": null or "string",
+  "report_date": null or "string",
+  "test_results": [
+    {{
+      "test_name": "string",
+      "value": null or "string",
+      "unit": null or "string",
+      "result": "positive" | "negative" | "normal" | "abnormal" | "high" | "low" | null,
+      "reference_range": null or "string"
+    }}
+  ]
+}}
+
+Rules:
+- Extract all reported investigations with values or qualitative results.
+- Use result=positive/negative for antigen/antibody/microscopy style results when stated.
+- If text is not a lab report, set is_lab_report=false and provide error.
+
+Lab report text:
+{extracted_text}
+"""
+    return _groq_chat(prompt)
+
+
+def extract_discharge_summary_with_groq(extracted_text: str) -> dict[str, Any]:
+    prompt = f"""
+You are helping extract discharge summary details for Indian patients.
+
+Task:
+1) Decide if the text looks like a hospital discharge summary or clinical note.
+2) If yes, extract diagnosis, symptoms, test results, and procedures.
+3) If no, return an error message.
+
+Return ONLY valid JSON with this exact shape:
+{{
+  "is_discharge_summary": true or false,
+  "error": null or "reason text",
+  "diagnosis": null or "string",
+  "symptoms": [
+    {{ "name": "string", "duration": null or "string", "severity": null or "string" }}
+  ],
+  "test_results": [
+    {{
+      "test_name": "string",
+      "value": null or "string",
+      "unit": null or "string",
+      "result": "positive" | "negative" | "normal" | "abnormal" | "high" | "low" | null,
+      "reference_range": null or "string"
+    }}
+  ],
+  "procedures": [{{ "name": "string" }}]
+}}
+
+Rules:
+- Extract final or provisional diagnosis if present.
+- Include presenting symptoms and significant investigation results from the summary.
+- If text is not a discharge summary, set is_discharge_summary=false and provide error.
+
+Discharge summary text:
+{extracted_text}
+"""
+    return _groq_chat(prompt)
+
+
+VALID_TEST_RESULTS = {
+    "positive",
+    "negative",
+    "normal",
+    "abnormal",
+    "high",
+    "low",
+    None,
+}
+
+
+def _normalize_symptoms(items: list[Any]) -> list[dict[str, str]]:
+    cleaned: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name", "")).strip()
+        if not name:
+            continue
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(
+            {
+                "name": name,
+                "duration": str(item.get("duration") or "").strip() or None,
+                "severity": str(item.get("severity") or "").strip() or None,
+            }
+        )
+    return cleaned
+
+
+def _normalize_test_results(items: list[Any]) -> list[dict[str, Any]]:
+    cleaned: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        test_name = str(item.get("test_name") or item.get("name") or "").strip()
+        if not test_name:
+            continue
+        key = test_name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        result = item.get("result")
+        if result is not None:
+            result = str(result).strip().lower() or None
+            if result not in VALID_TEST_RESULTS:
+                result = None
+        value = item.get("value")
+        if value is not None:
+            value = str(value).strip() or None
+        unit = item.get("unit")
+        if unit is not None:
+            unit = str(unit).strip() or None
+        reference_range = item.get("reference_range")
+        if reference_range is not None:
+            reference_range = str(reference_range).strip() or None
+        cleaned.append(
+            {
+                "test_name": test_name,
+                "value": value,
+                "unit": unit,
+                "result": result,
+                "reference_range": reference_range,
+            }
+        )
+    return cleaned
+
+
+def normalize_clinical_context(
+    *,
+    symptoms: list[Any] | None = None,
+    test_results: list[Any] | None = None,
+    symptoms_source: str = "manual",
+    test_results_source: str = "manual",
+) -> dict[str, Any]:
+    return {
+        "symptoms": _normalize_symptoms(symptoms or []),
+        "test_results": _normalize_test_results(test_results or []),
+        "symptoms_source": symptoms_source,
+        "test_results_source": test_results_source,
+    }
+
+
+def merge_clinical_contexts(
+    *contexts: dict[str, Any],
+    manual_symptoms: list[Any] | None = None,
+    manual_test_results: list[Any] | None = None,
+) -> dict[str, Any]:
+    """Merge clinical contexts; manual entries override extracted duplicates."""
+    symptoms: list[dict[str, Any]] = []
+    test_results: list[dict[str, Any]] = []
+    symptoms_source = "manual"
+    test_results_source = "manual"
+
+    for ctx in contexts:
+        if not ctx:
+            continue
+        symptoms.extend(ctx.get("symptoms") or [])
+        test_results.extend(ctx.get("test_results") or [])
+        if ctx.get("symptoms"):
+            symptoms_source = ctx.get("symptoms_source") or symptoms_source
+        if ctx.get("test_results"):
+            test_results_source = ctx.get("test_results_source") or test_results_source
+
+    if manual_symptoms:
+        symptoms = list(manual_symptoms) + symptoms
+        symptoms_source = "manual"
+    if manual_test_results:
+        test_results = list(manual_test_results) + test_results
+        test_results_source = "manual"
+
+    return normalize_clinical_context(
+        symptoms=symptoms,
+        test_results=test_results,
+        symptoms_source=symptoms_source,
+        test_results_source=test_results_source,
+    )
 
 
 def normalize_prescription_items(payload: dict[str, Any]) -> dict[str, Any]:
@@ -217,5 +429,11 @@ def normalize_prescription_items(payload: dict[str, Any]) -> dict[str, Any]:
         "tests": _clean_name_list(tests if isinstance(tests, list) else []),
         "procedures": _clean_name_list(
             procedures if isinstance(procedures, list) else []
+        ),
+        "clinical_context": normalize_clinical_context(
+            symptoms=payload.get("symptoms") or [],
+            test_results=[],
+            symptoms_source="prescription",
+            test_results_source="manual",
         ),
     }

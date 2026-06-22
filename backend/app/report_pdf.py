@@ -39,6 +39,75 @@ _HOSPITAL_TYPE_LABELS: dict[str, str] = {
 }
 
 
+def _render_clinical_evidence_html(report: dict[str, Any]) -> str:
+    clinical_context = report.get("clinical_context") or {}
+    symptoms = clinical_context.get("symptoms") or []
+    test_results = clinical_context.get("test_results") or []
+    treatment_audit = report.get("treatment_audit_flags") or {}
+    alignment = treatment_audit.get("clinical_alignment") or {}
+
+    if not symptoms and not test_results and not alignment:
+        return ""
+
+    symptom_rows = []
+    for item in symptoms:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        duration = str(item.get("duration") or "").strip()
+        severity = str(item.get("severity") or "").strip()
+        details = ", ".join(part for part in (duration, severity) if part)
+        symptom_rows.append(
+            f"<li>{escape(name)}{f' ({escape(details)})' if details else ''}</li>"
+        )
+
+    test_rows = []
+    for item in test_results:
+        if not isinstance(item, dict):
+            continue
+        test_name = str(item.get("test_name") or "").strip()
+        if not test_name:
+            continue
+        parts = [test_name]
+        if item.get("value"):
+            parts.append(str(item.get("value")))
+        if item.get("unit"):
+            parts.append(str(item.get("unit")))
+        if item.get("result"):
+            parts.append(str(item.get("result")))
+        test_rows.append(f"<li>{escape(' · '.join(parts))}</li>")
+
+    alignment_bits = []
+    supported = alignment.get("diagnosis_supported")
+    if supported is True:
+        alignment_bits.append("<p><b>Diagnosis supported:</b> Yes</p>")
+    elif supported is False:
+        alignment_bits.append("<p><b>Diagnosis supported:</b> No</p>")
+    elif supported is None and alignment:
+        alignment_bits.append("<p><b>Diagnosis supported:</b> Insufficient data</p>")
+
+    for label, key in (
+        ("Supporting evidence", "supporting_evidence"),
+        ("Missing or conflicting evidence", "missing_evidence"),
+    ):
+        items = alignment.get(key) or []
+        if items:
+            alignment_bits.append(f"<p><b>{label}:</b></p><ul>")
+            alignment_bits.extend(
+                f"<li>{escape(str(item))}</li>" for item in items if str(item).strip()
+            )
+            alignment_bits.append("</ul>")
+
+    return f"""
+  <h2>Clinical Evidence</h2>
+  {"<p><b>Symptoms</b></p><ul>" + ''.join(symptom_rows) + "</ul>" if symptom_rows else ""}
+  {"<p><b>Test results</b></p><ul>" + ''.join(test_rows) + "</ul>" if test_rows else ""}
+  {''.join(alignment_bits)}
+"""
+
+
 def register_scheme(scheme_id: str, render_html: RenderHtmlFn) -> None:
     _SCHEME_RENDERERS[scheme_id] = render_html
 
@@ -469,6 +538,7 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
     hrs_advisory_html = _render_hospitalisation_relief_advisory_html(report)
     kcr_advisory_html = _render_kcr_kit_advisory_html(report)
     rajiv_report_html = _render_rajiv_aarogyasri_report_html(report)
+    clinical_evidence_html = _render_clinical_evidence_html(report)
 
     return f"""
 <html>
@@ -532,6 +602,7 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
   {"<table><tr><th>Item</th><th>Type</th><th>Severity</th><th>Reason</th><th>Recommendation</th></tr>" + ''.join(audit_rows) + "</table>" if audit_rows else "<p>No suspicious repetitions or unnecessary package-component charges detected.</p>"}
 
   <h2>Treatment Appropriateness (STG)</h2>
+  {clinical_evidence_html}
   {"<p><b>Matched STG conditions:</b> " + escape(', '.join(treatment_audit.get('matched_stg_conditions') or [])) + "</p>" if treatment_audit.get('matched_stg_conditions') else ""}
   {"<table><tr><th>Item</th><th>Type</th><th>Severity</th><th>Reason</th><th>Recommendation</th><th>STG reference</th></tr>" + ''.join(treatment_rows) + "</table>" if treatment_rows else "<p>No treatment appropriateness flags for the supplied diagnosis.</p>"}
   <p class='disclaimer'>Guideline-based indication check using CRC Standard Treatment Guidelines, 7th ed. Not a substitute for clinical judgment.</p>
@@ -584,6 +655,8 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
             "</tr>"
         )
 
+    clinical_evidence_html = _render_clinical_evidence_html(report)
+
     return f"""
 <html>
 <head><style>
@@ -607,6 +680,7 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
   {"<h2>Procedures</h2><ul>" + ''.join(procedure_rows) + "</ul>" if procedure_rows else ""}
 
   <h2>Treatment Appropriateness (STG)</h2>
+  {clinical_evidence_html}
   {"<p><b>Matched STG conditions:</b> " + escape(', '.join(treatment_audit.get('matched_stg_conditions') or [])) + "</p>" if treatment_audit.get('matched_stg_conditions') else ""}
   {"<table><tr><th>Item</th><th>Type</th><th>Severity</th><th>Reason</th><th>Recommendation</th><th>STG reference</th></tr>" + ''.join(treatment_rows) + "</table>" if treatment_rows else "<p>No treatment appropriateness flags for the supplied diagnosis.</p>"}
 

@@ -1,0 +1,12 @@
+[
+  {
+    "condition": "Malaria",
+    "book_page": 100,
+    "chapter": "Infectious Diseases"
+  },
+  {
+    "condition": "Dengue",
+    "book_page": 120,
+    "chapter": "Infectious Diseases"
+  }
+]
