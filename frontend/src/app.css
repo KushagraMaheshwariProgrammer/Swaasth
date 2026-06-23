@@ -2231,6 +2231,158 @@ body {
   line-height: 1.45;
 }
 
+.scheme-card-heading {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.scheme-card-expanded-criteria {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(93, 138, 168, 0.2);
+}
+
+.cghs-eligibility-advisory .cghs-eligibility-advisory-heading h3 {
+  margin: 0;
+}
+
+.cghs-eligibility-fallback-note {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.8rem;
+  background: rgba(93, 138, 168, 0.1);
+  border-radius: var(--neu-radius-sm);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.cghs-eligibility-preview-box {
+  margin-bottom: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--neu-surface);
+  border-radius: var(--neu-radius-sm);
+  border-left: 3px solid #5d8aa8;
+  box-shadow: var(--neu-shadow-soft);
+}
+
+.cghs-eligibility-preview-box h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.88rem;
+  color: #1a5276;
+}
+
+.cghs-eligibility-preview-box p {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.cghs-eligibility-preview-box p + p {
+  margin-top: 0.35rem;
+}
+
+.cghs-eligibility-residence-rule {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--neu-surface);
+  border-radius: var(--neu-radius-sm);
+  border-left: 3px solid #1a5276;
+  box-shadow: var(--neu-shadow-soft);
+}
+
+.cghs-eligibility-residence-rule p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+
+.cghs-eligibility-accordion {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.cghs-eligibility-accordion-item {
+  background: var(--neu-surface);
+  border-radius: var(--neu-radius-sm);
+  box-shadow: var(--neu-shadow-soft);
+  overflow: hidden;
+}
+
+.cghs-eligibility-accordion-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1a5276;
+  cursor: pointer;
+}
+
+.cghs-eligibility-accordion-trigger:hover {
+  background: rgba(93, 138, 168, 0.08);
+}
+
+.cghs-eligibility-accordion-icon {
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: #5d8aa8;
+}
+
+.cghs-eligibility-accordion-body {
+  margin: 0;
+  padding: 0 0.85rem 0.75rem 1.35rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.cghs-eligibility-accordion-body li + li {
+  margin-top: 0.3rem;
+}
+
+.cghs-eligibility-content-compact .cghs-eligibility-residence-rule {
+  margin-bottom: 0.55rem;
+  padding: 0.65rem 0.75rem;
+}
+
+.cghs-eligibility-expand-btn {
+  margin-bottom: 0.65rem;
+}
+
+.cghs-eligibility-questions-body select {
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--neu-radius-sm);
+  border: 1px solid rgba(93, 138, 168, 0.35);
+  background: var(--neu-surface);
+  font-size: 0.88rem;
+}
+
+.cghs-eligibility-questions-intro {
+  margin: 0 0 0.85rem;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.cghs-eligibility-questions-footer {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
 .rajiv-aarogyasri-report {
   padding: 1rem 1.1rem;
   background: linear-gradient(

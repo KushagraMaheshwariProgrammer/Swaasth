@@ -13,6 +13,10 @@ import KcrKitQuestionsModal, {
 import RajivAarogyasriQuestionsModal, {
   emptyRajivAarogyasriAnswers,
 } from "./RajivAarogyasriQuestionsModal";
+import CghsEligibilityQuestionsModal, {
+  emptyCghsEligibilityAnswers,
+} from "./CghsEligibilityQuestionsModal";
+import CghsEligibilityCriteriaContent from "./CghsEligibilityCriteriaContent";
 import SchemeYesNoQuestion from "./SchemeYesNoQuestion";
 import { getStateOptions, isTelanganaState } from "../services/locations";
 
@@ -44,6 +48,11 @@ export const emptyRajivAarogyasriFields = () => ({
   rajivFamilyCoverageUsedAmount: "",
 });
 
+export const emptyCghsEligibilityFields = () => ({
+  cghsBeneficiaryCategory: "",
+  cghsResidesInCoveredCity: null,
+});
+
 export const emptyPatientForm = () => ({
   name: "",
   age: "",
@@ -55,6 +64,7 @@ export const emptyPatientForm = () => ({
   isRegisteredConstructionWorker: false,
   ...emptyKcrKitFields(),
   ...emptyRajivAarogyasriFields(),
+  ...emptyCghsEligibilityFields(),
   savePastBills: false,
 });
 
@@ -94,6 +104,8 @@ export function patientToFormFields(patient) {
       patient?.rajivFamilyCoverageUsedAmount != null
         ? String(patient.rajivFamilyCoverageUsedAmount)
         : "",
+    cghsBeneficiaryCategory: patient?.cghsBeneficiaryCategory || "",
+    cghsResidesInCoveredCity: patient?.cghsResidesInCoveredCity ?? null,
     savePastBills: Boolean(patient?.savePastBills),
   };
 }
@@ -128,6 +140,13 @@ function getRajivAnswersFromForm(form) {
   };
 }
 
+function getCghsAnswersFromForm(form) {
+  return {
+    cghsBeneficiaryCategory: form.cghsBeneficiaryCategory || "",
+    cghsResidesInCoveredCity: form.cghsResidesInCoveredCity,
+  };
+}
+
 export default function PatientForm({
   form,
   setForm,
@@ -139,6 +158,7 @@ export default function PatientForm({
   info,
 }) {
   const [activeModal, setActiveModal] = useState(null);
+  const [cghsCriteriaExpanded, setCghsCriteriaExpanded] = useState(false);
 
   const showAarogyaCard = isTelanganaState(form.state);
   const patientAge = Number(form.age);
@@ -262,6 +282,44 @@ export default function PatientForm({
             >
               Learn eligibility criteria
             </button>
+          </div>
+
+          <div className="scheme-card">
+            <p className="scheme-card-heading">CGHS Benchmark Rates</p>
+            <p className="scheme-card-description">
+              Default bill comparison benchmark when Ayushman Bharat PM-JAY or
+              Rajiv Aarogyasri is not selected. CGHS rates indicate government
+              reference pricing; eligibility is separate.
+            </p>
+            {(form.cghsBeneficiaryCategory || form.cghsResidesInCoveredCity != null) && (
+              <p className="scheme-card-status">Eligibility preview answers saved.</p>
+            )}
+            <div className="scheme-card-buttons">
+              <button
+                type="button"
+                className="eligibility-learn-btn"
+                onClick={() => setActiveModal("cghs-questions")}
+              >
+                {form.cghsBeneficiaryCategory || form.cghsResidesInCoveredCity != null
+                  ? "Update eligibility preview"
+                  : "Eligibility self-check (optional)"}
+              </button>
+              <button
+                type="button"
+                className="eligibility-learn-btn"
+                onClick={() => setCghsCriteriaExpanded((prev) => !prev)}
+                aria-expanded={cghsCriteriaExpanded}
+              >
+                {cghsCriteriaExpanded
+                  ? "Hide eligibility criteria"
+                  : "View eligibility criteria"}
+              </button>
+            </div>
+            {cghsCriteriaExpanded && (
+              <div className="scheme-card-expanded-criteria">
+                <CghsEligibilityCriteriaContent compact defaultExpanded={false} />
+              </div>
+            )}
           </div>
 
           {showAarogyaCard && (
@@ -485,6 +543,19 @@ export default function PatientForm({
             ? getRajivAnswersFromForm(form)
             : emptyRajivAarogyasriAnswers()
         }
+      />
+
+      <CghsEligibilityQuestionsModal
+        open={activeModal === "cghs-questions"}
+        onClose={() => setActiveModal(null)}
+        onSave={(answers) => {
+          setForm((prev) => ({
+            ...prev,
+            ...answers,
+          }));
+          setActiveModal(null);
+        }}
+        initialValues={getCghsAnswersFromForm(form)}
       />
 
       <EligibilityCriteriaModal

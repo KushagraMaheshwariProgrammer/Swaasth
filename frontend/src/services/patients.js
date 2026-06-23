@@ -122,6 +122,29 @@ function normalizeRajivAarogyasriFields(patientData) {
   };
 }
 
+function deriveCghsEligibleCategoryConfirmed(category) {
+  if (!category) {
+    return null;
+  }
+  if (category === "not_sure") {
+    return false;
+  }
+  return true;
+}
+
+function normalizeCghsEligibilityFields(patientData) {
+  const category = String(patientData?.cghsBeneficiaryCategory || "").trim();
+  const resides = patientData?.cghsResidesInCoveredCity;
+  const residesInCoveredCity =
+    resides === true || resides === false ? resides : null;
+
+  return {
+    cghsBeneficiaryCategory: category || null,
+    cghsEligibleCategoryConfirmed: deriveCghsEligibleCategoryConfirmed(category),
+    cghsResidesInCoveredCity: residesInCoveredCity,
+  };
+}
+
 export function validatePatientInput(patientData) {
   const name = patientData?.name?.trim() || "";
   if (!name) {
@@ -138,6 +161,7 @@ export function validatePatientInput(patientData) {
   const state = patientData?.state?.trim() || "";
   const kcrFields = normalizeKcrKitFields(patientData, age);
   const rajivFields = normalizeRajivAarogyasriFields(patientData);
+  const cghsFields = normalizeCghsEligibilityFields(patientData);
   return {
     name,
     gender,
@@ -154,6 +178,7 @@ export function validatePatientInput(patientData) {
     ),
     ...kcrFields,
     ...rajivFields,
+    ...cghsFields,
     savePastBills: Boolean(patientData?.savePastBills),
   };
 }
@@ -206,6 +231,9 @@ function buildFirestorePayload(patientData) {
     rajivHasAadhaar: validated.rajivHasAadhaar,
     rajivIsCancerRelated: validated.rajivIsCancerRelated,
     rajivFamilyCoverageUsedAmount: validated.rajivFamilyCoverageUsedAmount,
+    cghsBeneficiaryCategory: validated.cghsBeneficiaryCategory,
+    cghsEligibleCategoryConfirmed: validated.cghsEligibleCategoryConfirmed,
+    cghsResidesInCoveredCity: validated.cghsResidesInCoveredCity,
     savePastBills: validated.savePastBills,
     updatedAt: serverTimestamp(),
   };

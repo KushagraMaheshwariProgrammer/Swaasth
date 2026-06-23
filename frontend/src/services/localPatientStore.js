@@ -96,6 +96,19 @@ export function persistLocalPatient(userId, patientData, localId = null) {
         patientData.rajivFamilyCoverageUsedAmount !== ""
           ? Number(patientData.rajivFamilyCoverageUsedAmount)
           : null,
+      cghsBeneficiaryCategory: patientData.cghsBeneficiaryCategory || null,
+      cghsEligibleCategoryConfirmed:
+        patientData.cghsBeneficiaryCategory &&
+        patientData.cghsBeneficiaryCategory !== "not_sure"
+          ? true
+          : patientData.cghsBeneficiaryCategory === "not_sure"
+          ? false
+          : null,
+      cghsResidesInCoveredCity:
+        patientData.cghsResidesInCoveredCity === true ||
+        patientData.cghsResidesInCoveredCity === false
+          ? patientData.cghsResidesInCoveredCity
+          : null,
       savePastBills: Boolean(patientData.savePastBills),
     },
     synced: existing?.synced ?? false,

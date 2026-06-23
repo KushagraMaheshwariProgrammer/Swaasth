@@ -813,6 +813,16 @@ function CheckPage() {
           rajiv_is_cancer_related: Boolean(selectedPatient?.rajivIsCancerRelated),
           rajiv_family_coverage_used_amount:
             selectedPatient?.rajivFamilyCoverageUsedAmount ?? null,
+          cghs_fallback_from_aarogya: Boolean(
+            cghsFromAarogya ||
+              scanMeta?.comparison_settings?.cghs_fallback_from_aarogya
+          ),
+          cghs_beneficiary_category:
+            selectedPatient?.cghsBeneficiaryCategory || null,
+          cghs_eligible_category_confirmed:
+            selectedPatient?.cghsEligibleCategoryConfirmed ?? null,
+          cghs_resides_in_covered_city:
+            selectedPatient?.cghsResidesInCoveredCity ?? null,
           bill_date: scanMeta?.bill_date || null,
           patient_district:
             scanMeta?.comparison_settings?.aarogya_district ||
