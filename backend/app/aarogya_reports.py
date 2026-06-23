@@ -16,6 +16,8 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+from app.restricted_medicines import render_restricted_medicine_flags_html
+
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent
 _REPORT_DIR = _BACKEND_ROOT / "data" / "aarogya_bhadratha_cache" / "reports"
 
@@ -51,6 +53,7 @@ def build_report(
     bill: dict[str, Any],
     ocr: dict[str, Any],
     jan_aushadhi: dict[str, Any] | None = None,
+    restricted_medicine_flags: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     report_id = uuid.uuid4().hex
     now = _now_iso()
@@ -67,6 +70,7 @@ def build_report(
         "ocr": ocr,
         "comparison": comparison,
         "jan_aushadhi": jan_aushadhi,
+        "restricted_medicine_flags": restricted_medicine_flags,
         "disclaimer": DISCLAIMER,
     }
 
@@ -229,6 +233,8 @@ def render_report_html(report: dict[str, Any]) -> str:
   </table>
   <p style='margin-top:6px;font-size:9px;'>Medicines are compared against NPPA ceiling prices (with brand-to-generic resolution when needed). Procedures and other services use Aarogya Bhadratha annexure rates.</p>
   {"<h2>Jan Aushadhi — subsidized medicines</h2><ul>" + ''.join(jan_rows) + "</ul><p>" + escape(str(jan_aushadhi.get('advisory', ''))) + "</p>" if jan_rows else ""}
+
+  {render_restricted_medicine_flags_html(report)}
 
   <p class='disclaimer'>{escape(DISCLAIMER)}</p>
 </body>

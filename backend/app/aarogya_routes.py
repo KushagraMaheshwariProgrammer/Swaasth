@@ -26,6 +26,7 @@ from app.aarogya_reports import (
     save_report,
 )
 from app.medicine_comparison import enrich_scheme_line_items_with_jan_aushadhi
+from app.restricted_medicines import build_restricted_medicine_flags
 
 router = APIRouter(prefix="/api/aarogya-bhadratha", tags=["aarogya-bhadratha"])
 
@@ -173,6 +174,11 @@ def compare_rates(body: CompareRatesRequest) -> dict[str, Any]:
     )
     comparison = {**comparison, "items": enriched_items}
 
+    restricted_medicine_flags = build_restricted_medicine_flags(
+        ocr_text=body.ocr_text,
+        line_items=line_items,
+    )
+
     original_total = body.bill.original_total
     if original_total is None:
         original_total = round(
@@ -209,6 +215,7 @@ def compare_rates(body: CompareRatesRequest) -> dict[str, Any]:
             "line_items": line_items,
         },
         jan_aushadhi=jan_aushadhi,
+        restricted_medicine_flags=restricted_medicine_flags,
     )
     save_report(report)
     return report

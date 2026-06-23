@@ -13,6 +13,7 @@ import HospitalisationReliefAdvisory from "./HospitalisationReliefAdvisory";
 import KcrKitAdvisory from "./KcrKitAdvisory";
 import RajivAarogyasriReport from "./RajivAarogyasriReport";
 import TreatmentAuditSection from "./TreatmentAuditSection";
+import RestrictedMedicinesSection from "./RestrictedMedicinesSection";
 
 export default function BillResults({ result, toolbar = null }) {
   const summary = useMemo(() => computeBillSummary(result), [result]);
@@ -169,6 +170,8 @@ export default function BillResults({ result, toolbar = null }) {
         </div>
       </article>
 
+      <RajivAarogyasriReport report={result?.rajiv_aarogyasri_report} />
+
       <div className="results-grid">
         {result.line_items.map((item, index) => {
           const meta = getFlagMeta(item.flag);
@@ -232,7 +235,8 @@ export default function BillResults({ result, toolbar = null }) {
               </div>
               {item.aarogyasri_fallback_used && (
                 <p className="rajiv-fallback-note">
-                  CGHS fallback used because Aarogyasri package was not matched.
+                  CGHS fallback benchmark shown below. See Rajiv Aarogyasri verification
+                  above for package search and advisories.
                 </p>
               )}
               {item.jan_aushadhi_available && (
@@ -341,13 +345,15 @@ export default function BillResults({ result, toolbar = null }) {
 
       <TreatmentAuditSection treatmentAuditFlags={result?.treatment_audit_flags} />
 
+      <RestrictedMedicinesSection
+        restrictedMedicineFlags={result?.restricted_medicine_flags}
+      />
+
       <HospitalisationReliefAdvisory
         advisory={result?.hospitalisation_relief_advisory}
       />
 
       <KcrKitAdvisory advisory={result?.kcr_kit_advisory} />
-
-      <RajivAarogyasriReport report={result?.rajiv_aarogyasri_report} />
 
       <ReportActions report={result} />
     </>

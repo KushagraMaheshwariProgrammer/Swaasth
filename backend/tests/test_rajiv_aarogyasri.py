@@ -174,3 +174,51 @@ def test_cghs_fallback_when_package_not_found() -> None:
     assert comparison["fallback_used"] is True
     assert comparison["status"] == "CGHS Fallback Used"
     assert comparison["approved_rate"] == 1200
+
+
+def test_owaisi_oncology_bill_triggers_advisories_and_package_search() -> None:
+    ocr_text = (
+        "Owaisi Hospital and Research Centre\n"
+        "Hyderabad, Telangana\n"
+        "Department: Oncology\n"
+        "Diagnosis: Carcinoma Lung\n"
+        "Procedure: Chemotherapy Cycle 1\n"
+        "Chemotherapy Procedure Charges"
+    )
+    report = build_rajiv_aarogyasri_report(
+        rajiv_aarogyasri_selected=True,
+        rajiv_is_telangana_resident=True,
+        rajiv_has_eligible_card=True,
+        rajiv_has_aadhaar=True,
+        rajiv_is_cancer_related=True,
+        ocr_hospital_name="Owaisi Hospital and Research Centre",
+        patient_state="Telangana",
+        patient_district="Hyderabad",
+        patient_city="Hyderabad",
+        bill_date="25/10/2025",
+        diagnosis="Carcinoma Lung",
+        department="Oncology",
+        ocr_text=ocr_text,
+        line_items=[
+            {
+                "item_name": "Chemotherapy Procedure Charges",
+                "total_price": 12000,
+                "category": "procedure",
+            }
+        ],
+        compared_line_items=[{"cghs_rate": 8500}],
+    )
+    assert report is not None
+    titles = {item["title"] for item in report["advisories"]}
+    assert "Revised Aarogyasri Packages" in titles
+    assert "Old City Hospital Access" in titles
+    assert "Cancer Treatment Verification" in titles
+    assert "Cashless Package Scheme Advisory" in titles
+    assert "Manual Verification Advisory" in titles
+    assert report["package_search"]["searched_terms"]
+    assert report["package_search"]["source_files_searched"]
+    assert report["advisory_debug"]
+    hospital_status = report["hospital_verification"]["status"].lower()
+    assert "not found" in hospital_status or "manual verification" in hospital_status
+    comparison = report["package_comparisons"][0]
+    assert comparison["matched_package_name"] or comparison["fallback_used"]

@@ -749,6 +749,18 @@ body {
   }
 }
 
+.compare-error-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.compare-retry-btn {
+  align-self: flex-start;
+}
+
 .error-text {
   color: #dc2626;
   font-weight: 600;
@@ -1006,6 +1018,59 @@ body {
 .audit-section-header h3 {
   margin: 0;
   font-size: 1.15rem;
+}
+
+.restricted-medicines-section {
+  background: #f4f7fb;
+  border: 1px solid #d6e4f0;
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+  box-shadow: 0 8px 24px rgba(44, 62, 80, 0.08);
+}
+
+.restricted-medicines-warning {
+  border-left: 4px solid #c0392b;
+}
+
+.restricted-medicines-safe {
+  border-left: 4px solid #27ae60;
+}
+
+.restricted-medicine-count {
+  background: #fdecea;
+  color: #922b21;
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.restricted-medicine-intro {
+  margin: 0 0 1rem;
+  color: #566573;
+  font-size: 0.95rem;
+}
+
+.restricted-medicine-card {
+  background: #fff;
+  border: 1px solid #e5edf5;
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  box-shadow: 0 4px 14px rgba(44, 62, 80, 0.06);
+}
+
+.restricted-medicine-meta,
+.restricted-medicine-disclaimer {
+  margin: 0.35rem 0 0;
+  color: #566573;
+  font-size: 0.92rem;
+}
+
+.restricted-medicine-disclaimer {
+  margin-top: 0.85rem;
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  font-style: italic;
 }
 
 .audit-summary-badges {
@@ -2300,6 +2365,31 @@ body {
   margin: 0.25rem 0 0;
   font-size: 0.86rem;
   color: var(--text-secondary);
+}
+
+.rajiv-advisory-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.rajiv-advisory-card {
+  background: #fff;
+  border: 1px solid #e5edf5;
+  border-radius: 12px;
+  padding: 0.85rem 0.95rem;
+}
+
+.rajiv-closest-matches {
+  margin-top: 0.75rem;
+}
+
+.rajiv-debug-card {
+  border-left: 3px solid #5d8aa8;
+}
+
+.rajiv-debug-input {
+  color: #7f8c8d;
+  font-size: 0.85rem;
 }
 
 .rajiv-advisory-date {

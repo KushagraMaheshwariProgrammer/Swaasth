@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 from pathlib import Path
@@ -33,11 +34,20 @@ from app.services.document_extraction import (
     extract_json_from_text,
     normalize_clinical_context,
 )
+from app.restricted_medicines import build_restricted_medicine_flags, get_restricted_medicines_store
 from app.services.treatment_audit import analyze_treatment
 
 
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(_BACKEND_ROOT / ".env")
+
+logger = logging.getLogger(__name__)
+
+
+def _dev_logging_enabled() -> bool:
+    return os.getenv("ENV", "").lower() in {"dev", "development", "local"} or os.getenv(
+        "RAJIV_AAROGYASRI_DEBUG", ""
+    ).lower() in {"1", "true", "yes"}
 
 app = FastAPI(title="MedBill Backend")
 
@@ -137,6 +147,32 @@ def load_reference_data() -> None:
         )
     except Exception as exc:
         print(f"WARNING: Aarogya Bhadratha data failed to load: {exc}")
+
+    try:
+        restricted = get_restricted_medicines_store()
+        if restricted.is_available():
+            print(
+                f"Loaded {len(restricted.rows)} restricted medicines "
+                f"from {restricted.csv_path}"
+            )
+        else:
+            print(
+                f"WARNING: Restricted medicines CSV not loaded "
+                f"(expected at {restricted.csv_path})"
+            )
+    except Exception as exc:
+        print(f"WARNING: Restricted medicines catalog failed to load: {exc}")
+
+    try:
+        from app.rajiv_aarogyasri import get_rajiv_aarogyasri_store
+
+        rajiv = get_rajiv_aarogyasri_store()
+        print(
+            f"Loaded {len(rajiv.hospitals)} Rajiv Aarogyasri hospitals and "
+            f"{len(rajiv.packages)} packages from {rajiv.data_dir.name}"
+        )
+    except Exception as exc:
+        print(f"WARNING: Rajiv Aarogyasri data failed to load: {exc}")
 
 
 @app.get("/health")
@@ -470,6 +506,7 @@ def _add_rajiv_aarogyasri_comparison(
     tier: str,
     rate_type: str,
     bill_date: str | None = None,
+    context_match: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     from app.rajiv_aarogyasri import get_rajiv_aarogyasri_store
 
@@ -481,6 +518,17 @@ def _add_rajiv_aarogyasri_comparison(
             tier=tier,
             rate_type=rate_type,
         )
+    except Exception as exc:
+        logger.exception("Rajiv Aarogyasri comparison unavailable: %s", exc)
+        compared_items: list[dict[str, Any]] = []
+        for raw_item in line_items:
+            cghs_items = _add_cghs_comparison([raw_item], tier=tier, rate_type=rate_type)
+            fallback_item = cghs_items[0]
+            fallback_item["comparison_source"] = "cghs"
+            fallback_item["aarogyasri_fallback_used"] = True
+            fallback_item["aarogyasri_package_not_found"] = True
+            compared_items.append(fallback_item)
+        return compared_items
 
     compared_items: list[dict[str, Any]] = []
 
@@ -488,7 +536,27 @@ def _add_rajiv_aarogyasri_comparison(
         item = dict(raw_item)
         item_name = str(item.get("item_name", "")).strip()
         total_price = _to_float(item.get("total_price"))
-        package_match = store.match_aarogyasri_package(item_name, bill_date)
+        try:
+            package_match = store.match_aarogyasri_package(item_name, bill_date)
+            if (
+                not package_match.get("matched_package")
+                and context_match
+                and context_match.get("matched_package")
+            ):
+                package_match = context_match
+        except Exception as exc:
+            logger.exception(
+                "Rajiv Aarogyasri package match failed for '%s': %s",
+                item_name,
+                exc,
+            )
+            cghs_items = _add_cghs_comparison([item], tier=tier, rate_type=rate_type)
+            fallback_item = cghs_items[0]
+            fallback_item["comparison_source"] = "cghs"
+            fallback_item["aarogyasri_fallback_used"] = True
+            fallback_item["aarogyasri_package_not_found"] = True
+            compared_items.append(fallback_item)
+            continue
 
         if package_match.get("matched_package") and package_match.get("approved_rate") is not None:
             approved_rate = _to_float(package_match["approved_rate"])
@@ -530,6 +598,7 @@ def _add_price_comparison(
     pmjay_eligible: bool = False,
     rajiv_aarogyasri_selected: bool = False,
     bill_date: str | None = None,
+    rajiv_context_match: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     from app.medicine_comparison import (
         compare_line_item_with_nppa,
@@ -551,6 +620,7 @@ def _add_price_comparison(
                     tier=tier,
                     rate_type=rate_type,
                     bill_date=bill_date,
+                    context_match=rajiv_context_match,
                 )
             )
         elif pmjay_eligible:
@@ -688,6 +758,7 @@ class CompareBillRequest(BaseModel):
     prescription_procedures: list[PrescriptionItemInput] = Field(default_factory=list)
     symptoms: list[SymptomInput] = Field(default_factory=list)
     test_results: list[TestResultInput] = Field(default_factory=list)
+    ocr_text: str | None = None
 
     @model_validator(mode="after")
     def resolve_state(self) -> "CompareBillRequest":
@@ -808,6 +879,7 @@ def _build_comparison_response(
     prescription_items: list[dict[str, Any]] | None = None,
     clinical_context: dict[str, Any] | None = None,
     report_kind: str = "bill",
+    ocr_text: str | None = None,
 ) -> dict[str, Any]:
     if not line_items:
         raise HTTPException(status_code=400, detail="Add at least one line item.")
@@ -823,6 +895,51 @@ def _build_comparison_response(
 
     normalized_items = _normalize_line_items(line_items)
     tier_id = location_meta.get("tier_id") or tier or "tier_3"
+    from app.rajiv_aarogyasri import (
+        build_package_search_terms,
+        build_rajiv_aarogyasri_fallback_report,
+        extract_department_from_text,
+        get_rajiv_aarogyasri_store,
+    )
+
+    package_search_terms: list[str] = []
+    rajiv_context_match: dict[str, Any] | None = None
+    if rajiv_aarogyasri_selected:
+        package_search_terms = build_package_search_terms(
+            ocr_text=ocr_text,
+            diagnosis=diagnosis,
+            department=extract_department_from_text(ocr_text),
+            line_items=normalized_items,
+            prescription_items=prescription_items or [],
+        )
+        if _dev_logging_enabled():
+            logger.info(
+                "compare-bill Rajiv context: %d bill items, %d search terms, hospital=%s",
+                len(normalized_items),
+                len(package_search_terms),
+                hospital_name,
+            )
+        try:
+            rajiv_store = get_rajiv_aarogyasri_store()
+            if _dev_logging_enabled():
+                logger.info(
+                    "Rajiv Aarogyasri CSV folder=%s files=%s",
+                    rajiv_store.data_dir,
+                    [path.name for path in rajiv_store._discover_package_files()],
+                )
+            rajiv_context_match = rajiv_store.match_package_from_search_terms(
+                package_search_terms,
+                bill_date,
+            )
+            if _dev_logging_enabled():
+                logger.info(
+                    "Rajiv Aarogyasri package match result=%s confidence=%s",
+                    rajiv_context_match.get("package_match_status"),
+                    rajiv_context_match.get("confidence_score"),
+                )
+        except Exception as exc:
+            logger.exception("Rajiv Aarogyasri package context match failed: %s", exc)
+
     compared_line_items = _add_price_comparison(
         normalized_items,
         tier=canonical_tier,
@@ -831,6 +948,7 @@ def _build_comparison_response(
         pmjay_eligible=pmjay_eligible,
         rajiv_aarogyasri_selected=rajiv_aarogyasri_selected,
         bill_date=bill_date,
+        rajiv_context_match=rajiv_context_match,
     )
     compared_line_items, jan_aushadhi = enrich_scheme_line_items_with_jan_aushadhi(
         compared_line_items
@@ -986,6 +1104,31 @@ def _build_comparison_response(
         bill_date=bill_date,
         line_items=normalized_items,
         compared_line_items=compared_line_items,
+        ocr_text=ocr_text,
+        diagnosis=diagnosis,
+        department=extract_department_from_text(ocr_text),
+        prescription_items=prescription_items or [],
+        context_match=rajiv_context_match,
+    )
+    if rajiv_aarogyasri_selected and rajiv_aarogyasri_report is None:
+        rajiv_aarogyasri_report = build_rajiv_aarogyasri_fallback_report(
+            rajiv_is_telangana_resident=rajiv_is_telangana_resident,
+            rajiv_has_eligible_card=rajiv_has_eligible_card,
+            rajiv_has_aadhaar=rajiv_has_aadhaar,
+            rajiv_is_cancer_related=rajiv_is_cancer_related,
+            rajiv_family_coverage_used_amount=rajiv_family_coverage_used_amount,
+            ocr_hospital_name=hospital_name,
+            patient_state=location_meta.get("state_name", state_ut_name),
+            patient_district=patient_district or location_meta.get("city", city),
+            patient_city=location_meta.get("city", city),
+            line_items=normalized_items,
+            compared_line_items=compared_line_items,
+        )
+
+    restricted_medicine_flags = build_restricted_medicine_flags(
+        ocr_text=ocr_text,
+        line_items=compared_line_items,
+        prescription_items=prescription_items or [],
     )
 
     return {
@@ -1024,6 +1167,7 @@ def _build_comparison_response(
         "hospitalisation_relief_advisory": hospitalisation_relief_advisory,
         "kcr_kit_advisory": kcr_kit_advisory,
         "rajiv_aarogyasri_report": rajiv_aarogyasri_report,
+        "restricted_medicine_flags": restricted_medicine_flags,
     }
 
 
@@ -1046,7 +1190,16 @@ def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
         else "bill"
     )
     clinical_context = _clinical_context_from_request(body.symptoms, body.test_results)
-    return _build_comparison_response(
+    if _dev_logging_enabled():
+        logger.info(
+            "POST /compare-bill: items=%d rajiv=%s state=%s city=%s hospital=%s",
+            len(line_items),
+            body.rajiv_aarogyasri_selected,
+            body.state_ut_name,
+            body.city,
+            body.hospital_name,
+        )
+    response = _build_comparison_response(
         line_items=line_items,
         state_ut_name=body.state_ut_name,
         city=body.city,
@@ -1086,7 +1239,16 @@ def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
         prescription_items=prescription_items,
         clinical_context=clinical_context,
         report_kind=report_kind,
+        ocr_text=body.ocr_text,
     )
+    if _dev_logging_enabled():
+        logger.info(
+            "POST /compare-bill complete: compared_items=%d rajiv_report=%s status=%s",
+            len(response.get("line_items") or []),
+            bool(response.get("rajiv_aarogyasri_report")),
+            (response.get("rajiv_aarogyasri_report") or {}).get("status"),
+        )
+    return response
 
 
 @app.post("/upload-bill")
@@ -1198,6 +1360,7 @@ async def upload_bill(
             "hospital_type": hospital_meta["hospital_type"],
         },
         "line_items": normalized_items,
+        "ocr_text": extracted_text,
     }
 
 

@@ -486,6 +486,8 @@ function CheckPage() {
   const [editableItems, setEditableItems] = useState([]);
   const [hospitalNameEdit, setHospitalNameEdit] = useState("");
   const [isComparing, setIsComparing] = useState(false);
+  const [compareFailed, setCompareFailed] = useState(false);
+  const lastCompareRef = useRef(null);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(8);
   const [saveMessage, setSaveMessage] = useState("");
@@ -754,7 +756,9 @@ function CheckPage() {
     cghsLocationRef.current = location;
     setError("");
     setSaveMessage("");
+    setCompareFailed(false);
     setIsComparing(true);
+    lastCompareRef.current = { validItems, locationOverride, metaOverride };
 
     try {
       const response = await fetch(`${API_BASE}/compare-bill`, {
@@ -824,11 +828,17 @@ function CheckPage() {
           prescription_tests: buildPrescriptionRequestItems().tests,
           prescription_procedures: buildPrescriptionRequestItems().procedures,
           ...clinicalContextToApiPayload(clinicalContext),
+          ocr_text:
+            [
+              scanMeta?.ocr_text,
+              prescriptionMeta?.ocr_text,
+            ]
+              .filter(Boolean)
+              .join("\n") || null,
         }),
       });
       const payload = await parseJsonResponse(response);
       setResult(payload);
-      setIsComparing(false);
 
       if (user && selectedPatient?.savePastBills) {
         const localId = persistLocalBill(user.uid, payload);
@@ -851,9 +861,20 @@ function CheckPage() {
           });
       }
     } catch (err) {
-      setError(err.message || "Something went wrong during comparison.");
+      setCompareFailed(true);
+      setError(formatFetchError(err, "Something went wrong during comparison."));
+    } finally {
       setIsComparing(false);
     }
+  };
+
+  const retryLastComparison = () => {
+    const last = lastCompareRef.current;
+    if (!last?.validItems?.length) {
+      setError("Nothing to retry. Edit bill items and compare again.");
+      return;
+    }
+    runCghsComparison(last.validItems, last.locationOverride, last.metaOverride);
   };
 
   useEffect(() => {
@@ -974,6 +995,7 @@ function CheckPage() {
       file_type: payload.file_type,
       prescriber: normalized.prescriber,
       prescriptionDate: normalized.prescriptionDate,
+      ocr_text: payload.ocr_text || "",
     });
     setPrescriptionMedicines(normalized.medicines.filter((item) => item.name));
     setPrescriptionTests(normalized.tests.filter((item) => item.name));
@@ -1142,6 +1164,7 @@ function CheckPage() {
         symptoms: clinicalPayload.symptoms,
         testResults: clinicalPayload.test_results,
         patient: selectedPatient,
+        ocrText: prescriptionMeta?.ocr_text || "",
       });
       const report = {
         ...payload,
@@ -1247,6 +1270,7 @@ function CheckPage() {
         file_type: billResponse.file_type,
         hospital: billResponse.hospital,
         comparison_settings: billResponse.comparison_settings,
+        ocr_text: billResponse.ocr_text || "",
       });
       setHospitalNameEdit(billResponse.hospital?.name_from_bill ?? "");
       setEditableItems(items);
@@ -1301,6 +1325,7 @@ function CheckPage() {
         file_type: payload.file_type,
         hospital: payload.hospital,
         comparison_settings: payload.comparison_settings,
+        ocr_text: payload.ocr_text || "",
       });
       setHospitalNameEdit(payload.hospital?.name_from_bill ?? "");
       setEditableItems(items);
@@ -2062,7 +2087,21 @@ function CheckPage() {
                     : comparisonCopy.compareButton}
                 </button>
               </div>
-              {error && <p className="error-text">{error}</p>}
+              {error && (
+                <div className="compare-error-block">
+                  <p className="error-text">{error}</p>
+                  {compareFailed && (
+                    <button
+                      type="button"
+                      className="bill-editor-secondary compare-retry-btn"
+                      onClick={retryLastComparison}
+                      disabled={isComparing}
+                    >
+                      Retry comparison
+                    </button>
+                  )}
+                </div>
+              )}
             </motion.section>
           )}
 

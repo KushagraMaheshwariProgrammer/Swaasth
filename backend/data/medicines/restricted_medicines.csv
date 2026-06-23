@@ -1,0 +1,4 @@
+medicine_name,generic_name,aliases,brand_names,restriction_type,schedule_or_category,reason,severity,source,notes
+Tramadol,Tramadol,"Tramadol Hydrochloride|Tramadol HCL","Ultram|Contramal",Controlled Medicine,Schedule H1,Requires caution/prescription verification,High,User database,Flag if found in prescription
+Alprazolam,Alprazolam,"Alprazolam Tablets|Alprazolam IP","Alprax|Restyl|Trika",Controlled Medicine,Schedule H1,Requires caution/prescription verification,High,User database,Flag if found in prescription
+Codeine,Codeine,"Codeine Phosphate|Codeine Syrup","Corex|Phensedyl",Banned/Restricted,Schedule H,Restricted combination product — verify legality,High,User database,Flag if found in prescription
