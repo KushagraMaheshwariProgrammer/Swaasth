@@ -15,6 +15,7 @@ from typing import Any
 from app.aarogya_reports import render_report_html as render_aarogya_report_html
 from app.hospitalisation_relief_scheme import build_hospitalisation_relief_advisory
 from app.kcr_kit_scheme import build_kcr_kit_advisory
+from app.restricted_medicines import render_restricted_medicine_flags_html
 
 RenderHtmlFn = Callable[[dict[str, Any]], str]
 
@@ -539,6 +540,7 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
     kcr_advisory_html = _render_kcr_kit_advisory_html(report)
     rajiv_report_html = _render_rajiv_aarogyasri_report_html(report)
     clinical_evidence_html = _render_clinical_evidence_html(report)
+    restricted_medicine_html = render_restricted_medicine_flags_html(report)
 
     return f"""
 <html>
@@ -587,6 +589,8 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
   </table>
 
   {"<h2>Jan Aushadhi — subsidized medicines</h2><ul>" + ''.join(jan_rows) + "</ul><p>" + escape(str(jan_aushadhi.get('advisory', ''))) + "</p>" if jan_rows else ""}
+
+  {restricted_medicine_html}
 
   <h2>Item-level Comparison</h2>
   <table>
@@ -656,6 +660,7 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
         )
 
     clinical_evidence_html = _render_clinical_evidence_html(report)
+    restricted_medicine_html = render_restricted_medicine_flags_html(report)
 
     return f"""
 <html>
@@ -678,6 +683,8 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
   {"<h2>Medicines</h2><ul>" + ''.join(medicine_rows) + "</ul>" if medicine_rows else ""}
   {"<h2>Tests</h2><ul>" + ''.join(test_rows) + "</ul>" if test_rows else ""}
   {"<h2>Procedures</h2><ul>" + ''.join(procedure_rows) + "</ul>" if procedure_rows else ""}
+
+  {restricted_medicine_html}
 
   <h2>Treatment Appropriateness (STG)</h2>
   {clinical_evidence_html}

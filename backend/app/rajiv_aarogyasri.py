@@ -5,7 +5,10 @@ from __future__ import annotations
 import csv
 import json
 import logging
+import os
 import re
+import time
+import traceback
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from difflib import SequenceMatcher
@@ -21,6 +24,14 @@ HOSPITAL_STRONG_MATCH = 0.82
 HOSPITAL_CANDIDATE_MATCH = 0.55
 PACKAGE_STRONG_MATCH = 0.72
 PACKAGE_CANDIDATE_MATCH = 0.50
+MIN_MATCH_TOKEN_LEN = 4
+MAX_PACKAGE_SEARCH_TERMS = 15
+PACKAGE_MATCH_TIME_BUDGET_SEC = 3.0
+MAX_PACKAGE_CANDIDATES = 200
+
+AAROGYASRI_MATCH_FAILED_ADVISORY = (
+    "Aarogyasri package matching failed. CGHS fallback is shown as a general benchmark."
+)
 
 DISCLAIMER = (
     "This report is based on OCR-extracted bill data and available Rajiv "
@@ -72,6 +83,7 @@ _CANCER_KEYWORDS = frozenset(
         "cancer",
         "oncology",
         "chemotherapy",
+        "chemo",
         "radiotherapy",
         "radiation",
         "tumor",
@@ -80,6 +92,30 @@ _CANCER_KEYWORDS = frozenset(
         "carcinoma",
     }
 )
+
+_OLD_CITY_HOSPITAL_PHRASES = (
+    "owaisi hospital",
+    "owaisi hospital and research centre",
+    "princess esra hospital",
+    "old city",
+    "hyderabad old city",
+)
+
+_HOSPITAL_NOT_FOUND_STATUS = (
+    "Hospital not found in Rajiv Aarogyasri empanelled hospital data — "
+    "manual verification required."
+)
+
+_PACKAGE_NOT_MATCHED_MESSAGE = (
+    "Aarogyasri package was not matched from OCR/package data. "
+    "CGHS fallback is shown only as a general benchmark."
+)
+
+def _dev_logging_enabled() -> bool:
+    return os.getenv("ENV", "").lower() in {"dev", "development", "local"} or os.getenv(
+        "RAJIV_AAROGYASRI_DEBUG", ""
+    ).lower() in {"1", "true", "yes"}
+
 
 _CODE_COLUMN_ALIASES = frozenset(
     {"code", "package code", "procedure code", "surgery code"}
@@ -271,8 +307,32 @@ class AarogyasriPackageRecord:
         object.__setattr__(
             self,
             "tokens",
-            frozenset(token for token in self.normalized_name.split() if len(token) >= 3),
+            frozenset(
+                token
+                for token in self.normalized_name.split()
+                if len(token) >= MIN_MATCH_TOKEN_LEN
+            ),
         )
+
+
+def _meaningful_tokens(text: str) -> set[str]:
+    return {
+        token
+        for token in normalize_text(text).split()
+        if len(token) >= MIN_MATCH_TOKEN_LEN
+    }
+
+
+def _package_score_boost(query_norm: str, record: AarogyasriPackageRecord, base: float) -> float:
+    boosted = base
+    if "chemotherapy" in query_norm or "chemo" in query_norm.split():
+        if "chemotherapy" in record.normalized_name or "chemo" in record.normalized_name:
+            boosted += 0.15
+    if "carcinoma" in query_norm and "lung" in query_norm:
+        specialty_norm = normalize_text(record.specialty)
+        if "lung" in specialty_norm or "lung" in record.normalized_name:
+            boosted += 0.08
+    return min(boosted, 1.0)
 
 
 class RajivAarogyasriStore:
@@ -283,7 +343,9 @@ class RajivAarogyasriStore:
         self.manifest: list[dict[str, Any]] = []
         self._hospital_alias_index: dict[str, list[AarogyasriHospitalRecord]] = {}
         self._package_alias_index: dict[str, list[AarogyasriPackageRecord]] = {}
+        self._package_by_token: dict[str, list[AarogyasriPackageRecord]] = {}
         self._load()
+        self._build_package_token_index()
 
     def _discover_package_files(self) -> list[Path]:
         patterns = (
@@ -383,6 +445,17 @@ class RajivAarogyasriStore:
                 logger.warning("Package CSV missing rate column: %s", path.name)
                 return
 
+            if _dev_logging_enabled():
+                logger.info(
+                    "Rajiv Aarogyasri package CSV headers (%s): %s | mapped code=%s name=%s specialty=%s rate=%s",
+                    path.name,
+                    headers,
+                    code_col,
+                    name_col,
+                    specialty_col,
+                    rate_col,
+                )
+
             # Skip secondary header row when present in current procedure files.
             peek = next(reader, None)
             if peek is not None:
@@ -433,8 +506,60 @@ class RajivAarogyasriStore:
             logger.info("Loaded %d Rajiv Aarogyasri packages from %s", loaded, path.name)
 
     def _load_packages(self) -> None:
-        for path in self._discover_package_files():
-            self._load_packages_from_file(path)
+        discovered = self._discover_package_files()
+        if _dev_logging_enabled():
+            logger.info(
+                "Rajiv Aarogyasri CSV folder: %s | package files found: %s",
+                self.data_dir,
+                [path.name for path in discovered],
+            )
+        for path in discovered:
+            try:
+                self._load_packages_from_file(path)
+            except Exception as exc:
+                logger.exception(
+                    "Failed to load Rajiv Aarogyasri package CSV %s: %s",
+                    path.name,
+                    exc,
+                )
+
+    def _build_package_token_index(self) -> None:
+        self._package_by_token = {}
+        for record in self.packages:
+            for token in _meaningful_tokens(record.package_name):
+                self._package_by_token.setdefault(token, []).append(record)
+            if record.specialty:
+                for token in _meaningful_tokens(record.specialty):
+                    self._package_by_token.setdefault(token, []).append(record)
+
+    def _package_records_for_query(self, query: str) -> list[AarogyasriPackageRecord]:
+        query_norm = normalize_text(query)
+        if not query_norm:
+            return []
+
+        candidates: dict[int, AarogyasriPackageRecord] = {}
+        for record in self._package_alias_index.get(query_norm, []):
+            candidates[id(record)] = record
+
+        for alias in build_aliases(query):
+            for record in self._package_alias_index.get(alias, []):
+                candidates[id(record)] = record
+
+        query_tokens = _meaningful_tokens(query)
+        for token in query_tokens:
+            for record in self._package_by_token.get(token, []):
+                candidates[id(record)] = record
+
+        if not candidates and query_tokens:
+            for record in self.packages:
+                name = record.normalized_name
+                specialty = normalize_text(record.specialty)
+                if any(token in name for token in query_tokens):
+                    candidates[id(record)] = record
+                elif specialty and any(token in specialty for token in query_tokens):
+                    candidates[id(record)] = record
+
+        return list(candidates.values())[:MAX_PACKAGE_CANDIDATES]
 
     def _load(self) -> None:
         if not self.data_dir.exists():
@@ -444,6 +569,13 @@ class RajivAarogyasriStore:
         self._load_packages()
         if not self.packages:
             logger.warning("No Rajiv Aarogyasri package rows loaded from %s", self.data_dir)
+        if _dev_logging_enabled():
+            logger.info(
+                "Rajiv Aarogyasri store ready: %d hospitals, %d packages from %s",
+                len(self.hospitals),
+                len(self.packages),
+                self.data_dir,
+            )
 
     def _location_bonus(
         self,
@@ -535,7 +667,7 @@ class RajivAarogyasriStore:
                 "district": patient_district,
                 "city": patient_city,
                 "hospital_type": None,
-                "status": "Hospital Not Found — Manual Verification Required",
+                "status": _HOSPITAL_NOT_FOUND_STATUS,
             }
 
         best_score, best_reason, best_record = max(candidates.values(), key=lambda item: item[0])
@@ -595,15 +727,19 @@ class RajivAarogyasriStore:
                         record,
                     )
 
-        query_tokens = set(query_norm.split())
-        for record in self.packages:
+        query_tokens = _meaningful_tokens(query)
+        for record in self._package_records_for_query(query):
             if id(record) in candidates:
                 continue
             ratio = SequenceMatcher(None, query_norm, record.normalized_name).ratio()
             if query_tokens and record.tokens:
                 overlap = len(query_tokens & record.tokens) / max(len(query_tokens), 1)
                 ratio = max(ratio, overlap * 0.95)
+            combined = normalize_text(f"{record.specialty} {record.package_name}")
+            if query_norm in combined or combined in query_norm:
+                ratio = max(ratio, 0.86)
             if ratio >= PACKAGE_CANDIDATE_MATCH:
+                ratio = _package_score_boost(query_norm, record, ratio)
                 candidates[id(record)] = (ratio, "Fuzzy procedure match", record)
 
         if not candidates:
@@ -643,6 +779,138 @@ class RajivAarogyasriStore:
             "confidence_score": round(best_score, 3),
             "match_reason": best_reason,
             "status": "Matched",
+        }
+
+    def find_package_candidates(
+        self,
+        query: str,
+        *,
+        limit: int = 5,
+    ) -> list[dict[str, Any]]:
+        query = _clean_spaces(query)
+        if not query:
+            return []
+
+        query_norm = normalize_text(query)
+        query_tokens = _meaningful_tokens(query)
+        scored: list[tuple[float, AarogyasriPackageRecord, str]] = []
+
+        for record in self._package_records_for_query(query):
+            ratio = SequenceMatcher(None, query_norm, record.normalized_name).ratio()
+            specialty_norm = normalize_text(record.specialty)
+            if specialty_norm:
+                specialty_ratio = SequenceMatcher(None, query_norm, specialty_norm).ratio()
+                ratio = max(ratio, specialty_ratio * 0.95)
+                if any(token in specialty_norm for token in query_tokens):
+                    ratio = max(ratio, 0.78)
+
+            combined = normalize_text(f"{record.specialty} {record.package_name}")
+            combined_ratio = SequenceMatcher(None, query_norm, combined).ratio()
+            ratio = max(ratio, combined_ratio)
+            if query_norm in combined or combined in query_norm:
+                ratio = max(ratio, 0.84)
+
+            if query_tokens and record.tokens:
+                overlap = len(query_tokens & record.tokens) / max(len(query_tokens), 1)
+                ratio = max(ratio, overlap * 0.9)
+
+            if ratio >= PACKAGE_CANDIDATE_MATCH:
+                ratio = _package_score_boost(query_norm, record, ratio)
+                scored.append((ratio, record, "Fuzzy package candidate"))
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        results: list[dict[str, Any]] = []
+        for score, record, reason in scored[:limit]:
+            results.append(
+                {
+                    "package_code": record.package_code or None,
+                    "package_name": record.package_name,
+                    "specialty": record.specialty or None,
+                    "approved_rate": record.approved_rate,
+                    "source_file": record.source_file,
+                    "confidence_score": round(score, 3),
+                    "match_reason": reason,
+                }
+            )
+        return results
+
+    def match_package_from_search_terms(
+        self,
+        search_terms: list[str],
+        bill_date: str | None = None,
+    ) -> dict[str, Any]:
+        searched_terms: list[str] = []
+        closest_map: dict[str, dict[str, Any]] = {}
+        best_match: dict[str, Any] | None = None
+        best_score = 0.0
+        best_term = ""
+        deadline = time.monotonic() + PACKAGE_MATCH_TIME_BUDGET_SEC
+
+        for raw_term in search_terms:
+            if len(searched_terms) >= MAX_PACKAGE_SEARCH_TERMS:
+                break
+            term = _clean_spaces(raw_term)
+            if not term:
+                continue
+            if term not in searched_terms:
+                searched_terms.append(term)
+
+        for term in searched_terms:
+            if time.monotonic() > deadline:
+                if _dev_logging_enabled():
+                    logger.info(
+                        "Rajiv Aarogyasri package search stopped early after %.2fs",
+                        PACKAGE_MATCH_TIME_BUDGET_SEC,
+                    )
+                break
+
+            match = self.match_aarogyasri_package(term, bill_date)
+            if time.monotonic() <= deadline:
+                for candidate in self.find_package_candidates(term, limit=3):
+                    key = f"{candidate.get('package_code')}::{candidate.get('package_name')}"
+                    existing = closest_map.get(key)
+                    if (
+                        existing is None
+                        or candidate["confidence_score"] > existing["confidence_score"]
+                    ):
+                        closest_map[key] = candidate
+
+            if match.get("matched_package"):
+                score = float(match.get("confidence_score") or 0)
+                if score > best_score:
+                    best_score = score
+                    best_match = dict(match)
+                    best_term = term
+                if score >= PACKAGE_STRONG_MATCH:
+                    break
+
+        closest_matches = sorted(
+            closest_map.values(),
+            key=lambda item: item.get("confidence_score") or 0,
+            reverse=True,
+        )[:5]
+
+        if best_match:
+            best_match["matched_search_term"] = best_term
+            best_match["searched_terms"] = searched_terms
+            best_match["closest_matches"] = closest_matches
+            best_match["package_match_status"] = "matched"
+            return best_match
+
+        return {
+            "matched_package": None,
+            "package_code": None,
+            "package_name": None,
+            "specialty": closest_matches[0].get("specialty") if closest_matches else None,
+            "approved_rate": None,
+            "source_file": closest_matches[0].get("source_file") if closest_matches else None,
+            "confidence_score": closest_matches[0].get("confidence_score") if closest_matches else 0.0,
+            "match_reason": "No Aarogyasri package match found from OCR/package context",
+            "status": "Package Not Found",
+            "searched_terms": searched_terms,
+            "closest_matches": closest_matches,
+            "package_match_status": "not_matched",
+            "matched_search_term": None,
         }
 
 
@@ -692,18 +960,123 @@ def _build_eligibility_preview(
     return messages
 
 
+def _text_has_cancer_keywords(text: str | None) -> bool:
+    normalized = normalize_text(text or "")
+    if not normalized:
+        return False
+    return any(keyword in normalized for keyword in _CANCER_KEYWORDS)
+
+
+def build_package_search_terms(
+    *,
+    ocr_text: str | None = None,
+    diagnosis: str | None = None,
+    department: str | None = None,
+    line_items: list[dict[str, Any]] | None = None,
+    prescription_items: list[dict[str, Any]] | None = None,
+) -> list[str]:
+    terms: list[str] = []
+    seen: set[str] = set()
+
+    def add(value: Any) -> None:
+        text = _clean_spaces(str(value or ""))
+        if not text:
+            return
+        key = text.lower()
+        if key in seen:
+            return
+        seen.add(key)
+        terms.append(text)
+
+    if diagnosis:
+        add(diagnosis)
+    if department:
+        add(department)
+    if diagnosis and department:
+        add(f"{diagnosis} {department}")
+    if diagnosis and "chemo" not in diagnosis.lower():
+        add(f"{diagnosis} Chemotherapy")
+
+    for item in line_items or []:
+        add(item.get("item_name"))
+        category = str(item.get("category") or "").strip().lower()
+        if category in {"procedure", "medicine", "test"}:
+            add(f"{item.get('item_name')} {diagnosis or ''}".strip())
+
+    for item in prescription_items or []:
+        add(item.get("name") or item.get("item_name"))
+
+    if ocr_text:
+        for line in ocr_text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            add(line)
+            if ":" in line:
+                _, _, tail = line.partition(":")
+                add(tail.strip())
+
+    combined_phrases = [
+        "Chemotherapy for Cancer Treatment",
+        "Chemotherapy Cycle 1",
+        "Chemotherapy Procedure Charges",
+        "Carcinoma Lung Oncology",
+    ]
+    blob = normalize_text(
+        " ".join(
+            [
+                diagnosis or "",
+                department or "",
+                ocr_text or "",
+                " ".join(str(item.get("item_name", "")) for item in (line_items or [])),
+            ]
+        )
+    )
+    if "carcinoma" in blob and "lung" in blob:
+        add("Carcinoma Lung")
+        add("Chemotherapy for Non SMAL cell Lung Cancer")
+    if "oncology" in blob or "chemotherapy" in blob or "chemo" in blob:
+        for phrase in combined_phrases:
+            add(phrase)
+
+    return terms
+
+
+def extract_department_from_text(text: str | None) -> str | None:
+    if not text:
+        return None
+    for line in text.splitlines():
+        if re.search(r"\bdepartment\b", line, re.IGNORECASE):
+            _, _, tail = line.partition(":")
+            if tail.strip():
+                return tail.strip()
+    normalized = normalize_text(text)
+    if "oncology" in normalized:
+        return "Oncology"
+    return None
+
+
 def _is_old_city_context(
     *,
     ocr_hospital_name: str | None,
     patient_city: str | None,
+    ocr_text: str | None = None,
 ) -> bool:
-    combined = normalize_text(f"{ocr_hospital_name or ''} {patient_city or ''}")
+    combined = normalize_text(
+        f"{ocr_hospital_name or ''} {patient_city or ''} {ocr_text or ''}"
+    )
+    raw_combined = _clean_spaces(
+        re.sub(r"[^a-z0-9 ]+", " ", f"{ocr_hospital_name or ''} {ocr_text or ''}".lower())
+    )
     if any(token in combined for token in ("old city", "charminar", "oldcity")):
         return True
-    hospital_norm = normalize_text(ocr_hospital_name or "")
-    if "princess esra" in hospital_norm or "owaisi" in hospital_norm:
+    if "owaisi" in raw_combined or "owaisi" in combined:
         return True
-    return any(name in hospital_norm for name in _OLD_CITY_HOSPITALS)
+    if ("princess" in raw_combined and "esra" in raw_combined) or (
+        "princess" in combined and "esra" in combined
+    ):
+        return True
+    return any(phrase in raw_combined or phrase in combined for phrase in _OLD_CITY_HOSPITAL_PHRASES)
 
 
 def _is_cancer_context(
@@ -711,32 +1084,67 @@ def _is_cancer_context(
     cancer_related: bool,
     package_specialty: str | None,
     package_name: str | None,
+    search_text: str | None = None,
 ) -> bool:
     if cancer_related:
+        return True
+    if _text_has_cancer_keywords(search_text):
         return True
     combined = normalize_text(f"{package_specialty or ''} {package_name or ''}")
     return any(keyword in combined for keyword in _CANCER_KEYWORDS)
 
 
-def _collect_advisories(
+def _evaluate_advisory_rules(
     *,
     rajiv_selected: bool,
     bill_date: str | None,
     ocr_hospital_name: str | None,
     patient_city: str | None,
+    ocr_text: str | None,
+    search_text: str | None,
     cancer_related: bool,
     package_specialty: str | None,
     package_name: str | None,
     hospital_status: str,
     package_statuses: list[str],
     low_confidence: bool,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     advisories: list[dict[str, Any]] = []
+    advisory_debug: list[dict[str, Any]] = []
     parsed_bill_date = _parse_date(bill_date)
+    cancer_detected = _is_cancer_context(
+        cancer_related=cancer_related,
+        package_specialty=package_specialty,
+        package_name=package_name,
+        search_text=search_text,
+    )
+    old_city_detected = _is_old_city_context(
+        ocr_hospital_name=ocr_hospital_name,
+        patient_city=patient_city,
+        ocr_text=ocr_text,
+    )
+    needs_manual = (
+        low_confidence
+        or "not found" in hospital_status.lower()
+        or "manual verification" in hospital_status.lower()
+        or any(
+            status in {"Package Not Found", "Manual Verification Required", "CGHS Fallback Used"}
+            for status in package_statuses
+        )
+    )
 
-    if parsed_bill_date and parsed_bill_date >= date(2024, 7, 16):
-        advisories.append(
-            {
+    rules: list[dict[str, Any]] = [
+        {
+            "rule_key": "revised_aarogyasri_packages",
+            "title": "Revised Aarogyasri Packages",
+            "triggered": bool(parsed_bill_date and parsed_bill_date >= date(2024, 7, 16)),
+            "trigger_reason": (
+                f"Bill date {bill_date} is on or after 2024-07-16"
+                if parsed_bill_date and parsed_bill_date >= date(2024, 7, 16)
+                else f"Bill date {bill_date or 'missing'} is before 2024-07-16"
+            ),
+            "input_checked": bill_date or "",
+            "payload": {
                 "title": "Revised Aarogyasri Packages",
                 "effective_date": "2024-07-16",
                 "message": (
@@ -744,15 +1152,21 @@ def _collect_advisories(
                     "dated 16 July 2024. The app uses the available Aarogyasri package "
                     "files as the primary rate source for eligible bills."
                 ),
-            }
-        )
-
-    if _is_old_city_context(
-        ocr_hospital_name=ocr_hospital_name,
-        patient_city=patient_city,
-    ):
-        advisories.append(
-            {
+            },
+        },
+        {
+            "rule_key": "old_city_hospital_access",
+            "title": "Old City Hospital Access",
+            "triggered": old_city_detected,
+            "trigger_reason": (
+                "Hospital/OCR text matched Old City access criteria"
+                if old_city_detected
+                else "No Old City hospital keyword detected"
+            ),
+            "input_checked": _clean_spaces(
+                f"{ocr_hospital_name or ''} | {patient_city or ''} | {(ocr_text or '')[:120]}"
+            ),
+            "payload": {
                 "title": "Old City Hospital Access",
                 "effective_date": "2025-10-24",
                 "message": (
@@ -760,16 +1174,19 @@ def _collect_advisories(
                     "include Owaisi Hospital and Princess Esra Hospital. Verify current "
                     "empanelment and eligibility before final conclusion."
                 ),
-            }
-        )
-
-    if _is_cancer_context(
-        cancer_related=cancer_related,
-        package_specialty=package_specialty,
-        package_name=package_name,
-    ):
-        advisories.append(
-            {
+            },
+        },
+        {
+            "rule_key": "cancer_treatment_verification",
+            "title": "Cancer Treatment Verification",
+            "triggered": cancer_detected,
+            "trigger_reason": (
+                "Cancer/oncology/chemotherapy keywords found in OCR or patient flags"
+                if cancer_detected
+                else "No cancer-related keywords detected"
+            ),
+            "input_checked": _clean_spaces(search_text or "")[:240],
+            "payload": {
                 "title": "Cancer Treatment Verification",
                 "effective_date": "2026-02-04",
                 "message": (
@@ -778,12 +1195,15 @@ def _collect_advisories(
                     "approved oncology hospitals under the latest applicable government "
                     "instructions."
                 ),
-            }
-        )
-
-    if rajiv_selected:
-        advisories.append(
-            {
+            },
+        },
+        {
+            "rule_key": "cashless_package_scheme",
+            "title": "Cashless Package Scheme Advisory",
+            "triggered": rajiv_selected,
+            "trigger_reason": "Rajiv Aarogyasri selected for this patient",
+            "input_checked": "rajiv_aarogyasri_selected=true",
+            "payload": {
                 "title": "Cashless Package Scheme Advisory",
                 "effective_date": None,
                 "message": (
@@ -792,21 +1212,21 @@ def _collect_advisories(
                     "hospital/package is covered, direct collection from the patient may "
                     "require manual verification with the Aarogyasri helpdesk or Trust."
                 ),
-            }
-        )
-
-    needs_manual = (
-        low_confidence
-        or "Not Found" in hospital_status
-        or "Manual Verification Required" in hospital_status
-        or any(
-            status in {"Package Not Found", "Manual Verification Required", "CGHS Fallback Used"}
-            for status in package_statuses
-        )
-    )
-    if needs_manual:
-        advisories.append(
-            {
+            },
+        },
+        {
+            "rule_key": "manual_verification",
+            "title": "Manual Verification Advisory",
+            "triggered": needs_manual,
+            "trigger_reason": (
+                "Hospital/package match missing or low confidence"
+                if needs_manual
+                else "Hospital and package checks passed with acceptable confidence"
+            ),
+            "input_checked": _clean_spaces(
+                f"hospital_status={hospital_status}; package_statuses={', '.join(package_statuses)}"
+            ),
+            "payload": {
                 "title": "Manual Verification Advisory",
                 "effective_date": None,
                 "message": (
@@ -814,9 +1234,60 @@ def _collect_advisories(
                     "empanelment, package approval, and final eligibility must be "
                     "verified manually with official Aarogyasri sources."
                 ),
+            },
+        },
+    ]
+
+    for rule in rules:
+        advisory_debug.append(
+            {
+                "rule_key": rule["rule_key"],
+                "title": rule["title"],
+                "triggered": rule["triggered"],
+                "trigger_reason": rule["trigger_reason"],
+                "input_checked": rule["input_checked"],
             }
         )
+        if rule["triggered"]:
+            advisories.append(rule["payload"])
+            logger.info(
+                "Rajiv Aarogyasri rule triggered: %s because %s",
+                rule["rule_key"],
+                rule["trigger_reason"],
+            )
 
+    return advisories, advisory_debug
+
+
+def _collect_advisories(
+    *,
+    rajiv_selected: bool,
+    bill_date: str | None,
+    ocr_hospital_name: str | None,
+    patient_city: str | None,
+    ocr_text: str | None = None,
+    search_text: str | None = None,
+    cancer_related: bool,
+    package_specialty: str | None,
+    package_name: str | None,
+    hospital_status: str,
+    package_statuses: list[str],
+    low_confidence: bool,
+) -> list[dict[str, Any]]:
+    advisories, _ = _evaluate_advisory_rules(
+        rajiv_selected=rajiv_selected,
+        bill_date=bill_date,
+        ocr_hospital_name=ocr_hospital_name,
+        patient_city=patient_city,
+        ocr_text=ocr_text,
+        search_text=search_text,
+        cancer_related=cancer_related,
+        package_specialty=package_specialty,
+        package_name=package_name,
+        hospital_status=hospital_status,
+        package_statuses=package_statuses,
+        low_confidence=low_confidence,
+    )
     return advisories
 
 
@@ -828,6 +1299,106 @@ def _comparison_status(charged: float, approved_rate: float | None, *, matched: 
     if charged < approved_rate:
         return "Below Approved Rate"
     return "Within / Below Approved Package Rate"
+
+
+def build_rajiv_aarogyasri_fallback_report(
+    *,
+    rajiv_is_telangana_resident: bool = False,
+    rajiv_has_eligible_card: bool = False,
+    rajiv_has_aadhaar: bool = False,
+    rajiv_is_cancer_related: bool = False,
+    rajiv_family_coverage_used_amount: float | None = None,
+    ocr_hospital_name: str | None = None,
+    patient_state: str | None = None,
+    patient_district: str | None = None,
+    patient_city: str | None = None,
+    line_items: list[dict[str, Any]] | None = None,
+    compared_line_items: list[dict[str, Any]] | None = None,
+    error_message: str | None = None,
+) -> dict[str, Any]:
+    items = line_items or []
+    cghs_items = compared_line_items or []
+    package_comparisons: list[dict[str, Any]] = []
+    for index, item in enumerate(items):
+        bill_item_name = str(item.get("item_name", "")).strip()
+        charged_amount = _parse_amount(item.get("total_price")) or 0.0
+        cghs_item = cghs_items[index] if index < len(cghs_items) else {}
+        cghs_rate = _parse_amount(cghs_item.get("cghs_rate"))
+        excess_amount = (
+            round(max(charged_amount - cghs_rate, 0.0), 2)
+            if cghs_rate is not None
+            else None
+        )
+        package_comparisons.append(
+            {
+                "bill_item_name": bill_item_name,
+                "charged_amount": charged_amount,
+                "matched_package_code": None,
+                "matched_package_name": None,
+                "specialty": None,
+                "approved_rate": cghs_rate,
+                "source_file": None,
+                "confidence_score": 0.0,
+                "match_reason": AAROGYASRI_MATCH_FAILED_ADVISORY,
+                "excess_amount": excess_amount,
+                "status": "CGHS Fallback Used" if cghs_rate is not None else "Package Not Found",
+                "fallback_used": True,
+            }
+        )
+
+    return {
+        "selected": True,
+        "status": "manual_verification_required",
+        "eligibility_snapshot": {
+            "telangana_resident": rajiv_is_telangana_resident,
+            "has_eligible_card": rajiv_has_eligible_card,
+            "has_aadhaar": rajiv_has_aadhaar,
+            "cancer_related": rajiv_is_cancer_related,
+            "family_coverage_used_amount": rajiv_family_coverage_used_amount,
+        },
+        "eligibility_preview": _build_eligibility_preview(
+            telangana_resident=rajiv_is_telangana_resident,
+            has_eligible_card=rajiv_has_eligible_card,
+            has_aadhaar=rajiv_has_aadhaar,
+            cancer_related=rajiv_is_cancer_related,
+        ),
+        "hospital_verification": {
+            "ocr_hospital_name": ocr_hospital_name,
+            "matched_hospital_name": None,
+            "confidence_score": 0.0,
+            "match_reason": error_message or AAROGYASRI_MATCH_FAILED_ADVISORY,
+            "state": patient_state,
+            "district": patient_district,
+            "city": patient_city,
+            "hospital_type": None,
+            "empanelled_status": None,
+            "specialities": None,
+            "status": "Manual Verification Required",
+        },
+        "package_comparisons": package_comparisons,
+        "package_search": {
+            "searched_terms": [],
+            "package_match_status": "failed",
+            "matched_package_name": None,
+            "matched_package_code": None,
+            "matched_search_term": None,
+            "confidence_score": 0.0,
+            "match_reason": AAROGYASRI_MATCH_FAILED_ADVISORY,
+            "closest_matches": [],
+            "source_files_searched": [],
+            "not_matched_message": _PACKAGE_NOT_MATCHED_MESSAGE,
+        },
+        "advisories": [
+            {
+                "title": "Manual Verification Advisory",
+                "effective_date": None,
+                "message": AAROGYASRI_MATCH_FAILED_ADVISORY,
+            }
+        ],
+        "advisory_debug": [],
+        "disclaimer": DISCLAIMER,
+        "error_debug": error_message if _dev_logging_enabled() else None,
+    }
 
 
 def build_rajiv_aarogyasri_report(
@@ -845,16 +1416,82 @@ def build_rajiv_aarogyasri_report(
     bill_date: str | None = None,
     line_items: list[dict[str, Any]] | None = None,
     compared_line_items: list[dict[str, Any]] | None = None,
+    ocr_text: str | None = None,
+    diagnosis: str | None = None,
+    department: str | None = None,
+    prescription_items: list[dict[str, Any]] | None = None,
+    context_match: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     if not rajiv_aarogyasri_selected:
         return None
 
+    try:
+        return _build_rajiv_aarogyasri_report_inner(
+            rajiv_is_telangana_resident=rajiv_is_telangana_resident,
+            rajiv_has_eligible_card=rajiv_has_eligible_card,
+            rajiv_has_aadhaar=rajiv_has_aadhaar,
+            rajiv_is_cancer_related=rajiv_is_cancer_related,
+            rajiv_family_coverage_used_amount=rajiv_family_coverage_used_amount,
+            ocr_hospital_name=ocr_hospital_name,
+            patient_state=patient_state,
+            patient_district=patient_district,
+            patient_city=patient_city,
+            bill_date=bill_date,
+            line_items=line_items,
+            compared_line_items=compared_line_items,
+            ocr_text=ocr_text,
+            diagnosis=diagnosis,
+            department=department,
+            prescription_items=prescription_items,
+            context_match=context_match,
+        )
+    except Exception as exc:
+        logger.exception("Rajiv Aarogyasri report build failed: %s", exc)
+        return build_rajiv_aarogyasri_fallback_report(
+            rajiv_is_telangana_resident=rajiv_is_telangana_resident,
+            rajiv_has_eligible_card=rajiv_has_eligible_card,
+            rajiv_has_aadhaar=rajiv_has_aadhaar,
+            rajiv_is_cancer_related=rajiv_is_cancer_related,
+            rajiv_family_coverage_used_amount=rajiv_family_coverage_used_amount,
+            ocr_hospital_name=ocr_hospital_name,
+            patient_state=patient_state,
+            patient_district=patient_district,
+            patient_city=patient_city,
+            line_items=line_items,
+            compared_line_items=compared_line_items,
+            error_message=(
+                f"{exc}\n{traceback.format_exc()}" if _dev_logging_enabled() else str(exc)
+            ),
+        )
+
+
+def _build_rajiv_aarogyasri_report_inner(
+    *,
+    rajiv_is_telangana_resident: bool = False,
+    rajiv_has_eligible_card: bool = False,
+    rajiv_has_aadhaar: bool = False,
+    rajiv_is_cancer_related: bool = False,
+    rajiv_family_coverage_used_amount: float | None = None,
+    ocr_hospital_name: str | None = None,
+    patient_state: str | None = None,
+    patient_district: str | None = None,
+    patient_city: str | None = None,
+    bill_date: str | None = None,
+    line_items: list[dict[str, Any]] | None = None,
+    compared_line_items: list[dict[str, Any]] | None = None,
+    ocr_text: str | None = None,
+    diagnosis: str | None = None,
+    department: str | None = None,
+    prescription_items: list[dict[str, Any]] | None = None,
+    context_match: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     try:
         store = get_rajiv_aarogyasri_store()
     except FileNotFoundError as exc:
         logger.warning("Rajiv Aarogyasri store unavailable: %s", exc)
         return {
             "selected": True,
+            "status": "manual_verification_required",
             "eligibility_snapshot": {
                 "telangana_resident": rajiv_is_telangana_resident,
                 "has_eligible_card": rajiv_has_eligible_card,
@@ -882,9 +1519,50 @@ def build_rajiv_aarogyasri_report(
                 "status": "Manual Verification Required",
             },
             "package_comparisons": [],
+            "package_search": {
+                "searched_terms": [],
+                "package_match_status": "unavailable",
+                "closest_matches": [],
+                "source_files_searched": [],
+                "not_matched_message": _PACKAGE_NOT_MATCHED_MESSAGE,
+            },
             "advisories": [],
+            "advisory_debug": [],
             "disclaimer": DISCLAIMER,
         }
+
+    search_terms = build_package_search_terms(
+        ocr_text=ocr_text,
+        diagnosis=diagnosis,
+        department=department,
+        line_items=line_items,
+        prescription_items=prescription_items,
+    )
+    search_blob = _clean_spaces(
+        " ".join(
+            [
+                ocr_text or "",
+                diagnosis or "",
+                department or "",
+                ocr_hospital_name or "",
+                " ".join(
+                    str(item.get("item_name", ""))
+                    for item in (line_items or [])
+                ),
+            ]
+        )
+    )
+    if context_match is None:
+        context_match = store.match_package_from_search_terms(search_terms, bill_date)
+    source_files = [path.name for path in store._discover_package_files()]
+
+    if _dev_logging_enabled():
+        logger.info(
+            "Rajiv Aarogyasri package search terms=%s match=%s hospital=%s",
+            search_terms[:MAX_PACKAGE_SEARCH_TERMS],
+            context_match.get("package_match_status"),
+            ocr_hospital_name,
+        )
 
     hospital_verification = store.match_hospital(
         ocr_hospital_name,
@@ -893,6 +1571,14 @@ def build_rajiv_aarogyasri_report(
         patient_state=patient_state,
     )
     hospital_verification["ocr_hospital_name"] = ocr_hospital_name
+
+    if _dev_logging_enabled():
+        logger.info(
+            "Rajiv Aarogyasri hospital match: ocr=%s result=%s confidence=%s",
+            ocr_hospital_name,
+            hospital_verification.get("matched_hospital_name"),
+            hospital_verification.get("confidence_score"),
+        )
 
     package_comparisons: list[dict[str, Any]] = []
     package_statuses: list[str] = []
@@ -904,6 +1590,15 @@ def build_rajiv_aarogyasri_report(
         bill_item_name = str(item.get("item_name", "")).strip()
         charged_amount = _parse_amount(item.get("total_price")) or 0.0
         package_match = store.match_aarogyasri_package(bill_item_name, bill_date)
+        if not package_match.get("matched_package") and context_match.get("matched_package"):
+            package_match = {
+                **context_match,
+                "match_reason": (
+                    f"Context match via '{context_match.get('matched_search_term')}' "
+                    f"({context_match.get('match_reason')})"
+                ),
+            }
+
         approved_rate = package_match.get("approved_rate")
         matched = bool(package_match.get("matched_package"))
         fallback_used = not matched
@@ -947,21 +1642,56 @@ def build_rajiv_aarogyasri_report(
         )
 
     first_package = package_comparisons[0] if package_comparisons else {}
-    advisories = _collect_advisories(
+    advisories, advisory_debug = _evaluate_advisory_rules(
         rajiv_selected=True,
         bill_date=bill_date,
         ocr_hospital_name=ocr_hospital_name,
         patient_city=patient_city or patient_district,
+        ocr_text=ocr_text,
+        search_text=search_blob,
         cancer_related=rajiv_is_cancer_related,
-        package_specialty=first_package.get("specialty"),
-        package_name=first_package.get("matched_package_name"),
+        package_specialty=first_package.get("specialty")
+        or context_match.get("specialty"),
+        package_name=first_package.get("matched_package_name")
+        or context_match.get("package_name"),
         hospital_status=str(hospital_verification.get("status", "")),
         package_statuses=package_statuses,
         low_confidence=low_confidence,
     )
 
+    package_search = {
+        "searched_terms": search_terms,
+        "package_match_status": context_match.get("package_match_status"),
+        "matched_package_name": context_match.get("package_name"),
+        "matched_package_code": context_match.get("package_code"),
+        "matched_search_term": context_match.get("matched_search_term"),
+        "confidence_score": context_match.get("confidence_score"),
+        "match_reason": context_match.get("match_reason"),
+        "closest_matches": context_match.get("closest_matches") or [],
+        "source_files_searched": source_files,
+        "not_matched_message": (
+            ""
+            if context_match.get("matched_package")
+            else _PACKAGE_NOT_MATCHED_MESSAGE
+        ),
+    }
+
+    report_status = "matched"
+    hospital_status_text = str(hospital_verification.get("status", "")).lower()
+    if (
+        low_confidence
+        or "not found" in hospital_status_text
+        or "manual verification" in hospital_status_text
+        or any(
+            status in {"Package Not Found", "Manual Verification Required", "CGHS Fallback Used"}
+            for status in package_statuses
+        )
+    ):
+        report_status = "manual_verification_required"
+
     return {
         "selected": True,
+        "status": report_status,
         "eligibility_snapshot": {
             "telangana_resident": rajiv_is_telangana_resident,
             "has_eligible_card": rajiv_has_eligible_card,
@@ -977,6 +1707,8 @@ def build_rajiv_aarogyasri_report(
         ),
         "hospital_verification": hospital_verification,
         "package_comparisons": package_comparisons,
+        "package_search": package_search,
         "advisories": advisories,
+        "advisory_debug": advisory_debug,
         "disclaimer": DISCLAIMER,
     }

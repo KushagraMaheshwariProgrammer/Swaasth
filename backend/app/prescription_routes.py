@@ -7,6 +7,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
+from app.restricted_medicines import build_restricted_medicine_flags
 from app.services.document_extraction import (
     extract_discharge_summary_with_groq,
     extract_document_text,
@@ -67,6 +68,7 @@ class AnalyzeTreatmentRequest(BaseModel):
     test_results: list[TestResultInput] = Field(default_factory=list)
     patient_id: str | None = None
     patient_name: str | None = None
+    ocr_text: str | None = None
 
 
 def _prescription_items_from_payload(
@@ -278,6 +280,12 @@ def analyze_treatment_endpoint(body: AnalyzeTreatmentRequest) -> dict[str, Any]:
         diagnosis_user_provided=body.diagnosis_user_provided,
     )
 
+    restricted_medicine_flags = build_restricted_medicine_flags(
+        ocr_text=body.ocr_text,
+        line_items=bill_items,
+        prescription_items=prescription_items,
+    )
+
     return {
         "message": "Treatment analysis completed",
         "diagnosis": body.diagnosis,
@@ -291,5 +299,6 @@ def analyze_treatment_endpoint(body: AnalyzeTreatmentRequest) -> dict[str, Any]:
         "prescription_items": prescription_items,
         "clinical_context": clinical_context,
         "treatment_audit_flags": treatment_audit_flags,
+        "restricted_medicine_flags": restricted_medicine_flags,
         "report_kind": "prescription",
     }

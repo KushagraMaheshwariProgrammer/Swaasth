@@ -1,8 +1,9 @@
 import TreatmentAuditSection from "./TreatmentAuditSection";
+import RestrictedMedicinesSection from "./RestrictedMedicinesSection";
 import ReportActions from "./ReportActions";
 
 export default function PrescriptionResults({ result, toolbar = null }) {
-  if (!result?.treatment_audit_flags) {
+  if (!result?.treatment_audit_flags && !result?.restricted_medicine_flags) {
     return null;
   }
 
@@ -68,6 +69,10 @@ export default function PrescriptionResults({ result, toolbar = null }) {
       </section>
 
       <TreatmentAuditSection treatmentAuditFlags={result.treatment_audit_flags} />
+
+      <RestrictedMedicinesSection
+        restrictedMedicineFlags={result?.restricted_medicine_flags}
+      />
 
       <ReportActions report={result} />
     </>

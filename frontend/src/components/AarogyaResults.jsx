@@ -1,5 +1,6 @@
 import { formatCurrency } from "../billUtils";
 import ReportActions from "./ReportActions";
+import RestrictedMedicinesSection from "./RestrictedMedicinesSection";
 
 const STATUS_META = {
   "Above Approved Rate": { cls: "status-pill status-red", card: "abh-item-card abh-item-above" },
@@ -373,6 +374,10 @@ export default function AarogyaResults({ report, toolbar = null }) {
           annual claim status with the EHS office for accurate coverage information.
         </p>
       </section>
+
+      <RestrictedMedicinesSection
+        restrictedMedicineFlags={report?.restricted_medicine_flags}
+      />
 
       <p className="abh-disclaimer">{report.disclaimer}</p>
 
