@@ -759,6 +759,10 @@ class CompareBillRequest(BaseModel):
     symptoms: list[SymptomInput] = Field(default_factory=list)
     test_results: list[TestResultInput] = Field(default_factory=list)
     ocr_text: str | None = None
+    cghs_fallback_from_aarogya: bool = False
+    cghs_beneficiary_category: str | None = None
+    cghs_eligible_category_confirmed: bool | None = None
+    cghs_resides_in_covered_city: bool | None = None
 
     @model_validator(mode="after")
     def resolve_state(self) -> "CompareBillRequest":
@@ -880,6 +884,10 @@ def _build_comparison_response(
     clinical_context: dict[str, Any] | None = None,
     report_kind: str = "bill",
     ocr_text: str | None = None,
+    cghs_fallback_from_aarogya: bool = False,
+    cghs_beneficiary_category: str | None = None,
+    cghs_eligible_category_confirmed: bool | None = None,
+    cghs_resides_in_covered_city: bool | None = None,
 ) -> dict[str, Any]:
     if not line_items:
         raise HTTPException(status_code=400, detail="Add at least one line item.")
@@ -1042,6 +1050,7 @@ def _build_comparison_response(
         rates_source["jan_aushadhi_file"] = None
         rates_source["total_jan_aushadhi_products"] = 0
 
+    from app.cghs_eligibility import build_cghs_eligibility_advisory
     from app.hospitalisation_relief_scheme import build_hospitalisation_relief_advisory
     from app.kcr_kit_scheme import build_kcr_kit_advisory
     from app.rajiv_aarogyasri import build_rajiv_aarogyasri_report
@@ -1073,6 +1082,9 @@ def _build_comparison_response(
             "rajiv_has_aadhaar": rajiv_has_aadhaar,
             "rajiv_is_cancer_related": rajiv_is_cancer_related,
             "rajiv_family_coverage_used_amount": rajiv_family_coverage_used_amount,
+            "cghs_beneficiary_category": cghs_beneficiary_category,
+            "cghs_eligible_category_confirmed": cghs_eligible_category_confirmed,
+            "cghs_resides_in_covered_city": cghs_resides_in_covered_city,
         }
 
     hospitalisation_relief_advisory = build_hospitalisation_relief_advisory(
@@ -1130,6 +1142,14 @@ def _build_comparison_response(
         line_items=compared_line_items,
         prescription_items=prescription_items or [],
     )
+    cghs_eligibility_advisory = build_cghs_eligibility_advisory(
+        comparison_scheme=comparison_scheme,
+        cghs_fallback_from_aarogya=cghs_fallback_from_aarogya,
+        line_items=compared_line_items,
+        beneficiary_category=cghs_beneficiary_category,
+        eligible_category_confirmed=cghs_eligible_category_confirmed,
+        resides_in_covered_city=cghs_resides_in_covered_city,
+    )
 
     return {
         "filename": filename,
@@ -1154,6 +1174,7 @@ def _build_comparison_response(
             "pmjay_eligible": pmjay_eligible,
             "rajiv_aarogyasri_selected": rajiv_aarogyasri_selected,
             "comparison_scheme": comparison_scheme,
+            "cghs_fallback_from_aarogya": cghs_fallback_from_aarogya,
         },
         "patient": patient_payload,
         "rates_source": rates_source,
@@ -1168,6 +1189,7 @@ def _build_comparison_response(
         "kcr_kit_advisory": kcr_kit_advisory,
         "rajiv_aarogyasri_report": rajiv_aarogyasri_report,
         "restricted_medicine_flags": restricted_medicine_flags,
+        "cghs_eligibility_advisory": cghs_eligibility_advisory,
     }
 
 
@@ -1240,6 +1262,10 @@ def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
         clinical_context=clinical_context,
         report_kind=report_kind,
         ocr_text=body.ocr_text,
+        cghs_fallback_from_aarogya=body.cghs_fallback_from_aarogya,
+        cghs_beneficiary_category=body.cghs_beneficiary_category,
+        cghs_eligible_category_confirmed=body.cghs_eligible_category_confirmed,
+        cghs_resides_in_covered_city=body.cghs_resides_in_covered_city,
     )
     if _dev_logging_enabled():
         logger.info(

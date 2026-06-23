@@ -10,6 +10,7 @@ import {
 } from "../billUtils";
 import ReportActions from "./ReportActions";
 import HospitalisationReliefAdvisory from "./HospitalisationReliefAdvisory";
+import CghsEligibilityAdvisory from "./CghsEligibilityAdvisory";
 import KcrKitAdvisory from "./KcrKitAdvisory";
 import RajivAarogyasriReport from "./RajivAarogyasriReport";
 import TreatmentAuditSection from "./TreatmentAuditSection";
@@ -354,6 +355,11 @@ export default function BillResults({ result, toolbar = null }) {
       />
 
       <KcrKitAdvisory advisory={result?.kcr_kit_advisory} />
+
+      <CghsEligibilityAdvisory
+        advisory={result?.cghs_eligibility_advisory}
+        report={result}
+      />
 
       <ReportActions report={result} />
     </>

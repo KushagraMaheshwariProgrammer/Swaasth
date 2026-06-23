@@ -13,6 +13,7 @@ from html import escape
 from typing import Any
 
 from app.aarogya_reports import render_report_html as render_aarogya_report_html
+from app.cghs_eligibility import build_cghs_eligibility_advisory
 from app.hospitalisation_relief_scheme import build_hospitalisation_relief_advisory
 from app.kcr_kit_scheme import build_kcr_kit_advisory
 from app.restricted_medicines import render_restricted_medicine_flags_html
@@ -247,6 +248,72 @@ def _render_hospitalisation_relief_advisory_html(report: dict[str, Any]) -> str:
     <h3>Documents Required</h3>
     <ul>{document_rows}</ul>
   </div>
+  <p class='hrs-pdf-note'>{escape(str(advisory.get('important_note', '')))}</p>
+"""
+
+
+def _render_cghs_eligibility_advisory_html(report: dict[str, Any]) -> str:
+    advisory = report.get("cghs_eligibility_advisory")
+    if not advisory:
+        settings = report.get("comparison_settings") or {}
+        patient = report.get("patient") or {}
+        advisory = build_cghs_eligibility_advisory(
+            comparison_scheme=str(settings.get("comparison_scheme") or "cghs"),
+            cghs_fallback_from_aarogya=bool(settings.get("cghs_fallback_from_aarogya")),
+            line_items=report.get("line_items") or [],
+            beneficiary_category=patient.get("cghs_beneficiary_category"),
+            eligible_category_confirmed=patient.get("cghs_eligible_category_confirmed"),
+            resides_in_covered_city=patient.get("cghs_resides_in_covered_city"),
+        )
+    if not advisory:
+        return ""
+
+    mode = str(advisory.get("mode") or "full")
+    is_fallback = mode == "fallback"
+    preview_rows = "".join(
+        f"<li>{escape(str(message))}</li>"
+        for message in (advisory.get("eligibility_preview") or [])
+        if message
+    )
+    preview_html = (
+        f"<ul class='cghs-pdf-preview'>{preview_rows}</ul>" if preview_rows else ""
+    )
+    fallback_html = ""
+    if is_fallback:
+        fallback_html = (
+            f"<p class='cghs-pdf-fallback'>{escape(str(advisory.get('fallback_note', '')))}</p>"
+        )
+
+    groups = advisory.get("groups") or []
+    group_html_parts: list[str] = []
+    if not is_fallback:
+        group_html_parts.append(
+            f"<div class='cghs-pdf-card'><p>{escape(str(advisory.get('residence_rule', '')))}</p></div>"
+        )
+    for group in groups:
+        items = "".join(
+            f"<li>{escape(str(item))}</li>" for item in (group.get("items") or [])
+        )
+        group_html_parts.append(
+            f"<div class='cghs-pdf-card'>"
+            f"<h3>{escape(str(group.get('title', '')))}</h3>"
+            f"<ul>{items}</ul>"
+            "</div>"
+        )
+    groups_html = "".join(group_html_parts)
+    if is_fallback:
+        groups_html = (
+            f"<details class='cghs-pdf-details'><summary>View CGHS eligibility criteria</summary>"
+            f"{groups_html}"
+            "</details>"
+        )
+
+    return f"""
+  <h2>{escape(str(advisory.get('title', 'CGHS Eligibility Criteria')))}</h2>
+  <p>{escape(str(advisory.get('subtitle', '')))}</p>
+  {fallback_html}
+  {preview_html}
+  {groups_html}
   <p class='hrs-pdf-note'>{escape(str(advisory.get('important_note', '')))}</p>
 """
 
@@ -537,6 +604,7 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
             nabh_line = "NABH: Not found in NABH registry"
 
     hrs_advisory_html = _render_hospitalisation_relief_advisory_html(report)
+    cghs_advisory_html = _render_cghs_eligibility_advisory_html(report)
     kcr_advisory_html = _render_kcr_kit_advisory_html(report)
     rajiv_report_html = _render_rajiv_aarogyasri_report_html(report)
     clinical_evidence_html = _render_clinical_evidence_html(report)
@@ -560,6 +628,11 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
   .hrs-pdf-card {{ background: #f4f7fb; border-left: 3px solid #5d8aa8; border-radius: 6px; padding: 8px 10px; margin: 8px 0; }}
   .hrs-pdf-card h3 {{ margin: 0 0 4px; font-size: 10px; color: #1a5276; }}
   .hrs-pdf-note {{ margin-top: 8px; font-size: 8.5px; color: #566573; font-style: italic; }}
+  .cghs-pdf-card {{ background: #f4f7fb; border-left: 3px solid #5d8aa8; border-radius: 6px; padding: 8px 10px; margin: 8px 0; }}
+  .cghs-pdf-card h3 {{ margin: 0 0 4px; font-size: 10px; color: #1a5276; }}
+  .cghs-pdf-fallback {{ margin: 6px 0; font-size: 9px; color: #566573; }}
+  .cghs-pdf-preview {{ margin: 6px 0; padding-left: 16px; }}
+  .cghs-pdf-details {{ margin: 8px 0; font-size: 9px; }}
 </style></head>
 <body>
   <h1>{escape(title)}</h1>
@@ -612,6 +685,8 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
   <p class='disclaimer'>Guideline-based indication check using CRC Standard Treatment Guidelines, 7th ed. Not a substitute for clinical judgment.</p>
 
   {hrs_advisory_html}
+
+  {cghs_advisory_html}
 
   {kcr_advisory_html}
 
