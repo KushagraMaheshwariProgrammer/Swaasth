@@ -30,6 +30,7 @@ import ClinicalContextForm from "./components/ClinicalContextForm";
 import DiagnosisPrompt from "./components/DiagnosisPrompt";
 import PrescriptionResults from "./components/PrescriptionResults";
 import TermsAndConditionsModal from "./components/TermsAndConditionsModal";
+import DragAndDropUpload from "./components/DragAndDropUpload";
 import { Capacitor } from "@capacitor/core";
 import { createPatient, getPatients, getPatientsLocalSnapshot } from "./services/patients";
 import { markLocalBillSynced, persistLocalBill, saveBill } from "./services/bills";
@@ -51,13 +52,13 @@ import {
   resolveCghsFallbackLocation,
   resolveCityTier,
 } from "./services/locations";
+import { validateUploadFile } from "./utils/fileUpload";
 
 // Web dev: leave VITE_API_BASE unset to use the Vite proxy (/api → :8000).
 // Android emulator: uses http://10.0.2.2:8000 (your Mac's localhost).
 const API_BASE =
   import.meta.env.VITE_API_BASE ??
   (Capacitor.isNativePlatform() ? "http://10.0.2.2:8000" : "");
-const ALLOWED_EXTENSIONS = ["pdf", "jpg", "jpeg", "png"];
 
 function formatFetchError(err, fallback) {
   if (err?.message === "Failed to fetch") {
@@ -137,11 +138,6 @@ const pageTransition = {
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -8 },
   transition: { duration: 0.35 },
-};
-
-const isSupportedFile = (file) => {
-  const ext = file.name.split(".").pop()?.toLowerCase();
-  return Boolean(ext && ALLOWED_EXTENSIONS.includes(ext));
 };
 
 function UserNav({ className = "" }) {
@@ -466,7 +462,6 @@ function LandingPage() {
 function CheckPage() {
   const { user } = useAuth();
   const location = useLocation();
-  const inputRef = useRef(null);
   const cghsLocationRef = useRef({ state: "", city: "" });
   const [selectedFile, setSelectedFile] = useState(null);
   const [states] = useState(() => getStateOptions());
@@ -475,7 +470,6 @@ function CheckPage() {
   const [city, setCity] = useState("");
   const [resolvedTier, setResolvedTier] = useState(null);
   const [hospitalType, setHospitalType] = useState("general");
-  const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const locationError = states.length
     ? ""
@@ -510,7 +504,6 @@ function CheckPage() {
   const [diagnosisUserProvided, setDiagnosisUserProvided] = useState(false);
   const [clinicalStep, setClinicalStep] = useState(null);
   const [clinicalContext, setClinicalContext] = useState(emptyClinicalContext);
-  const prescriptionInputRef = useRef(null);
 
   const reloadPatients = useCallback(async () => {
     if (!user) {
@@ -959,8 +952,9 @@ function CheckPage() {
     if (!file) {
       return;
     }
-    if (!isSupportedFile(file)) {
-      setError("Please upload a valid PDF, JPG, JPEG, or PNG file.");
+    const validation = validateUploadFile(file);
+    if (!validation.ok) {
+      setError(validation.error);
       setSelectedFile(null);
       return;
     }
@@ -976,10 +970,12 @@ function CheckPage() {
 
   const handlePrescriptionFileSelection = (file) => {
     if (!file) {
+      setSelectedPrescriptionFile(null);
       return;
     }
-    if (!isSupportedFile(file)) {
-      setError("Please upload a valid PDF, JPG, JPEG, or PNG file.");
+    const validation = validateUploadFile(file);
+    if (!validation.ok) {
+      setError(validation.error);
       setSelectedPrescriptionFile(null);
       return;
     }
@@ -1566,65 +1562,38 @@ function CheckPage() {
                 Step 2 — Upload {documentMode === "combined" ? "documents" : "bill"}
               </p>
 
-              <button
-                type="button"
-                className={`upload-zone ${isDragging ? "upload-zone-dragging" : ""}`}
-                onClick={() => inputRef.current?.click()}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  setIsDragging(false);
-                  handleFileSelection(event.dataTransfer.files?.[0]);
-                }}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  setIsDragging(true);
-                }}
-                onDragLeave={(event) => {
-                  event.preventDefault();
-                  setIsDragging(false);
-                }}
-              >
-                <div className="upload-icon">↑</div>
-                <p className="upload-title">Drop your bill here or click to browse</p>
-                <p className="upload-subtitle">Supports PDF, JPG, PNG</p>
-                {selectedFile && <p className="file-name">{selectedFile.name}</p>}
-              </button>
-              <input
-                ref={inputRef}
-                className="hidden-input"
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                onChange={(event) => {
-                  handleFileSelection(event.target.files?.[0]);
-                  event.target.value = "";
+              <DragAndDropUpload
+                icon="↑"
+                title="Drop your bill here or click to browse"
+                dragTitle="Drop your bill here"
+                subtitle="Supports PDF, JPG, PNG"
+                file={selectedFile}
+                onFileSelect={handleFileSelection}
+                onValidationError={(message) => {
+                  if (message) {
+                    setError(message);
+                  } else {
+                    setError("");
+                  }
                 }}
               />
 
               {documentMode === "combined" && (
                 <>
                   <p className="comparison-settings-title">Prescription</p>
-                  <button
-                    type="button"
-                    className={`upload-zone ${isDragging ? "upload-zone-dragging" : ""}`}
-                    onClick={() => prescriptionInputRef.current?.click()}
-                  >
-                    <div className="upload-icon">Rx</div>
-                    <p className="upload-title">
-                      Drop your prescription here or click to browse
-                    </p>
-                    <p className="upload-subtitle">Supports PDF, JPG, PNG</p>
-                    {selectedPrescriptionFile && (
-                      <p className="file-name">{selectedPrescriptionFile.name}</p>
-                    )}
-                  </button>
-                  <input
-                    ref={prescriptionInputRef}
-                    className="hidden-input"
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                    onChange={(event) => {
-                      handlePrescriptionFileSelection(event.target.files?.[0]);
-                      event.target.value = "";
+                  <DragAndDropUpload
+                    icon="Rx"
+                    title="Drop your prescription here or click to browse"
+                    dragTitle="Drop your prescription here"
+                    subtitle="Supports PDF, JPG, PNG"
+                    file={selectedPrescriptionFile}
+                    onFileSelect={handlePrescriptionFileSelection}
+                    onValidationError={(message) => {
+                      if (message) {
+                        setError(message);
+                      } else {
+                        setError("");
+                      }
                     }}
                   />
                 </>
@@ -1763,28 +1732,19 @@ function CheckPage() {
               </div>
 
               <p className="comparison-settings-title">Step 2 — Upload prescription</p>
-              <button
-                type="button"
-                className="upload-zone"
-                onClick={() => prescriptionInputRef.current?.click()}
-              >
-                <div className="upload-icon">Rx</div>
-                <p className="upload-title">
-                  Drop your prescription here or click to browse
-                </p>
-                <p className="upload-subtitle">Supports PDF, JPG, PNG</p>
-                {selectedPrescriptionFile && (
-                  <p className="file-name">{selectedPrescriptionFile.name}</p>
-                )}
-              </button>
-              <input
-                ref={prescriptionInputRef}
-                className="hidden-input"
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                onChange={(event) => {
-                  handlePrescriptionFileSelection(event.target.files?.[0]);
-                  event.target.value = "";
+              <DragAndDropUpload
+                icon="Rx"
+                title="Drop your prescription here or click to browse"
+                dragTitle="Drop your prescription here"
+                subtitle="Supports PDF, JPG, PNG"
+                file={selectedPrescriptionFile}
+                onFileSelect={handlePrescriptionFileSelection}
+                onValidationError={(message) => {
+                  if (message) {
+                    setError(message);
+                  } else {
+                    setError("");
+                  }
                 }}
               />
 
