@@ -595,6 +595,26 @@ body {
   display: none;
 }
 
+.upload-zone:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.upload-preview {
+  margin: 0 auto 0.75rem;
+  max-width: 220px;
+}
+
+.upload-preview-image {
+  display: block;
+  width: 100%;
+  max-height: 160px;
+  object-fit: contain;
+  border-radius: var(--neu-radius-sm);
+  box-shadow: var(--neu-shadow-flat);
+  background: var(--neu-surface);
+}
+
 .comparison-settings {
   margin-top: 1rem;
   padding: 0.9rem;
