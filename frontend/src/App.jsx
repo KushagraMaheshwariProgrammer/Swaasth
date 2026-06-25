@@ -806,6 +806,25 @@ function CheckPage() {
           rajiv_is_cancer_related: Boolean(selectedPatient?.rajivIsCancerRelated),
           rajiv_family_coverage_used_amount:
             selectedPatient?.rajivFamilyCoverageUsedAmount ?? null,
+          ehs_selected: Boolean(selectedPatient?.ehsSelected),
+          ehs_is_government_employee: Boolean(
+            selectedPatient?.ehsIsGovernmentEmployee
+          ),
+          ehs_is_pensioner: Boolean(selectedPatient?.ehsIsPensioner),
+          ehs_is_dependent: Boolean(selectedPatient?.ehsIsDependent),
+          ehs_has_health_card: Boolean(selectedPatient?.ehsHasHealthCard),
+          ehs_card_number: selectedPatient?.ehsCardNumber || null,
+          jhs_selected: Boolean(selectedPatient?.jhsSelected),
+          jhs_is_working_journalist: Boolean(
+            selectedPatient?.jhsIsWorkingJournalist
+          ),
+          jhs_is_retired_journalist: Boolean(
+            selectedPatient?.jhsIsRetiredJournalist
+          ),
+          jhs_is_dependent: Boolean(selectedPatient?.jhsIsDependent),
+          jhs_has_health_card: Boolean(selectedPatient?.jhsHasHealthCard),
+          jhs_has_aadhaar: Boolean(selectedPatient?.jhsHasAadhaar),
+          jhs_card_number: selectedPatient?.jhsCardNumber || null,
           cghs_fallback_from_aarogya: Boolean(
             cghsFromAarogya ||
               scanMeta?.comparison_settings?.cghs_fallback_from_aarogya
@@ -816,6 +835,13 @@ function CheckPage() {
             selectedPatient?.cghsEligibleCategoryConfirmed ?? null,
           cghs_resides_in_covered_city:
             selectedPatient?.cghsResidesInCoveredCity ?? null,
+          pmjay_has_ayushman_card: selectedPatient?.pmjayHasAyushmanCard ?? null,
+          pmjay_state: selectedPatient?.state || location.stateUtName || null,
+          pmjay_district:
+            scanMeta?.comparison_settings?.aarogya_district ||
+            location.city ||
+            null,
+          pmjay_city: location.city || null,
           bill_date: scanMeta?.bill_date || null,
           patient_district:
             scanMeta?.comparison_settings?.aarogya_district ||

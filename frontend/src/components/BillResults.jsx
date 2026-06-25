@@ -12,9 +12,40 @@ import ReportActions from "./ReportActions";
 import HospitalisationReliefAdvisory from "./HospitalisationReliefAdvisory";
 import CghsEligibilityAdvisory from "./CghsEligibilityAdvisory";
 import KcrKitAdvisory from "./KcrKitAdvisory";
+import EhsJhsReport from "./EhsJhsReport";
+import CghsCostsReport from "./CghsCostsReport";
 import RajivAarogyasriReport from "./RajivAarogyasriReport";
+import PmjayHospitalVerificationReport from "./PmjayHospitalVerificationReport";
 import TreatmentAuditSection from "./TreatmentAuditSection";
 import RestrictedMedicinesSection from "./RestrictedMedicinesSection";
+
+function getCghsLineItemBadge(item, cghsComparison) {
+  if (cghsComparison?.generic_pharmacy || item.cghs_generic_pharmacy) {
+    return {
+      badgeLabel: "Verify Medicine Pricing",
+      badgeClass: "status-pill status-amber",
+    };
+  }
+  if (item.comparison_source === "cghs_city_costs") {
+    return {
+      badgeLabel: "City-wise CGHS Match",
+      badgeClass: "status-pill status-green",
+    };
+  }
+  if (item.cghs_tier_fallback && item.cghs_rate != null) {
+    return {
+      badgeLabel: "Existing CGHS Fallback Used",
+      badgeClass: "status-pill status-amber",
+    };
+  }
+  if (item.flag === "no_reference") {
+    return {
+      badgeLabel: "Manual Verification Required",
+      badgeClass: "status-pill status-neutral",
+    };
+  }
+  return null;
+}
 
 export default function BillResults({ result, toolbar = null }) {
   const summary = useMemo(() => computeBillSummary(result), [result]);
@@ -136,6 +167,16 @@ export default function BillResults({ result, toolbar = null }) {
               {" · "}
               <strong>Rajiv Aarogyasri package benchmark</strong>
             </>
+          ) : result.comparison_settings.comparison_scheme === "ehs" ? (
+            <>
+              {" · "}
+              <strong>EHS package benchmark</strong>
+            </>
+          ) : result.comparison_settings.comparison_scheme === "jhs" ? (
+            <>
+              {" · "}
+              <strong>JHS package benchmark</strong>
+            </>
           ) : (
             <>
               {" · "}
@@ -173,19 +214,40 @@ export default function BillResults({ result, toolbar = null }) {
 
       <RajivAarogyasriReport report={result?.rajiv_aarogyasri_report} />
 
+      <CghsCostsReport report={result?.cghs_costs_report} />
+
+      <EhsJhsReport report={result?.ehs_jhs_report} />
+
+      <PmjayHospitalVerificationReport
+        verification={result?.pmjay_hospital_verification}
+      />
+
       <div className="results-grid">
         {result.line_items.map((item, index) => {
           const meta = getFlagMeta(item.flag);
+          const isCghsScheme =
+            result?.comparison_settings?.comparison_scheme === "cghs";
+          const cghsComparison = result?.cghs_costs_report?.comparisons?.[index];
+          const cghsBadge = isCghsScheme
+            ? getCghsLineItemBadge(item, cghsComparison)
+            : null;
+          const badgeLabel = cghsBadge?.badgeLabel ?? meta.badgeLabel;
+          const badgeClass = cghsBadge?.badgeClass ?? meta.badgeClass;
+          const showCghsReportNotes = !result?.cghs_costs_report?.enabled;
           const isMedicine =
             item.comparison_source === "pharma" || item.category === "medicine";
           const isHbp = item.comparison_source === "hbp";
           const isAarogyasri = item.comparison_source === "aarogyasri";
+          const isEhsJhs = item.comparison_source === "ehs_jhs";
+          const isCghsCityCosts = item.comparison_source === "cghs_city_costs";
           const referenceRate = isMedicine
             ? item.pharma_rate
             : isHbp
             ? item.hbp_rate
             : isAarogyasri
             ? item.aarogyasri_rate
+            : isEhsJhs
+            ? item.ehs_jhs_rate
             : item.cghs_rate;
           const referenceLabel = isMedicine
             ? "NPPA Ceiling"
@@ -193,6 +255,12 @@ export default function BillResults({ result, toolbar = null }) {
             ? "PM-JAY HBP Rate"
             : isAarogyasri
             ? "Aarogyasri Package Rate"
+            : isEhsJhs
+            ? item.ehs_jhs_fallback_used
+              ? "CGHS Benchmark"
+              : "EHS/JHS Package Rate"
+            : isCghsCityCosts
+            ? "CGHS City Rate"
             : "CGHS Rate";
           return (
             <article
@@ -201,13 +269,15 @@ export default function BillResults({ result, toolbar = null }) {
             >
               <div className="result-top">
                 <h4>{item.item_name || "--"}</h4>
-                <span className={meta.badgeClass}>{meta.badgeLabel}</span>
+                <span className={badgeClass}>{badgeLabel}</span>
               </div>
               {item.matched_reference_item && (
                 <p className="matched-reference">
                   Matched: {item.matched_reference_item}
                   {item.aarogyasri_package_code
                     ? ` (${item.aarogyasri_package_code})`
+                    : item.ehs_jhs_package_code
+                    ? ` (${item.ehs_jhs_package_code})`
                     : item.hbp_procedure_code
                     ? ` (${item.hbp_procedure_code})`
                     : item.cghs_code
@@ -287,6 +357,39 @@ export default function BillResults({ result, toolbar = null }) {
                     Non-NABH {formatCurrency(item.non_nabh_rate)} · NABH{" "}
                     {formatCurrency(item.nabh_rate)} · Super speciality{" "}
                     {formatCurrency(item.super_speciality_rate)}
+                  </p>
+                )}
+              {showCghsReportNotes && isCghsCityCosts && (
+                <p className="rate-breakdown">
+                  Matched from CGHS city-wise costs data.
+                  {item.cghs_costs_extraction_method === "ocr"
+                    ? " · OCR-extracted row. Verify if needed."
+                    : ""}
+                </p>
+              )}
+              {showCghsReportNotes &&
+                item.comparison_source === "cghs" &&
+                item.cghs_tier_fallback &&
+                item.cghs_rate != null && (
+                  <p className="rajiv-fallback-note">
+                    City-wise CGHS cost not matched. Existing CGHS fallback rate used.
+                  </p>
+                )}
+              {showCghsReportNotes &&
+                item.comparison_source === "cghs" &&
+                item.cghs_generic_pharmacy && (
+                  <p className="rajiv-fallback-note">
+                    Generic pharmacy charge detected. Verify medicine-wise pricing/NPPA
+                    where applicable.
+                  </p>
+                )}
+              {showCghsReportNotes &&
+                item.comparison_source === "cghs" &&
+                item.flag === "no_reference" &&
+                !item.cghs_generic_pharmacy && (
+                  <p className="rajiv-fallback-note">
+                    CGHS rate not found in city-wise or fallback data — manual
+                    verification required.
                   </p>
                 )}
             </article>

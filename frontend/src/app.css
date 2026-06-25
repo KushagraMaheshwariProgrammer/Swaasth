@@ -2044,6 +2044,98 @@ body {
   outline-offset: -2px;
 }
 
+.yes-no-not-sure-fieldset {
+  border: 0;
+  margin: 0 0 1rem;
+  padding: 0;
+  min-width: 0;
+}
+
+.yes-no-not-sure-label {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+
+.yes-no-not-sure-helper {
+  margin: -0.35rem 0 0.75rem;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.yes-no-not-sure-group {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  width: 100%;
+}
+
+.yes-no-not-sure-option {
+  position: relative;
+  display: block;
+  min-height: 44px;
+}
+
+.yes-no-not-sure-option input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  overflow: hidden;
+}
+
+.yes-no-not-sure-option span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgba(107, 140, 255, 0.22);
+  border-radius: 999px;
+  background: var(--neu-surface);
+  box-shadow: var(--neu-shadow-soft);
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease,
+    box-shadow 0.15s ease;
+  user-select: none;
+}
+
+.yes-no-not-sure-option:hover span {
+  border-color: rgba(107, 140, 255, 0.35);
+  color: var(--text-primary);
+}
+
+.yes-no-not-sure-option.is-selected span,
+.yes-no-not-sure-option:has(input:checked) span {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(107, 140, 255, 0.28);
+}
+
+.yes-no-not-sure-option:has(input:focus-visible) span {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .yes-no-not-sure-group {
+    grid-template-columns: 1fr;
+  }
+}
+
 .scheme-card-description {
   margin: 0;
   font-size: 0.84rem;
@@ -3176,6 +3268,357 @@ body {
 
   .location-picker-sheet-header {
     border-radius: var(--neu-radius-lg) var(--neu-radius-lg) 0 0;
+  }
+}
+
+.cghs-covered-cities-link {
+  margin-top: 0.55rem;
+  padding-left: 0;
+}
+
+.cghs-covered-cities-sheet {
+  background: var(--neu-bg);
+}
+
+.cghs-covered-cities-header {
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.cghs-covered-cities-heading h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--text-primary);
+}
+
+.cghs-covered-cities-subtitle {
+  margin: 0.35rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.cghs-covered-cities-list {
+  background: transparent;
+  padding: 0 1rem 1rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.cghs-covered-city-card {
+  width: 100%;
+  border: 1px solid rgba(107, 140, 255, 0.16);
+  border-radius: var(--neu-radius-sm);
+  background: var(--neu-surface);
+  box-shadow: var(--neu-shadow-soft);
+  padding: 0.95rem 1rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.cghs-covered-city-card:hover,
+.cghs-covered-city-card:focus-visible {
+  border-color: rgba(107, 140, 255, 0.35);
+  box-shadow: var(--neu-shadow-raised);
+  transform: translateY(-1px);
+}
+
+.cghs-covered-city-card-name {
+  display: block;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.cghs-covered-cities-search-wrap {
+  padding: 0 1rem 0.75rem;
+}
+
+.cghs-covered-city-confirm {
+  border-top: 1px solid rgba(107, 140, 255, 0.15);
+  padding: 0.9rem 1rem 1rem;
+  background: var(--neu-surface);
+}
+
+.cghs-covered-city-confirm p {
+  margin: 0 0 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.cghs-covered-city-confirm-actions {
+  display: flex;
+  gap: 0.65rem;
+  justify-content: flex-end;
+}
+
+.pmjay-hospitals-sheet,
+.pmjay-hospital-verification {
+  background: var(--neu-bg);
+}
+
+.pmjay-hospitals-header,
+.pmjay-hospital-verification-heading h3 {
+  margin: 0;
+}
+
+.pmjay-hospitals-subtitle,
+.pmjay-questions-intro {
+  margin: 0.35rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.pmjay-hospitals-filters {
+  padding: 0 1rem 0.75rem;
+}
+
+.pmjay-hospitals-filter-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.65rem;
+}
+
+.pmjay-hospitals-filter-row select {
+  width: 100%;
+  border: 1px solid rgba(107, 140, 255, 0.18);
+  border-radius: var(--neu-radius-sm);
+  background: var(--neu-surface);
+  padding: 0.55rem 0.65rem;
+  color: var(--text-primary);
+}
+
+.pmjay-hospitals-count {
+  margin: 0.55rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.pmjay-hospitals-list-v2 {
+  background: transparent;
+  padding: 0 1rem 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.pmjay-hospital-card-v2 {
+  border: 1px solid rgba(107, 140, 255, 0.16);
+  border-radius: var(--neu-radius-sm);
+  background: var(--neu-surface);
+  box-shadow: var(--neu-shadow-soft);
+  padding: 1rem;
+}
+
+.pmjay-hospital-card-v2-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.pmjay-hospital-card-v2-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.pmjay-hospital-card-v2-name {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.pmjay-hospital-card-v2-location {
+  margin: 0.3rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.pmjay-hospital-card-v2-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.hospital-type-badge,
+.empanelment-status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.22rem 0.55rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hospital-type-public {
+  background: rgba(107, 140, 255, 0.14);
+  color: #3b5bcc;
+}
+
+.hospital-type-private {
+  background: rgba(155, 89, 182, 0.14);
+  color: #7d3c98;
+}
+
+.hospital-type-neutral,
+.empanelment-status-neutral {
+  background: rgba(127, 140, 141, 0.14);
+  color: #566573;
+}
+
+.empanelment-status-active {
+  background: rgba(46, 204, 113, 0.16);
+  color: #1e8449;
+}
+
+.empanelment-status-suspended,
+.empanelment-status-delisted {
+  background: rgba(241, 196, 15, 0.18);
+  color: #9a7d0a;
+}
+
+.pmjay-hospital-card-v2-specialities {
+  margin: 0.75rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+}
+
+.pmjay-hospital-card-v2-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
+.pmjay-speciality-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.28rem 0.6rem;
+  background: rgba(214, 224, 245, 0.65);
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.pmjay-hospital-card-v2-details-btn {
+  margin-top: 0.65rem;
+  padding-left: 0;
+}
+
+.pmjay-hospital-card-v2-details {
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(107, 140, 255, 0.12);
+}
+
+.pmjay-hospital-card-v2-details-label {
+  margin: 0 0 0.35rem;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.pmjay-hospital-card-v2-details-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--text-primary);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.pmjay-hospital-card {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgba(107, 140, 255, 0.12);
+}
+
+.pmjay-hospital-card strong {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.pmjay-hospital-card p {
+  margin: 0.15rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.pmjay-hospital-specialities {
+  font-size: 0.8rem !important;
+}
+
+.pmjay-hospital-verification-card {
+  background: var(--neu-surface);
+  border-radius: var(--neu-radius-sm);
+  box-shadow: var(--neu-shadow-soft);
+  padding: 0.95rem 1rem;
+  margin-top: 0.85rem;
+}
+
+.pmjay-meta-list,
+.pmjay-candidate-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--text-primary);
+}
+
+.pmjay-meta-list li,
+.pmjay-candidate-list li {
+  margin-bottom: 0.35rem;
+  line-height: 1.45;
+}
+
+.pmjay-match-reason {
+  color: var(--text-secondary);
+}
+
+.pmjay-advisory-box {
+  margin-top: 0.85rem;
+}
+
+.pmjay-status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pmjay-status-success {
+  background: rgba(46, 204, 113, 0.16);
+  color: #1e8449;
+}
+
+.pmjay-status-warning {
+  background: rgba(241, 196, 15, 0.18);
+  color: #9a7d0a;
+}
+
+.pmjay-status-muted {
+  background: rgba(127, 140, 141, 0.16);
+  color: #566573;
+}
+
+.pmjay-status-info {
+  background: rgba(107, 140, 255, 0.16);
+  color: #3b5bcc;
+}
+
+@media (min-width: 641px) {
+  .pmjay-hospitals-filter-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 

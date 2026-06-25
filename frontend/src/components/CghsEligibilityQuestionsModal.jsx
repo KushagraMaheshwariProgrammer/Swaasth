@@ -3,6 +3,8 @@ import {
   CGHS_BENEFICIARY_CATEGORIES,
   buildCghsEligibilityPreview,
 } from "../data/cghsEligibilityCriteria";
+import CghsCoveredCitiesModal from "./CghsCoveredCitiesModal";
+import YesNoNotSureSelector from "./YesNoNotSureSelector";
 
 export function emptyCghsEligibilityAnswers() {
   return {
@@ -18,6 +20,7 @@ export default function CghsEligibilityQuestionsModal({
   initialValues = emptyCghsEligibilityAnswers(),
 }) {
   const [draft, setDraft] = useState(initialValues);
+  const [citiesModalOpen, setCitiesModalOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -89,33 +92,25 @@ export default function CghsEligibilityQuestionsModal({
             </select>
           </label>
 
-          <fieldset className="scheme-card-followup scheme-card-followup-compact">
-            <legend className="scheme-card-followup-question">
-              Does the patient reside in a CGHS-covered city?
-            </legend>
-            <div className="scheme-card-choice-group">
-              {[
-                { value: true, label: "Yes" },
-                { value: false, label: "No" },
-                { value: null, label: "Not sure" },
-              ].map((option) => (
-                <label key={String(option.value)} className="scheme-card-choice">
-                  <input
-                    type="radio"
-                    name="cghsResidesInCoveredCity"
-                    checked={draft.cghsResidesInCoveredCity === option.value}
-                    onChange={() =>
-                      setDraft((prev) => ({
-                        ...prev,
-                        cghsResidesInCoveredCity: option.value,
-                      }))
-                    }
-                  />
-                  <span>{option.label}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          <YesNoNotSureSelector
+            id="cghs-covered-city-question"
+            label="Does the patient reside in a CGHS-covered city?"
+            name="cghsResidesInCoveredCity"
+            value={draft.cghsResidesInCoveredCity}
+            onChange={(nextValue) =>
+              setDraft((prev) => ({
+                ...prev,
+                cghsResidesInCoveredCity: nextValue,
+              }))
+            }
+          />
+          <button
+            type="button"
+            className="eligibility-learn-btn cghs-covered-cities-link"
+            onClick={() => setCitiesModalOpen(true)}
+          >
+            View CGHS-covered cities
+          </button>
 
           {previewMessages.length > 0 && (
             <div className="cghs-eligibility-preview-box">
@@ -135,6 +130,16 @@ export default function CghsEligibilityQuestionsModal({
           </button>
         </footer>
       </div>
+      <CghsCoveredCitiesModal
+        open={citiesModalOpen}
+        onClose={() => setCitiesModalOpen(false)}
+        onSelectCity={() =>
+          setDraft((prev) => ({
+            ...prev,
+            cghsResidesInCoveredCity: true,
+          }))
+        }
+      />
     </div>
   );
 }

@@ -90,6 +90,54 @@ function normalizeKcrKitFields(patientData, age = Number(patientData?.age)) {
   };
 }
 
+function normalizeEhsFields(patientData) {
+  const selected = Boolean(patientData?.ehsSelected);
+  if (!selected) {
+    return {
+      ehsSelected: false,
+      ehsIsGovernmentEmployee: false,
+      ehsIsPensioner: false,
+      ehsIsDependent: false,
+      ehsHasHealthCard: false,
+      ehsCardNumber: null,
+    };
+  }
+  const cardNumber = String(patientData?.ehsCardNumber || "").trim();
+  return {
+    ehsSelected: true,
+    ehsIsGovernmentEmployee: Boolean(patientData?.ehsIsGovernmentEmployee),
+    ehsIsPensioner: Boolean(patientData?.ehsIsPensioner),
+    ehsIsDependent: Boolean(patientData?.ehsIsDependent),
+    ehsHasHealthCard: Boolean(patientData?.ehsHasHealthCard),
+    ehsCardNumber: cardNumber || null,
+  };
+}
+
+function normalizeJhsFields(patientData) {
+  const selected = Boolean(patientData?.jhsSelected);
+  if (!selected) {
+    return {
+      jhsSelected: false,
+      jhsIsWorkingJournalist: false,
+      jhsIsRetiredJournalist: false,
+      jhsIsDependent: false,
+      jhsHasHealthCard: false,
+      jhsHasAadhaar: false,
+      jhsCardNumber: null,
+    };
+  }
+  const cardNumber = String(patientData?.jhsCardNumber || "").trim();
+  return {
+    jhsSelected: true,
+    jhsIsWorkingJournalist: Boolean(patientData?.jhsIsWorkingJournalist),
+    jhsIsRetiredJournalist: Boolean(patientData?.jhsIsRetiredJournalist),
+    jhsIsDependent: Boolean(patientData?.jhsIsDependent),
+    jhsHasHealthCard: Boolean(patientData?.jhsHasHealthCard),
+    jhsHasAadhaar: Boolean(patientData?.jhsHasAadhaar),
+    jhsCardNumber: cardNumber || null,
+  };
+}
+
 function normalizeRajivAarogyasriFields(patientData) {
   const selected = Boolean(patientData?.rajivAarogyasriSelected);
   if (!selected) {
@@ -145,6 +193,19 @@ function normalizeCghsEligibilityFields(patientData) {
   };
 }
 
+function normalizePmjayFields(patientData) {
+  const selected = Boolean(patientData?.ayushmanEligible);
+  if (!selected) {
+    return {
+      pmjayHasAyushmanCard: null,
+    };
+  }
+  const card = patientData?.pmjayHasAyushmanCard;
+  return {
+    pmjayHasAyushmanCard: card === true || card === false ? card : null,
+  };
+}
+
 export function validatePatientInput(patientData) {
   const name = patientData?.name?.trim() || "";
   if (!name) {
@@ -161,7 +222,10 @@ export function validatePatientInput(patientData) {
   const state = patientData?.state?.trim() || "";
   const kcrFields = normalizeKcrKitFields(patientData, age);
   const rajivFields = normalizeRajivAarogyasriFields(patientData);
+  const ehsFields = normalizeEhsFields(patientData);
+  const jhsFields = normalizeJhsFields(patientData);
   const cghsFields = normalizeCghsEligibilityFields(patientData);
+  const pmjayFields = normalizePmjayFields(patientData);
   return {
     name,
     gender,
@@ -178,7 +242,10 @@ export function validatePatientInput(patientData) {
     ),
     ...kcrFields,
     ...rajivFields,
+    ...ehsFields,
+    ...jhsFields,
     ...cghsFields,
+    ...pmjayFields,
     savePastBills: Boolean(patientData?.savePastBills),
   };
 }
@@ -231,9 +298,23 @@ function buildFirestorePayload(patientData) {
     rajivHasAadhaar: validated.rajivHasAadhaar,
     rajivIsCancerRelated: validated.rajivIsCancerRelated,
     rajivFamilyCoverageUsedAmount: validated.rajivFamilyCoverageUsedAmount,
+    ehsSelected: validated.ehsSelected,
+    ehsIsGovernmentEmployee: validated.ehsIsGovernmentEmployee,
+    ehsIsPensioner: validated.ehsIsPensioner,
+    ehsIsDependent: validated.ehsIsDependent,
+    ehsHasHealthCard: validated.ehsHasHealthCard,
+    ehsCardNumber: validated.ehsCardNumber,
+    jhsSelected: validated.jhsSelected,
+    jhsIsWorkingJournalist: validated.jhsIsWorkingJournalist,
+    jhsIsRetiredJournalist: validated.jhsIsRetiredJournalist,
+    jhsIsDependent: validated.jhsIsDependent,
+    jhsHasHealthCard: validated.jhsHasHealthCard,
+    jhsHasAadhaar: validated.jhsHasAadhaar,
+    jhsCardNumber: validated.jhsCardNumber,
     cghsBeneficiaryCategory: validated.cghsBeneficiaryCategory,
     cghsEligibleCategoryConfirmed: validated.cghsEligibleCategoryConfirmed,
     cghsResidesInCoveredCity: validated.cghsResidesInCoveredCity,
+    pmjayHasAyushmanCard: validated.pmjayHasAyushmanCard,
     savePastBills: validated.savePastBills,
     updatedAt: serverTimestamp(),
   };

@@ -26,8 +26,18 @@ IMPORTANT_NOTE = (
 )
 
 FALLBACK_NOTE = (
-    "CGHS rates are being used as a benchmark/fallback. CGHS eligibility is "
-    "separate and must be verified."
+    "CGHS rates are used only as a benchmark/fallback here. "
+    "CGHS eligibility is separate."
+)
+
+RESIDENCE_CONFIRMED = "Patient indicated residence in a CGHS-covered city."
+RESIDENCE_NOT_CONFIRMED = (
+    "Patient indicated they do not reside in a CGHS-covered city. "
+    "CGHS eligibility/facility access should be verified."
+)
+RESIDENCE_UNKNOWN = (
+    "CGHS-covered city residence was not confirmed. "
+    "Verify city coverage with CGHS/MoHFW."
 )
 
 CGHS_ELIGIBILITY_GROUPS: list[dict[str, Any]] = [
@@ -192,14 +202,20 @@ PREVIEW_NOT_CONFIRMED = (
     "CGHS eligibility could not be confirmed from the information provided. "
     "Verify beneficiary category and CGHS card status."
 )
-PREVIEW_CITY_REQUIRED = (
-    "CGHS eligibility/facility access depends on residence in a notified "
-    "CGHS-covered city or applicable special rules."
-)
 
 
 def _category_is_confirmed(beneficiary_category: str | None) -> bool:
     return bool(beneficiary_category and beneficiary_category != "not_sure")
+
+
+def build_residence_advisory(
+    resides_in_covered_city: bool | None = None,
+) -> str:
+    if resides_in_covered_city is True:
+        return RESIDENCE_CONFIRMED
+    if resides_in_covered_city is False:
+        return RESIDENCE_NOT_CONFIRMED
+    return RESIDENCE_UNKNOWN
 
 
 def build_cghs_eligibility_preview(
@@ -207,11 +223,8 @@ def build_cghs_eligibility_preview(
     beneficiary_category: str | None = None,
     resides_in_covered_city: bool | None = None,
 ) -> list[str]:
-    messages: list[str] = []
+    messages: list[str] = [build_residence_advisory(resides_in_covered_city)]
     category_confirmed = _category_is_confirmed(beneficiary_category)
-
-    if resides_in_covered_city is False:
-        messages.append(PREVIEW_CITY_REQUIRED)
 
     if category_confirmed and resides_in_covered_city is True:
         messages.append(PREVIEW_MAY_BE_ELIGIBLE)
@@ -270,6 +283,7 @@ def build_cghs_eligibility_advisory(
         "subtitle": SUBTITLE,
         "badge": BADGE,
         "residence_rule": RESIDENCE_RULE,
+        "residence_advisory": build_residence_advisory(resides_in_covered_city),
         "groups": CGHS_ELIGIBILITY_GROUPS,
         "important_note": IMPORTANT_NOTE,
         "mode": mode,

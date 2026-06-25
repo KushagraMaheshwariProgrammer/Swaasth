@@ -275,6 +275,14 @@ def _render_cghs_eligibility_advisory_html(report: dict[str, Any]) -> str:
         for message in (advisory.get("eligibility_preview") or [])
         if message
     )
+    residence_advisory = advisory.get("residence_advisory")
+    if residence_advisory and not any(
+        residence_advisory == message
+        for message in (advisory.get("eligibility_preview") or [])
+    ):
+        preview_rows = (
+            f"<li>{escape(str(residence_advisory))}</li>{preview_rows}"
+        )
     preview_html = (
         f"<ul class='cghs-pdf-preview'>{preview_rows}</ul>" if preview_rows else ""
     )
@@ -315,6 +323,47 @@ def _render_cghs_eligibility_advisory_html(report: dict[str, Any]) -> str:
   {preview_html}
   {groups_html}
   <p class='hrs-pdf-note'>{escape(str(advisory.get('important_note', '')))}</p>
+"""
+
+
+def _render_pmjay_hospital_verification_html(report: dict[str, Any]) -> str:
+    verification = report.get("pmjay_hospital_verification")
+    if not verification or not verification.get("selected"):
+        return ""
+
+    status = str(verification.get("status") or "unknown").replace("_", " ").title()
+    advisories = verification.get("advisories") or []
+    advisory_rows = "".join(
+        f"<li>{escape(str(message))}</li>" for message in advisories if message
+    )
+    location = ", ".join(
+        part
+        for part in [
+            verification.get("city"),
+            verification.get("district"),
+            verification.get("state"),
+        ]
+        if part
+    )
+    confidence = verification.get("confidence_score")
+    confidence_text = (
+        f"{round(float(confidence) * 100)}%" if confidence is not None else "—"
+    )
+
+    return f"""
+  <h2>PM-JAY Hospital Empanelment Check</h2>
+  <div class='cghs-pdf-card'>
+    <p><b>Status:</b> {escape(status)}</p>
+    <p><b>Hospital on bill:</b> {escape(str(verification.get('ocr_hospital_name') or '—'))}</p>
+    <p><b>Matched PM-JAY hospital:</b> {escape(str(verification.get('matched_hospital_name') or '—'))}</p>
+    <p><b>Match confidence:</b> {escape(confidence_text)}</p>
+    <p><b>Location:</b> {escape(location or '—')}</p>
+    <p><b>Hospital type:</b> {escape(str(verification.get('hospital_type') or '—'))}</p>
+    <p><b>Empanelment type:</b> {escape(str(verification.get('empanelment_type') or '—'))}</p>
+    <p><b>Empanelment status:</b> {escape(str(verification.get('empanelment_status') or '—'))}</p>
+    <p><b>Specialities:</b> {escape(str(verification.get('specialities') or '—'))}</p>
+    {f"<ul>{advisory_rows}</ul>" if advisory_rows else ""}
+  </div>
 """
 
 
@@ -400,6 +449,107 @@ def _render_rajiv_aarogyasri_report_html(report: dict[str, Any]) -> str:
   {"<h3>Aarogyasri Package Comparison</h3><table><tr><th>Bill item</th><th class='num'>Charged</th><th>Matched package</th><th class='num'>Approved rate</th><th class='num'>Excess</th><th>Status</th><th>Source</th></tr>" + comparison_rows + "</table>" if comparison_rows else ""}
   {"<div class='hrs-pdf-card'><h3>Advisories</h3><ul>" + advisory_rows + "</ul></div>" if advisory_rows else ""}
   <p class='hrs-pdf-note'>{escape(str(rajiv.get('disclaimer', '')))}</p>
+"""
+
+
+def _render_ehs_jhs_report_html(report: dict[str, Any]) -> str:
+    ehs_jhs = report.get("ehs_jhs_report")
+    if not ehs_jhs or not ehs_jhs.get("selected"):
+        return ""
+
+    scheme_type = str(ehs_jhs.get("scheme_type") or "EHS")
+    title = (
+        "Journalists Health Scheme Verification"
+        if scheme_type == "JHS"
+        else "Employees Health Scheme Verification"
+    )
+    eligibility = ehs_jhs.get("eligibility_snapshot") or {}
+    hospital = ehs_jhs.get("hospital_verification") or {}
+    comparisons = ehs_jhs.get("package_comparisons") or []
+    advisories = ehs_jhs.get("advisories") or []
+
+    def yes_no(value: Any) -> str:
+        if value is True:
+            return "Yes"
+        if value is False:
+            return "No"
+        return "—"
+
+    if scheme_type == "EHS":
+        eligibility_rows = (
+            f"<li>Telangana government employee: {escape(yes_no(eligibility.get('government_employee')))}</li>"
+            f"<li>Pensioner: {escape(yes_no(eligibility.get('pensioner')))}</li>"
+            f"<li>Dependent family member: {escape(yes_no(eligibility.get('dependent')))}</li>"
+            f"<li>EHS health card: {escape(yes_no(eligibility.get('has_health_card')))}</li>"
+        )
+    else:
+        eligibility_rows = (
+            f"<li>Working journalist: {escape(yes_no(eligibility.get('working_journalist')))}</li>"
+            f"<li>Retired journalist: {escape(yes_no(eligibility.get('retired_journalist')))}</li>"
+            f"<li>Dependent family member: {escape(yes_no(eligibility.get('dependent')))}</li>"
+            f"<li>JHS health card: {escape(yes_no(eligibility.get('has_health_card')))}</li>"
+            f"<li>Aadhaar: {escape(yes_no(eligibility.get('has_aadhaar')))}</li>"
+        )
+
+    card_number = eligibility.get("card_number")
+    if card_number:
+        eligibility_rows += f"<li>Card number: {escape(str(card_number))}</li>"
+
+    specialities = hospital.get("specialities") or (
+        ", ".join(hospital.get("specialities_readable") or [])
+        if hospital.get("specialities_readable")
+        else "—"
+    )
+
+    comparison_rows = "".join(
+        "<tr>"
+        f"<td>{escape(str(item.get('bill_item_name', '')))}</td>"
+        f"<td class='num'>{_fmt_currency(item.get('charged_amount'))}</td>"
+        f"<td>{escape(str(item.get('matched_package_name') or '—'))}</td>"
+        f"<td class='num'>{_fmt_currency(item.get('approved_rate'))}</td>"
+        f"<td class='num'>{_fmt_currency(item.get('excess_amount'))}</td>"
+        f"<td>{escape(str(item.get('status', '')))}</td>"
+        f"<td>{'CGHS fallback' if item.get('fallback_used') else escape(str(item.get('source_file') or '—'))}</td>"
+        "</tr>"
+        for item in comparisons
+    )
+    advisory_rows = "".join(
+        f"<li>{escape(str(message))}</li>" for message in advisories if message
+    )
+
+    location = ", ".join(
+        part
+        for part in [
+            hospital.get("municipality"),
+            hospital.get("mandal"),
+            hospital.get("district"),
+        ]
+        if part
+    )
+
+    return f"""
+  <h2>{escape(title)}</h2>
+  <div class='hrs-pdf-card'>
+    <h3>Eligibility Snapshot</h3>
+    <ul>{eligibility_rows}</ul>
+  </div>
+  <div class='hrs-pdf-card'>
+    <h3>Hospital Empanelment Check</h3>
+    <ul>
+      <li>Hospital on bill: {escape(str(hospital.get('ocr_hospital_name') or '—'))}</li>
+      <li>Matched hospital: {escape(str(hospital.get('matched_hospital_name') or '—'))}</li>
+      <li>Match confidence: {escape(str(hospital.get('confidence_score') or '—'))}</li>
+      <li>Location: {escape(location or '—')}</li>
+      <li>Hospital type: {escape(str(hospital.get('hospital_type') or '—'))}</li>
+      <li>Empanelment status: {escape(str(hospital.get('empanelment_status') or '—'))}</li>
+      <li>Source: EHS/JHS hospital data</li>
+      <li>Specialities: {escape(str(specialities))}</li>
+      <li>Status: {escape(str(hospital.get('status') or '—'))}</li>
+    </ul>
+  </div>
+  {"<h3>Package Comparison</h3><table><tr><th>Bill item</th><th class='num'>Charged</th><th>Matched package</th><th class='num'>Approved rate</th><th class='num'>Excess</th><th>Status</th><th>Source</th></tr>" + comparison_rows + "</table>" if comparison_rows else ""}
+  {"<div class='hrs-pdf-card'><h3>Advisories</h3><ul>" + advisory_rows + "</ul></div>" if advisory_rows else ""}
+  <p class='hrs-pdf-note'>{escape(str(ehs_jhs.get('disclaimer', '')))}</p>
 """
 
 
@@ -607,6 +757,8 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
     cghs_advisory_html = _render_cghs_eligibility_advisory_html(report)
     kcr_advisory_html = _render_kcr_kit_advisory_html(report)
     rajiv_report_html = _render_rajiv_aarogyasri_report_html(report)
+    ehs_jhs_report_html = _render_ehs_jhs_report_html(report)
+    pmjay_verification_html = _render_pmjay_hospital_verification_html(report)
     clinical_evidence_html = _render_clinical_evidence_html(report)
     restricted_medicine_html = render_restricted_medicine_flags_html(report)
 
@@ -691,6 +843,10 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
   {kcr_advisory_html}
 
   {rajiv_report_html}
+
+  {ehs_jhs_report_html}
+
+  {pmjay_verification_html}
 
   <p class='disclaimer'>{escape(BILL_DISCLAIMER)}</p>
 </body>

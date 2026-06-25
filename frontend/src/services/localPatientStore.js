@@ -96,6 +96,35 @@ export function persistLocalPatient(userId, patientData, localId = null) {
         patientData.rajivFamilyCoverageUsedAmount !== ""
           ? Number(patientData.rajivFamilyCoverageUsedAmount)
           : null,
+      ehsSelected: Boolean(patientData.ehsSelected),
+      ehsIsGovernmentEmployee: Boolean(
+        patientData.ehsSelected && patientData.ehsIsGovernmentEmployee
+      ),
+      ehsIsPensioner: Boolean(patientData.ehsSelected && patientData.ehsIsPensioner),
+      ehsIsDependent: Boolean(patientData.ehsSelected && patientData.ehsIsDependent),
+      ehsHasHealthCard: Boolean(
+        patientData.ehsSelected && patientData.ehsHasHealthCard
+      ),
+      ehsCardNumber:
+        patientData.ehsSelected && patientData.ehsCardNumber
+          ? String(patientData.ehsCardNumber).trim() || null
+          : null,
+      jhsSelected: Boolean(patientData.jhsSelected),
+      jhsIsWorkingJournalist: Boolean(
+        patientData.jhsSelected && patientData.jhsIsWorkingJournalist
+      ),
+      jhsIsRetiredJournalist: Boolean(
+        patientData.jhsSelected && patientData.jhsIsRetiredJournalist
+      ),
+      jhsIsDependent: Boolean(patientData.jhsSelected && patientData.jhsIsDependent),
+      jhsHasHealthCard: Boolean(
+        patientData.jhsSelected && patientData.jhsHasHealthCard
+      ),
+      jhsHasAadhaar: Boolean(patientData.jhsSelected && patientData.jhsHasAadhaar),
+      jhsCardNumber:
+        patientData.jhsSelected && patientData.jhsCardNumber
+          ? String(patientData.jhsCardNumber).trim() || null
+          : null,
       cghsBeneficiaryCategory: patientData.cghsBeneficiaryCategory || null,
       cghsEligibleCategoryConfirmed:
         patientData.cghsBeneficiaryCategory &&
@@ -108,6 +137,12 @@ export function persistLocalPatient(userId, patientData, localId = null) {
         patientData.cghsResidesInCoveredCity === true ||
         patientData.cghsResidesInCoveredCity === false
           ? patientData.cghsResidesInCoveredCity
+          : null,
+      pmjayHasAyushmanCard:
+        patientData.ayushmanEligible &&
+        (patientData.pmjayHasAyushmanCard === true ||
+          patientData.pmjayHasAyushmanCard === false)
+          ? patientData.pmjayHasAyushmanCard
           : null,
       savePastBills: Boolean(patientData.savePastBills),
     },

@@ -12,9 +12,14 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.aarogya_bhadratha import get_aarogya_store
 from app.aarogya_routes import router as aarogya_router
+from app.cghs_routes import router as cghs_router
+from app.pmjay_routes import router as pmjay_router
 from app.report_routes import router as report_router
+from app.cghs_covered_cities import get_cghs_covered_cities_store
+from app.pmjay_hospitals import get_pmjay_hospital_store
 from app.cghs_rates import (
     get_cghs_store,
+    normalize_item_name,
     resolve_hospital_type,
     resolve_rate_type,
     resolve_rate_type_for_hospital,
@@ -68,6 +73,8 @@ app.add_middleware(
 )
 
 app.include_router(aarogya_router)
+app.include_router(cghs_router)
+app.include_router(pmjay_router)
 app.include_router(report_router)
 app.include_router(prescription_router)
 
@@ -82,6 +89,51 @@ def load_reference_data() -> None:
         )
     except Exception as exc:
         print(f"WARNING: CGHS rates CSV failed to load: {exc}")
+
+    try:
+        covered_cities = get_cghs_covered_cities_store()
+        print(
+            f"Loaded {len(covered_cities.cities)} CGHS covered cities from "
+            f"{covered_cities.csv_path.name}"
+        )
+    except Exception as exc:
+        print(f"WARNING: CGHS covered cities CSV failed to load: {exc}")
+
+    try:
+        from app.cghs_costs import get_cghs_costs_store
+
+        costs_store = get_cghs_costs_store()
+        if costs_store:
+            print(
+                f"Loaded {len(costs_store.rows)} CGHS city-wise cost rows "
+                f"across {len(costs_store.cities)} cities from "
+                f"{costs_store.csv_path}"
+            )
+        else:
+            print("WARNING: CGHS city-wise costs CSV unavailable")
+    except Exception as exc:
+        print(f"WARNING: CGHS city-wise costs failed to load: {exc}")
+
+    try:
+        pmjay_hospitals = get_pmjay_hospital_store()
+        print(
+            f"Loaded {len(pmjay_hospitals.hospitals)} PM-JAY empanelled hospitals from "
+            f"{pmjay_hospitals.csv_path.name}"
+        )
+    except Exception as exc:
+        print(f"WARNING: PM-JAY hospital CSV failed to load: {exc}")
+
+    try:
+        from app.ehs_jhs import get_ehs_jhs_store
+
+        ehs_jhs = get_ehs_jhs_store()
+        print(
+            f"Loaded {len(ehs_jhs.packages)} EHS/JHS packages and "
+            f"{len(ehs_jhs.hospitals)} hospitals from "
+            f"{ehs_jhs.meta.get('primary_file', 'EHS_2017')}"
+        )
+    except Exception as exc:
+        print(f"WARNING: EHS/JHS data failed to load: {exc}")
 
     try:
         locations = get_location_store()
@@ -442,11 +494,54 @@ def _add_hbp_comparison(
     return compared_items
 
 
+def _tier_cghs_match_acceptable(item_name: str, match: dict[str, Any] | None) -> bool:
+    if match is None:
+        return False
+    normalized_item = normalize_item_name(item_name)
+    room_like = any(
+        token in normalized_item
+        for token in (
+            "room rent",
+            "room charges",
+            "ward charges",
+            "general ward",
+            "ward rent",
+        )
+    )
+    if not room_like:
+        return True
+    reference = normalize_item_name(str(match.get("reference_item", "")))
+    blocked_fragments = (
+        "polysomnography",
+        "sleep study",
+        "coronary care",
+        "icu ccu",
+        "picu",
+        "micu",
+        "hdu",
+    )
+    if any(fragment in reference for fragment in blocked_fragments):
+        return False
+    return any(
+        pattern in reference
+        for pattern in (
+            "room rent",
+            "room charges",
+            "ward charges",
+            "general ward",
+            "ward rent",
+        )
+    )
+
+
 def _add_cghs_comparison(
     line_items: list[dict[str, Any]],
     *,
     tier: str,
     rate_type: str,
+    patient_city: str | None = None,
+    hospital_type: str = "general",
+    nabh_accredited: bool = False,
 ) -> list[dict[str, Any]]:
     try:
         store = get_cghs_store()
@@ -455,16 +550,113 @@ def _add_cghs_comparison(
     except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    from app.cghs_costs import get_cghs_costs_store
+
+    costs_store = get_cghs_costs_store()
     compared_items: list[dict[str, Any]] = []
+
+    if costs_store and _dev_logging_enabled():
+        normalized_city = costs_store.normalize_city(patient_city)
+        logger.info(
+            "CGHS city-wise search: patient_city=%r normalized_city=%r rows=%s file=%s",
+            patient_city,
+            normalized_city,
+            costs_store.city_row_count(patient_city) if normalized_city else 0,
+            costs_store.csv_path,
+        )
 
     for raw_item in line_items:
         item = dict(raw_item)
-        item["comparison_source"] = "cghs"
         item_name = str(item.get("item_name", "")).strip()
         total_price = _to_float(item.get("total_price"))
+
+        city_match: dict[str, Any] | None = None
+        match_debug: dict[str, Any] | None = None
+        if costs_store and patient_city:
+            city_match, match_debug = costs_store.find_match_detailed(
+                item_name,
+                city=patient_city,
+                nabh_accredited=nabh_accredited,
+                hospital_type=hospital_type,
+            )
+        elif costs_store:
+            _, match_debug = costs_store.find_match_detailed(
+                item_name,
+                city=patient_city,
+                nabh_accredited=nabh_accredited,
+                hospital_type=hospital_type,
+            )
+
+        if match_debug and _dev_logging_enabled():
+            item["cghs_match_debug"] = match_debug
+
+        if match_debug and match_debug.get("special_handling") == "generic_pharmacy":
+            item["comparison_source"] = "cghs"
+            item["cghs_rate"] = None
+            item["price_difference"] = None
+            item["flag"] = "no_reference"
+            item["matched_reference_item"] = None
+            item["approximate_match"] = False
+            item["cghs_code"] = None
+            item["tier"] = canonical_tier
+            item["rate_type"] = canonical_rate_type
+            item["non_nabh_rate"] = None
+            item["nabh_rate"] = None
+            item["super_speciality_rate"] = None
+            item["speciality_classification"] = None
+            item["cghs_tier_fallback"] = False
+            item["cghs_generic_pharmacy"] = True
+            item["cghs_costs_match_reason"] = match_debug.get("fallback_reason")
+            compared_items.append(item)
+            continue
+
+        if city_match:
+            cghs_rate = _to_float(city_match["selected_rate"])
+            price_difference = round(total_price - cghs_rate, 2)
+            item["comparison_source"] = "cghs_city_costs"
+            item["cghs_rate"] = cghs_rate
+            item["price_difference"] = price_difference
+            item["flag"] = "overpriced" if price_difference > 0 else "acceptable"
+            item["matched_reference_item"] = city_match.get("matched_procedure_name")
+            item["approximate_match"] = bool(city_match.get("approximate_match"))
+            item["cghs_code"] = None
+            item["tier"] = canonical_tier
+            item["rate_type"] = city_match.get("rate_type_used") or canonical_rate_type
+            item["non_nabh_rate"] = city_match.get("non_nabh_rate")
+            item["nabh_rate"] = city_match.get("nabh_rate")
+            item["super_speciality_rate"] = None
+            item["speciality_classification"] = None
+            item["cghs_costs_source_pdf"] = city_match.get("source_pdf")
+            item["cghs_costs_source_page"] = city_match.get("source_page")
+            item["cghs_costs_source_label"] = city_match.get("source_label")
+            item["cghs_costs_source_display"] = city_match.get("source_display")
+            item["cghs_costs_source_city"] = city_match.get("source_city")
+            item["cghs_costs_source_file_internal"] = city_match.get("source_file_internal")
+            item["cghs_costs_extraction_method"] = city_match.get("extraction_method")
+            item["cghs_costs_quality_status"] = city_match.get("quality_status")
+            item["cghs_costs_match_reason"] = city_match.get("match_reason")
+            item["cghs_costs_confidence"] = city_match.get("confidence_score")
+            item["cghs_costs_rate_type"] = city_match.get("rate_type_used")
+            item["cghs_costs_rate_type_display"] = city_match.get("rate_type_display")
+            item["cghs_tier_fallback"] = False
+            item["cghs_generic_pharmacy"] = False
+            compared_items.append(item)
+            continue
+
+        item["comparison_source"] = "cghs"
         match = store.find_match(
             item_name, tier=canonical_tier, rate_type=canonical_rate_type
         )
+        city_attempted = bool(
+            match_debug and match_debug.get("city_wise_attempted")
+        )
+        if match and city_attempted and not _tier_cghs_match_acceptable(item_name, match):
+            if match_debug and _dev_logging_enabled():
+                match_debug["fallback_used"] = False
+                match_debug["fallback_reason"] = (
+                    "Rejected weak tier CGHS fallback match after city-wise room rent miss."
+                )
+            match = None
 
         if match is None:
             item["cghs_rate"] = None
@@ -479,6 +671,18 @@ def _add_cghs_comparison(
             item["nabh_rate"] = None
             item["super_speciality_rate"] = None
             item["speciality_classification"] = None
+            item["cghs_tier_fallback"] = bool(
+                costs_store and match_debug and match_debug.get("city_wise_attempted")
+            )
+            item["cghs_generic_pharmacy"] = False
+            if match_debug:
+                item["cghs_costs_match_reason"] = match_debug.get("fallback_reason")
+                if _dev_logging_enabled():
+                    match_debug["fallback_used"] = False
+                    match_debug["fallback_reason"] = (
+                        match_debug.get("fallback_reason")
+                        or "No tier CGHS fallback rate found"
+                    )
         else:
             cghs_rate = _to_float(match["rate"])
             price_difference = round(total_price - cghs_rate, 2)
@@ -494,6 +698,24 @@ def _add_cghs_comparison(
             item["nabh_rate"] = match["nabh_rate"]
             item["super_speciality_rate"] = match["super_speciality_rate"]
             item["speciality_classification"] = match["speciality_classification"]
+            item["cghs_tier_fallback"] = bool(
+                costs_store and match_debug and match_debug.get("city_wise_attempted")
+            )
+            item["cghs_generic_pharmacy"] = False
+            item["cghs_costs_match_reason"] = (
+                "City-wise CGHS cost not matched. Existing CGHS fallback rate used."
+            )
+            if match_debug and _dev_logging_enabled():
+                match_debug["fallback_used"] = True
+                match_debug["fallback_reason"] = item["cghs_costs_match_reason"]
+                if _dev_logging_enabled():
+                    logger.info(
+                        "CGHS tier fallback: item=%r tier=%s -> %r @ %s",
+                        item_name,
+                        canonical_tier,
+                        match["reference_item"],
+                        cghs_rate,
+                    )
 
         compared_items.append(item)
 
@@ -589,6 +811,66 @@ def _add_rajiv_aarogyasri_comparison(
     return compared_items
 
 
+def _add_ehs_jhs_comparison(
+    line_items: list[dict[str, Any]],
+    *,
+    tier: str,
+    rate_type: str,
+) -> list[dict[str, Any]]:
+    from app.ehs_jhs import get_ehs_jhs_store
+
+    try:
+        store = get_ehs_jhs_store()
+    except Exception as exc:
+        logger.exception("EHS/JHS comparison unavailable: %s", exc)
+        compared_items: list[dict[str, Any]] = []
+        for raw_item in line_items:
+            cghs_items = _add_cghs_comparison([raw_item], tier=tier, rate_type=rate_type)
+            fallback_item = cghs_items[0]
+            fallback_item["comparison_source"] = "cghs"
+            fallback_item["ehs_jhs_fallback_used"] = True
+            fallback_item["ehs_jhs_package_not_found"] = True
+            compared_items.append(fallback_item)
+        return compared_items
+
+    compared_items: list[dict[str, Any]] = []
+    for raw_item in line_items:
+        item = dict(raw_item)
+        item_name = str(item.get("item_name", "")).strip()
+        total_price = _to_float(item.get("total_price"))
+        package_match = store.match_package(item_name)
+        if package_match.get("matched_package") and package_match.get("approved_rate") is not None:
+            approved_rate = _to_float(package_match["approved_rate"])
+            price_difference = round(total_price - approved_rate, 2)
+            item["comparison_source"] = "ehs_jhs"
+            item["ehs_jhs_rate"] = approved_rate
+            item["price_difference"] = price_difference
+            item["flag"] = "overpriced" if price_difference > 0 else "acceptable"
+            item["matched_reference_item"] = package_match.get("package_name")
+            item["approximate_match"] = bool(
+                _to_float(package_match.get("confidence_score")) < 0.84
+            )
+            item["ehs_jhs_package_code"] = package_match.get("package_code")
+            item["ehs_jhs_package_name"] = package_match.get("package_name")
+            item["ehs_jhs_specialty"] = package_match.get("category_or_specialty")
+            item["ehs_jhs_source_file"] = package_match.get("source_file")
+            item["ehs_jhs_source_sheet"] = package_match.get("source_sheet")
+            item["ehs_jhs_match_confidence"] = package_match.get("confidence_score")
+            item["ehs_jhs_fallback_used"] = False
+            item["cghs_rate"] = None
+            compared_items.append(item)
+            continue
+
+        cghs_items = _add_cghs_comparison([item], tier=tier, rate_type=rate_type)
+        fallback_item = cghs_items[0]
+        fallback_item["comparison_source"] = "cghs"
+        fallback_item["ehs_jhs_fallback_used"] = True
+        fallback_item["ehs_jhs_package_not_found"] = True
+        compared_items.append(fallback_item)
+
+    return compared_items
+
+
 def _add_price_comparison(
     line_items: list[dict[str, Any]],
     *,
@@ -597,8 +879,13 @@ def _add_price_comparison(
     tier_id: str | None = None,
     pmjay_eligible: bool = False,
     rajiv_aarogyasri_selected: bool = False,
+    ehs_selected: bool = False,
+    jhs_selected: bool = False,
     bill_date: str | None = None,
     rajiv_context_match: dict[str, Any] | None = None,
+    patient_city: str | None = None,
+    hospital_type: str = "general",
+    nabh_accredited: bool = False,
 ) -> list[dict[str, Any]]:
     from app.medicine_comparison import (
         compare_line_item_with_nppa,
@@ -623,13 +910,24 @@ def _add_price_comparison(
                     context_match=rajiv_context_match,
                 )
             )
+        elif ehs_selected or jhs_selected:
+            compared.extend(
+                _add_ehs_jhs_comparison([item], tier=tier, rate_type=rate_type)
+            )
         elif pmjay_eligible:
             compared.extend(
                 _add_hbp_comparison([item], tier_id=effective_tier_id)
             )
         else:
             compared.extend(
-                _add_cghs_comparison([item], tier=tier, rate_type=rate_type)
+                _add_cghs_comparison(
+                    [item],
+                    tier=tier,
+                    rate_type=rate_type,
+                    patient_city=patient_city,
+                    hospital_type=hospital_type,
+                    nabh_accredited=nabh_accredited,
+                )
             )
     return compared
 
@@ -745,6 +1043,19 @@ class CompareBillRequest(BaseModel):
     rajiv_has_aadhaar: bool = False
     rajiv_is_cancer_related: bool = False
     rajiv_family_coverage_used_amount: float | None = None
+    ehs_selected: bool = False
+    ehs_is_government_employee: bool = False
+    ehs_is_pensioner: bool = False
+    ehs_is_dependent: bool = False
+    ehs_has_health_card: bool = False
+    ehs_card_number: str | None = None
+    jhs_selected: bool = False
+    jhs_is_working_journalist: bool = False
+    jhs_is_retired_journalist: bool = False
+    jhs_is_dependent: bool = False
+    jhs_has_health_card: bool = False
+    jhs_has_aadhaar: bool = False
+    jhs_card_number: str | None = None
     bill_date: str | None = None
     patient_district: str | None = None
     patient_id: str | None = None
@@ -763,6 +1074,10 @@ class CompareBillRequest(BaseModel):
     cghs_beneficiary_category: str | None = None
     cghs_eligible_category_confirmed: bool | None = None
     cghs_resides_in_covered_city: bool | None = None
+    pmjay_has_ayushman_card: bool | None = None
+    pmjay_state: str | None = None
+    pmjay_district: str | None = None
+    pmjay_city: str | None = None
 
     @model_validator(mode="after")
     def resolve_state(self) -> "CompareBillRequest":
@@ -872,6 +1187,19 @@ def _build_comparison_response(
     rajiv_has_aadhaar: bool = False,
     rajiv_is_cancer_related: bool = False,
     rajiv_family_coverage_used_amount: float | None = None,
+    ehs_selected: bool = False,
+    ehs_is_government_employee: bool = False,
+    ehs_is_pensioner: bool = False,
+    ehs_is_dependent: bool = False,
+    ehs_has_health_card: bool = False,
+    ehs_card_number: str | None = None,
+    jhs_selected: bool = False,
+    jhs_is_working_journalist: bool = False,
+    jhs_is_retired_journalist: bool = False,
+    jhs_is_dependent: bool = False,
+    jhs_has_health_card: bool = False,
+    jhs_has_aadhaar: bool = False,
+    jhs_card_number: str | None = None,
     bill_date: str | None = None,
     patient_district: str | None = None,
     patient_id: str | None = None,
@@ -888,6 +1216,10 @@ def _build_comparison_response(
     cghs_beneficiary_category: str | None = None,
     cghs_eligible_category_confirmed: bool | None = None,
     cghs_resides_in_covered_city: bool | None = None,
+    pmjay_has_ayushman_card: bool | None = None,
+    pmjay_state: str | None = None,
+    pmjay_district: str | None = None,
+    pmjay_city: str | None = None,
 ) -> dict[str, Any]:
     if not line_items:
         raise HTTPException(status_code=400, detail="Add at least one line item.")
@@ -900,6 +1232,8 @@ def _build_comparison_response(
     canonical_rate_type, hospital_meta = _resolve_nabh_and_rate_type(
         hospital_name, hospital_type
     )
+    patient_city = location_meta.get("city", city)
+    nabh_accredited = bool(hospital_meta["nabh"].get("is_accredited"))
 
     normalized_items = _normalize_line_items(line_items)
     tier_id = location_meta.get("tier_id") or tier or "tier_3"
@@ -955,8 +1289,13 @@ def _build_comparison_response(
         tier_id=tier_id,
         pmjay_eligible=pmjay_eligible,
         rajiv_aarogyasri_selected=rajiv_aarogyasri_selected,
+        ehs_selected=ehs_selected,
+        jhs_selected=jhs_selected,
         bill_date=bill_date,
         rajiv_context_match=rajiv_context_match,
+        patient_city=patient_city,
+        hospital_type=hospital_meta["hospital_type"],
+        nabh_accredited=nabh_accredited,
     )
     compared_line_items, jan_aushadhi = enrich_scheme_line_items_with_jan_aushadhi(
         compared_line_items
@@ -997,13 +1336,16 @@ def _build_comparison_response(
             }
 
     store = get_cghs_store()
-    comparison_scheme = (
-        "rajiv_aarogyasri"
-        if rajiv_aarogyasri_selected
-        else "hbp_pmjay"
-        if pmjay_eligible
-        else "cghs"
-    )
+    if rajiv_aarogyasri_selected:
+        comparison_scheme = "rajiv_aarogyasri"
+    elif ehs_selected:
+        comparison_scheme = "ehs"
+    elif jhs_selected:
+        comparison_scheme = "jhs"
+    elif pmjay_eligible:
+        comparison_scheme = "hbp_pmjay"
+    else:
+        comparison_scheme = "cghs"
     rates_source: dict[str, Any] = {
         "cghs_file": str(store.csv_path.name),
         "total_procedures_loaded": len(store.rows),
@@ -1019,6 +1361,20 @@ def _build_comparison_response(
         except Exception:
             rates_source["aarogyasri_hospitals_loaded"] = 0
             rates_source["aarogyasri_packages_loaded"] = 0
+    if ehs_selected or jhs_selected:
+        try:
+            from app.ehs_jhs import get_ehs_jhs_store
+
+            ehs_jhs_store = get_ehs_jhs_store()
+            rates_source["ehs_jhs_primary_file"] = ehs_jhs_store.meta.get("primary_file")
+            rates_source["ehs_jhs_primary_sheet"] = ehs_jhs_store.meta.get("primary_sheet")
+            rates_source["ehs_jhs_packages_loaded"] = len(ehs_jhs_store.packages)
+            rates_source["ehs_jhs_hospitals_loaded"] = len(ehs_jhs_store.hospitals)
+        except Exception:
+            rates_source["ehs_jhs_primary_file"] = None
+            rates_source["ehs_jhs_primary_sheet"] = None
+            rates_source["ehs_jhs_packages_loaded"] = 0
+            rates_source["ehs_jhs_hospitals_loaded"] = 0
     if pmjay_eligible:
         try:
             hbp_store = get_hbp_store()
@@ -1051,8 +1407,11 @@ def _build_comparison_response(
         rates_source["total_jan_aushadhi_products"] = 0
 
     from app.cghs_eligibility import build_cghs_eligibility_advisory
+    from app.cghs_costs import build_cghs_costs_report, get_cghs_costs_store
     from app.hospitalisation_relief_scheme import build_hospitalisation_relief_advisory
     from app.kcr_kit_scheme import build_kcr_kit_advisory
+    from app.pmjay_hospitals import build_pmjay_hospital_verification
+    from app.ehs_jhs import build_ehs_jhs_report
     from app.rajiv_aarogyasri import build_rajiv_aarogyasri_report
 
     patient_payload: dict[str, Any] | None = None
@@ -1082,9 +1441,26 @@ def _build_comparison_response(
             "rajiv_has_aadhaar": rajiv_has_aadhaar,
             "rajiv_is_cancer_related": rajiv_is_cancer_related,
             "rajiv_family_coverage_used_amount": rajiv_family_coverage_used_amount,
+            "ehs_selected": ehs_selected,
+            "ehs_is_government_employee": ehs_is_government_employee,
+            "ehs_is_pensioner": ehs_is_pensioner,
+            "ehs_is_dependent": ehs_is_dependent,
+            "ehs_has_health_card": ehs_has_health_card,
+            "ehs_card_number": ehs_card_number,
+            "jhs_selected": jhs_selected,
+            "jhs_is_working_journalist": jhs_is_working_journalist,
+            "jhs_is_retired_journalist": jhs_is_retired_journalist,
+            "jhs_is_dependent": jhs_is_dependent,
+            "jhs_has_health_card": jhs_has_health_card,
+            "jhs_has_aadhaar": jhs_has_aadhaar,
+            "jhs_card_number": jhs_card_number,
             "cghs_beneficiary_category": cghs_beneficiary_category,
             "cghs_eligible_category_confirmed": cghs_eligible_category_confirmed,
             "cghs_resides_in_covered_city": cghs_resides_in_covered_city,
+            "pmjay_has_ayushman_card": pmjay_has_ayushman_card,
+            "pmjay_state": pmjay_state or location_meta.get("state_name", state_ut_name),
+            "pmjay_district": pmjay_district or patient_district,
+            "pmjay_city": pmjay_city or location_meta.get("city", city),
         }
 
     hospitalisation_relief_advisory = build_hospitalisation_relief_advisory(
@@ -1150,6 +1526,59 @@ def _build_comparison_response(
         eligible_category_confirmed=cghs_eligible_category_confirmed,
         resides_in_covered_city=cghs_resides_in_covered_city,
     )
+    pmjay_hospital_verification = build_pmjay_hospital_verification(
+        pmjay_selected=pmjay_eligible,
+        ocr_hospital_name=hospital_name,
+        patient_state=pmjay_state or location_meta.get("state_name", state_ut_name),
+        patient_district=pmjay_district or patient_district,
+        patient_city=pmjay_city or location_meta.get("city", city),
+        pmjay_has_ayushman_card=pmjay_has_ayushman_card,
+        line_items=compared_line_items,
+        ocr_text=ocr_text,
+    )
+    ehs_jhs_scheme_type = "EHS" if ehs_selected else "JHS" if jhs_selected else ""
+    ehs_jhs_report = build_ehs_jhs_report(
+        scheme_type=ehs_jhs_scheme_type,
+        selected=ehs_selected or jhs_selected,
+        ehs_is_government_employee=ehs_is_government_employee,
+        ehs_is_pensioner=ehs_is_pensioner,
+        ehs_is_dependent=ehs_is_dependent,
+        ehs_has_health_card=ehs_has_health_card,
+        ehs_card_number=ehs_card_number,
+        jhs_is_working_journalist=jhs_is_working_journalist,
+        jhs_is_retired_journalist=jhs_is_retired_journalist,
+        jhs_is_dependent=jhs_is_dependent,
+        jhs_has_health_card=jhs_has_health_card,
+        jhs_has_aadhaar=jhs_has_aadhaar,
+        jhs_card_number=jhs_card_number,
+        ocr_hospital_name=hospital_name,
+        patient_district=patient_district or location_meta.get("city", city),
+        patient_city=location_meta.get("city", city),
+        line_items=normalized_items,
+        compared_line_items=compared_line_items,
+        ocr_text=ocr_text,
+    )
+
+    cghs_costs_report = None
+    if comparison_scheme == "cghs":
+        cghs_costs_report = build_cghs_costs_report(
+            enabled=True,
+            patient_city=patient_city,
+            hospital_type=hospital_meta["hospital_type"],
+            nabh_accredited=nabh_accredited,
+            line_items=normalized_items,
+            compared_line_items=compared_line_items,
+            include_debug=_dev_logging_enabled(),
+        )
+        costs_store = get_cghs_costs_store()
+        if costs_store:
+            rates_source["cghs_costs_file"] = costs_store.csv_path.name
+            rates_source["cghs_costs_rows_loaded"] = len(costs_store.rows)
+            rates_source["cghs_costs_cities_loaded"] = len(costs_store.cities)
+        else:
+            rates_source["cghs_costs_file"] = None
+            rates_source["cghs_costs_rows_loaded"] = 0
+            rates_source["cghs_costs_cities_loaded"] = 0
 
     return {
         "filename": filename,
@@ -1173,6 +1602,8 @@ def _build_comparison_response(
             "rate_type_label": _rate_type_label(canonical_rate_type),
             "pmjay_eligible": pmjay_eligible,
             "rajiv_aarogyasri_selected": rajiv_aarogyasri_selected,
+            "ehs_selected": ehs_selected,
+            "jhs_selected": jhs_selected,
             "comparison_scheme": comparison_scheme,
             "cghs_fallback_from_aarogya": cghs_fallback_from_aarogya,
         },
@@ -1188,8 +1619,11 @@ def _build_comparison_response(
         "hospitalisation_relief_advisory": hospitalisation_relief_advisory,
         "kcr_kit_advisory": kcr_kit_advisory,
         "rajiv_aarogyasri_report": rajiv_aarogyasri_report,
+        "ehs_jhs_report": ehs_jhs_report,
         "restricted_medicine_flags": restricted_medicine_flags,
         "cghs_eligibility_advisory": cghs_eligibility_advisory,
+        "cghs_costs_report": cghs_costs_report,
+        "pmjay_hospital_verification": pmjay_hospital_verification,
     }
 
 
@@ -1250,6 +1684,19 @@ def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
         rajiv_has_aadhaar=body.rajiv_has_aadhaar,
         rajiv_is_cancer_related=body.rajiv_is_cancer_related,
         rajiv_family_coverage_used_amount=body.rajiv_family_coverage_used_amount,
+        ehs_selected=body.ehs_selected,
+        ehs_is_government_employee=body.ehs_is_government_employee,
+        ehs_is_pensioner=body.ehs_is_pensioner,
+        ehs_is_dependent=body.ehs_is_dependent,
+        ehs_has_health_card=body.ehs_has_health_card,
+        ehs_card_number=body.ehs_card_number,
+        jhs_selected=body.jhs_selected,
+        jhs_is_working_journalist=body.jhs_is_working_journalist,
+        jhs_is_retired_journalist=body.jhs_is_retired_journalist,
+        jhs_is_dependent=body.jhs_is_dependent,
+        jhs_has_health_card=body.jhs_has_health_card,
+        jhs_has_aadhaar=body.jhs_has_aadhaar,
+        jhs_card_number=body.jhs_card_number,
         bill_date=body.bill_date,
         patient_district=body.patient_district,
         patient_id=body.patient_id,
@@ -1266,6 +1713,10 @@ def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
         cghs_beneficiary_category=body.cghs_beneficiary_category,
         cghs_eligible_category_confirmed=body.cghs_eligible_category_confirmed,
         cghs_resides_in_covered_city=body.cghs_resides_in_covered_city,
+        pmjay_has_ayushman_card=body.pmjay_has_ayushman_card,
+        pmjay_state=body.pmjay_state,
+        pmjay_district=body.pmjay_district,
+        pmjay_city=body.pmjay_city,
     )
     if _dev_logging_enabled():
         logger.info(
