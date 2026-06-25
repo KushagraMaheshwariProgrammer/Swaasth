@@ -12,7 +12,7 @@ export const CGHS_IMPORTANT_NOTE =
   "This section is an eligibility advisory based on CGHS beneficiary categories. Final eligibility, CGHS card validity, dependent status, city coverage, contribution requirements, and entitlement must be verified through official CGHS/MoHFW sources or the concerned CGHS Wellness Centre.";
 
 export const CGHS_FALLBACK_NOTE =
-  "CGHS rates are being used as a benchmark/fallback. CGHS eligibility is separate and must be verified.";
+  "CGHS rates are used only as a benchmark/fallback here. CGHS eligibility is separate.";
 
 export const CGHS_BENEFICIARY_CATEGORIES = [
   { id: "central_gov_employee", label: "Central Government employee" },
@@ -120,20 +120,30 @@ const PREVIEW_MAY_BE_ELIGIBLE =
   "Patient may fall under a CGHS eligible category, subject to CGHS card and official verification.";
 const PREVIEW_NOT_CONFIRMED =
   "CGHS eligibility could not be confirmed from the information provided. Verify beneficiary category and CGHS card status.";
-const PREVIEW_CITY_REQUIRED =
-  "CGHS eligibility/facility access depends on residence in a notified CGHS-covered city or applicable special rules.";
+const RESIDENCE_CONFIRMED =
+  "Patient indicated residence in a CGHS-covered city.";
+const RESIDENCE_NOT_CONFIRMED =
+  "Patient indicated they do not reside in a CGHS-covered city. CGHS eligibility/facility access should be verified.";
+const RESIDENCE_UNKNOWN =
+  "CGHS-covered city residence was not confirmed. Verify city coverage with CGHS/MoHFW.";
+
+function buildResidenceAdvisory(residesInCoveredCity = null) {
+  if (residesInCoveredCity === true) {
+    return RESIDENCE_CONFIRMED;
+  }
+  if (residesInCoveredCity === false) {
+    return RESIDENCE_NOT_CONFIRMED;
+  }
+  return RESIDENCE_UNKNOWN;
+}
 
 export function buildCghsEligibilityPreview({
   beneficiaryCategory = null,
   residesInCoveredCity = null,
 } = {}) {
-  const messages = [];
+  const messages = [buildResidenceAdvisory(residesInCoveredCity)];
   const categoryConfirmed =
     beneficiaryCategory && beneficiaryCategory !== "not_sure";
-
-  if (residesInCoveredCity === false) {
-    messages.push(PREVIEW_CITY_REQUIRED);
-  }
 
   if (categoryConfirmed && residesInCoveredCity === true) {
     messages.push(PREVIEW_MAY_BE_ELIGIBLE);

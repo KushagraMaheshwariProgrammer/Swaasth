@@ -8,3 +8,6 @@ groq
 python-dotenv
 fastembed
 chromadb
+openpyxl
+pdfplumber
+pandas

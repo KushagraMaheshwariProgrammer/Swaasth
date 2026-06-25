@@ -21,6 +21,24 @@ export const SCHEMES = {
     reportTitle: "PM-JAY HBP Bill Comparison Report",
     filenamePrefix: "pmjay-hbp",
   },
+  rajiv_aarogyasri: {
+    id: "rajiv_aarogyasri",
+    label: "Rajiv Aarogyasri Package Benchmark",
+    reportTitle: "Rajiv Aarogyasri Bill Comparison Report",
+    filenamePrefix: "rajiv-aarogyasri",
+  },
+  ehs: {
+    id: "ehs",
+    label: "EHS Package Benchmark",
+    reportTitle: "Employees Health Scheme Verification Report",
+    filenamePrefix: "ehs",
+  },
+  jhs: {
+    id: "jhs",
+    label: "JHS Package Benchmark",
+    reportTitle: "Journalists Health Scheme Verification Report",
+    filenamePrefix: "jhs",
+  },
   aarogya_bhadratha: {
     id: "aarogya_bhadratha",
     label: "Aarogya Bhadratha Scheme",

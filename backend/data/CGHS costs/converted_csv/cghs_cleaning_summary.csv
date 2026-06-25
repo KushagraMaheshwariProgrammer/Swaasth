@@ -1,0 +1,32 @@
+metric,value,details
+total_rows_before_cleaning,32509,
+total_clean_rows,22211,
+total_pdfplumber_rows_kept,21894,
+total_ocr_rows_kept,317,
+total_rows_moved_to_manual_review,9573,
+cities_covered_in_clean_file,24,"Ahmedabad, Allahabad and Prayagraj and Varanasi, Bengaluru, Bhopal, Bhubaneswar, Chandigarh, Chennai, Dehradun, Delhi and NCR, Hyderabad, Indore, Jabalpur, Jaipur, Kanpur and Gwalior, Kolkata, Lucknow, Meerut, Mumbai, Nagpur, Patna, Pune, Ranchi, Shillong, Trivandrum"
+ready_for_app_integration,yes,Use cleaned file only; review file is not for automatic matching
+city::Ahmedabad,634,clean=30; review=604; ocr_in_review=604; mostly_manual_review=yes
+city::Allahabad and Prayagraj and Varanasi,355,clean=27; review=328; ocr_in_review=328; mostly_manual_review=yes
+city::Bengaluru,576,clean=80; review=496; ocr_in_review=496; mostly_manual_review=yes
+city::Bhopal,277,clean=23; review=254; ocr_in_review=254; mostly_manual_review=yes
+city::Bhubaneswar,1640,clean=39; review=1601; ocr_in_review=1601; mostly_manual_review=yes
+city::Chandigarh,254,clean=29; review=225; ocr_in_review=225; mostly_manual_review=yes
+city::Chennai,1554,clean=21; review=1533; ocr_in_review=1533; mostly_manual_review=yes
+city::Dehradun,1781,clean=27; review=1754; ocr_in_review=1754; mostly_manual_review=yes
+city::Delhi and NCR,2079,clean=1810; review=269; ocr_in_review=94; mostly_manual_review=no
+city::Hyderabad,1395,clean=48; review=1347; ocr_in_review=1344; mostly_manual_review=yes
+city::Indore,106,clean=25; review=81; ocr_in_review=78; mostly_manual_review=yes
+city::Jabalpur,1964,clean=1787; review=177; ocr_in_review=0; mostly_manual_review=no
+city::Jaipur,1912,clean=1843; review=69; ocr_in_review=0; mostly_manual_review=no
+city::Kanpur and Gwalior,1929,clean=1838; review=91; ocr_in_review=0; mostly_manual_review=no
+city::Kolkata,1908,clean=1822; review=86; ocr_in_review=0; mostly_manual_review=no
+city::Lucknow,1936,clean=1832; review=104; ocr_in_review=0; mostly_manual_review=no
+city::Meerut,106,clean=25; review=81; ocr_in_review=78; mostly_manual_review=yes
+city::Mumbai,1849,clean=1799; review=50; ocr_in_review=0; mostly_manual_review=no
+city::Nagpur,1954,clean=1841; review=113; ocr_in_review=78; mostly_manual_review=no
+city::Patna,1863,clean=1823; review=40; ocr_in_review=0; mostly_manual_review=no
+city::Pune,1897,clean=1849; review=48; ocr_in_review=0; mostly_manual_review=no
+city::Ranchi,106,clean=25; review=81; ocr_in_review=78; mostly_manual_review=yes
+city::Shillong,1870,clean=1836; review=34; ocr_in_review=0; mostly_manual_review=no
+city::Trivandrum,1839,clean=1732; review=107; ocr_in_review=0; mostly_manual_review=no

@@ -7,6 +7,8 @@ import EligibilityCriteriaModal, {
   PMJAY_ELIGIBILITY_SECTIONS,
   RAJIV_AAROGYASRI_ELIGIBILITY_SECTIONS,
 } from "./EligibilityCriteriaModal";
+import EhsQuestionsModal, { emptyEhsAnswers } from "./EhsQuestionsModal";
+import JhsQuestionsModal, { emptyJhsAnswers } from "./JhsQuestionsModal";
 import KcrKitQuestionsModal, {
   emptyKcrKitAnswers,
 } from "./KcrKitQuestionsModal";
@@ -16,6 +18,8 @@ import RajivAarogyasriQuestionsModal, {
 import CghsEligibilityQuestionsModal, {
   emptyCghsEligibilityAnswers,
 } from "./CghsEligibilityQuestionsModal";
+import PmjayQuestionsModal, { emptyPmjayAnswers } from "./PmjayQuestionsModal";
+import PmjayEmpanelledHospitalsModal from "./PmjayEmpanelledHospitalsModal";
 import CghsEligibilityCriteriaContent from "./CghsEligibilityCriteriaContent";
 import SchemeYesNoQuestion from "./SchemeYesNoQuestion";
 import { getStateOptions, isTelanganaState } from "../services/locations";
@@ -39,6 +43,25 @@ export const emptyKcrKitFields = () => ({
   kcrIdentifiedByAnganwadiWorker: false,
 });
 
+export const emptyEhsFields = () => ({
+  ehsSelected: false,
+  ehsIsGovernmentEmployee: false,
+  ehsIsPensioner: false,
+  ehsIsDependent: false,
+  ehsHasHealthCard: false,
+  ehsCardNumber: "",
+});
+
+export const emptyJhsFields = () => ({
+  jhsSelected: false,
+  jhsIsWorkingJournalist: false,
+  jhsIsRetiredJournalist: false,
+  jhsIsDependent: false,
+  jhsHasHealthCard: false,
+  jhsHasAadhaar: false,
+  jhsCardNumber: "",
+});
+
 export const emptyRajivAarogyasriFields = () => ({
   rajivAarogyasriSelected: false,
   rajivIsTelanganaResident: false,
@@ -53,6 +76,10 @@ export const emptyCghsEligibilityFields = () => ({
   cghsResidesInCoveredCity: null,
 });
 
+export const emptyPmjayFields = () => ({
+  pmjayHasAyushmanCard: null,
+});
+
 export const emptyPatientForm = () => ({
   name: "",
   age: "",
@@ -64,7 +91,10 @@ export const emptyPatientForm = () => ({
   isRegisteredConstructionWorker: false,
   ...emptyKcrKitFields(),
   ...emptyRajivAarogyasriFields(),
+  ...emptyEhsFields(),
+  ...emptyJhsFields(),
   ...emptyCghsEligibilityFields(),
+  ...emptyPmjayFields(),
   savePastBills: false,
 });
 
@@ -104,8 +134,22 @@ export function patientToFormFields(patient) {
       patient?.rajivFamilyCoverageUsedAmount != null
         ? String(patient.rajivFamilyCoverageUsedAmount)
         : "",
+    ehsSelected: Boolean(patient?.ehsSelected),
+    ehsIsGovernmentEmployee: Boolean(patient?.ehsIsGovernmentEmployee),
+    ehsIsPensioner: Boolean(patient?.ehsIsPensioner),
+    ehsIsDependent: Boolean(patient?.ehsIsDependent),
+    ehsHasHealthCard: Boolean(patient?.ehsHasHealthCard),
+    ehsCardNumber: patient?.ehsCardNumber || "",
+    jhsSelected: Boolean(patient?.jhsSelected),
+    jhsIsWorkingJournalist: Boolean(patient?.jhsIsWorkingJournalist),
+    jhsIsRetiredJournalist: Boolean(patient?.jhsIsRetiredJournalist),
+    jhsIsDependent: Boolean(patient?.jhsIsDependent),
+    jhsHasHealthCard: Boolean(patient?.jhsHasHealthCard),
+    jhsHasAadhaar: Boolean(patient?.jhsHasAadhaar),
+    jhsCardNumber: patient?.jhsCardNumber || "",
     cghsBeneficiaryCategory: patient?.cghsBeneficiaryCategory || "",
     cghsResidesInCoveredCity: patient?.cghsResidesInCoveredCity ?? null,
+    pmjayHasAyushmanCard: patient?.pmjayHasAyushmanCard ?? null,
     savePastBills: Boolean(patient?.savePastBills),
   };
 }
@@ -130,6 +174,27 @@ function getKcrAnswersFromForm(form) {
   };
 }
 
+function getEhsAnswersFromForm(form) {
+  return {
+    ehsIsGovernmentEmployee: Boolean(form.ehsIsGovernmentEmployee),
+    ehsIsPensioner: Boolean(form.ehsIsPensioner),
+    ehsIsDependent: Boolean(form.ehsIsDependent),
+    ehsHasHealthCard: Boolean(form.ehsHasHealthCard),
+    ehsCardNumber: form.ehsCardNumber ?? "",
+  };
+}
+
+function getJhsAnswersFromForm(form) {
+  return {
+    jhsIsWorkingJournalist: Boolean(form.jhsIsWorkingJournalist),
+    jhsIsRetiredJournalist: Boolean(form.jhsIsRetiredJournalist),
+    jhsIsDependent: Boolean(form.jhsIsDependent),
+    jhsHasHealthCard: Boolean(form.jhsHasHealthCard),
+    jhsHasAadhaar: Boolean(form.jhsHasAadhaar),
+    jhsCardNumber: form.jhsCardNumber ?? "",
+  };
+}
+
 function getRajivAnswersFromForm(form) {
   return {
     rajivIsTelanganaResident: Boolean(form.rajivIsTelanganaResident),
@@ -144,6 +209,12 @@ function getCghsAnswersFromForm(form) {
   return {
     cghsBeneficiaryCategory: form.cghsBeneficiaryCategory || "",
     cghsResidesInCoveredCity: form.cghsResidesInCoveredCity,
+  };
+}
+
+function getPmjayAnswersFromForm(form) {
+  return {
+    pmjayHasAyushmanCard: form.pmjayHasAyushmanCard,
   };
 }
 
@@ -194,6 +265,12 @@ export default function PatientForm({
       setForm((prev) => ({ ...prev, ...emptyRajivAarogyasriFields() }));
     }
   }, [showAarogyaCard, form.rajivAarogyasriSelected, setForm]);
+
+  useEffect(() => {
+    if (!showAarogyaCard && (form.ehsSelected || form.jhsSelected)) {
+      setForm((prev) => ({ ...prev, ...emptyEhsFields(), ...emptyJhsFields() }));
+    }
+  }, [showAarogyaCard, form.ehsSelected, form.jhsSelected, setForm]);
 
   return (
     <form className="patient-form" onSubmit={onSubmit}>
@@ -270,18 +347,40 @@ export default function PatientForm({
                   setForm((prev) => ({
                     ...prev,
                     ayushmanEligible: event.target.checked,
+                    ...(event.target.checked ? {} : emptyPmjayFields()),
                   }))
                 }
               />
               <span>Patient is eligible for Ayushman Bharat Scheme</span>
             </label>
-            <button
-              type="button"
-              className="eligibility-learn-btn"
-              onClick={() => setActiveModal("ayushman")}
-            >
-              Learn eligibility criteria
-            </button>
+            {form.ayushmanEligible && form.pmjayHasAyushmanCard != null && (
+              <p className="scheme-card-status">PM-JAY preview answers saved.</p>
+            )}
+            <div className="scheme-card-buttons">
+              <button
+                type="button"
+                className="eligibility-learn-btn"
+                onClick={() => setActiveModal("pmjay-questions")}
+              >
+                {form.pmjayHasAyushmanCard != null
+                  ? "Update PM-JAY preview"
+                  : "PM-JAY self-check (optional)"}
+              </button>
+              <button
+                type="button"
+                className="eligibility-learn-btn"
+                onClick={() => setActiveModal("pmjay-hospitals")}
+              >
+                View PM-JAY empanelled hospitals
+              </button>
+              <button
+                type="button"
+                className="eligibility-learn-btn"
+                onClick={() => setActiveModal("ayushman")}
+              >
+                Learn eligibility criteria
+              </button>
+            </div>
           </div>
 
           <div className="scheme-card">
@@ -464,6 +563,87 @@ export default function PatientForm({
               <label className="scheme-card-checkbox">
                 <input
                   type="checkbox"
+                  checked={form.ehsSelected}
+                  onChange={(event) => {
+                    if (!event.target.checked) {
+                      setForm((prev) => ({ ...prev, ...emptyEhsFields() }));
+                    }
+                  }}
+                  onClick={(event) => {
+                    if (!form.ehsSelected) {
+                      event.preventDefault();
+                      setActiveModal("ehs-questions");
+                    }
+                  }}
+                />
+                <span>Employees Health Scheme / EHS</span>
+              </label>
+              <p className="scheme-card-description">
+                For Telangana government employees, pensioners, and eligible
+                dependents.
+              </p>
+              {form.ehsSelected && (
+                <p className="scheme-card-status">Eligibility answers saved.</p>
+              )}
+              <div className="scheme-card-buttons">
+                <button
+                  type="button"
+                  className="eligibility-learn-btn"
+                  onClick={() => setActiveModal("ehs-questions")}
+                >
+                  {form.ehsSelected
+                    ? "Update eligibility answers"
+                    : "Answer eligibility questions"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {showAarogyaCard && (
+            <div className="scheme-card">
+              <label className="scheme-card-checkbox">
+                <input
+                  type="checkbox"
+                  checked={form.jhsSelected}
+                  onChange={(event) => {
+                    if (!event.target.checked) {
+                      setForm((prev) => ({ ...prev, ...emptyJhsFields() }));
+                    }
+                  }}
+                  onClick={(event) => {
+                    if (!form.jhsSelected) {
+                      event.preventDefault();
+                      setActiveModal("jhs-questions");
+                    }
+                  }}
+                />
+                <span>Journalists Health Scheme / JHS</span>
+              </label>
+              <p className="scheme-card-description">
+                For working/retired journalists and eligible dependents.
+              </p>
+              {form.jhsSelected && (
+                <p className="scheme-card-status">Eligibility answers saved.</p>
+              )}
+              <div className="scheme-card-buttons">
+                <button
+                  type="button"
+                  className="eligibility-learn-btn"
+                  onClick={() => setActiveModal("jhs-questions")}
+                >
+                  {form.jhsSelected
+                    ? "Update eligibility answers"
+                    : "Answer eligibility questions"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {showAarogyaCard && (
+            <div className="scheme-card">
+              <label className="scheme-card-checkbox">
+                <input
+                  type="checkbox"
                   checked={form.aarogyaBhadrathaEligible}
                   onChange={(event) =>
                     setForm((prev) => ({
@@ -545,6 +725,40 @@ export default function PatientForm({
         }
       />
 
+      <EhsQuestionsModal
+        open={activeModal === "ehs-questions"}
+        onClose={() => setActiveModal(null)}
+        onSave={(answers) => {
+          setForm((prev) => ({
+            ...prev,
+            ...emptyJhsFields(),
+            ehsSelected: true,
+            ...answers,
+          }));
+          setActiveModal(null);
+        }}
+        initialValues={
+          form.ehsSelected ? getEhsAnswersFromForm(form) : emptyEhsAnswers()
+        }
+      />
+
+      <JhsQuestionsModal
+        open={activeModal === "jhs-questions"}
+        onClose={() => setActiveModal(null)}
+        onSave={(answers) => {
+          setForm((prev) => ({
+            ...prev,
+            ...emptyEhsFields(),
+            jhsSelected: true,
+            ...answers,
+          }));
+          setActiveModal(null);
+        }}
+        initialValues={
+          form.jhsSelected ? getJhsAnswersFromForm(form) : emptyJhsAnswers()
+        }
+      />
+
       <CghsEligibilityQuestionsModal
         open={activeModal === "cghs-questions"}
         onClose={() => setActiveModal(null)}
@@ -556,6 +770,26 @@ export default function PatientForm({
           setActiveModal(null);
         }}
         initialValues={getCghsAnswersFromForm(form)}
+      />
+
+      <PmjayQuestionsModal
+        open={activeModal === "pmjay-questions"}
+        onClose={() => setActiveModal(null)}
+        onSave={(answers) => {
+          setForm((prev) => ({
+            ...prev,
+            ayushmanEligible: true,
+            ...answers,
+          }));
+          setActiveModal(null);
+        }}
+        initialValues={getPmjayAnswersFromForm(form)}
+      />
+
+      <PmjayEmpanelledHospitalsModal
+        open={activeModal === "pmjay-hospitals"}
+        onClose={() => setActiveModal(null)}
+        initialState={form.state || ""}
       />
 
       <EligibilityCriteriaModal

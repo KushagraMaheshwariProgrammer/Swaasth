@@ -77,6 +77,12 @@ export function getBillComparisonScheme(patient, comparisonSettings = null) {
   if (patient?.rajivAarogyasriSelected) {
     return "rajiv_aarogyasri";
   }
+  if (patient?.ehsSelected) {
+    return "ehs";
+  }
+  if (patient?.jhsSelected) {
+    return "jhs";
+  }
   if (patient?.ayushmanEligible) {
     return "hbp_pmjay";
   }
@@ -92,6 +98,26 @@ export function getComparisonSchemeCopy(scheme) {
         "Correct anything the scan missed, then compare against approved Aarogyasri package rates.",
       rateLabel: "Aarogyasri Package Rate",
       benchmarkLabel: "Rajiv Aarogyasri package benchmark",
+    };
+  }
+  if (scheme === "ehs") {
+    return {
+      compareButton: "Compare with EHS package rates →",
+      loading: "Comparing with EHS package rates...",
+      editHint:
+        "Correct anything the scan missed, then compare against approved EHS package rates.",
+      rateLabel: "EHS Package Rate",
+      benchmarkLabel: "Employees Health Scheme package benchmark",
+    };
+  }
+  if (scheme === "jhs") {
+    return {
+      compareButton: "Compare with JHS package rates →",
+      loading: "Comparing with JHS package rates...",
+      editHint:
+        "Correct anything the scan missed, then compare against approved JHS/EHS package rates.",
+      rateLabel: "JHS Package Rate",
+      benchmarkLabel: "Journalists Health Scheme package benchmark",
     };
   }
   if (scheme === "hbp_pmjay") {

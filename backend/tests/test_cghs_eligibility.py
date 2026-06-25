@@ -66,7 +66,15 @@ def test_eligibility_preview_city_no() -> None:
         beneficiary_category="central_gov_employee",
         resides_in_covered_city=False,
     )
-    assert any("cghs-covered city" in message.lower() for message in messages)
+    assert any("do not reside" in message.lower() for message in messages)
+
+
+def test_eligibility_preview_city_not_sure() -> None:
+    messages = build_cghs_eligibility_preview(
+        beneficiary_category="central_gov_employee",
+        resides_in_covered_city=None,
+    )
+    assert any("not confirmed" in message.lower() for message in messages)
 
 
 def test_compare_bill_includes_cghs_eligibility_advisory() -> None:
