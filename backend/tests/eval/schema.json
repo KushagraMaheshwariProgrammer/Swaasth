@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RAGGoldCase",
+  "type": "object",
+  "required": ["id", "source", "input", "retrieval_gold", "audit_gold"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "source": { "enum": ["guideline_derived", "clinician"] },
+    "input": {
+      "type": "object",
+      "required": ["diagnosis"],
+      "properties": {
+        "diagnosis": { "type": "string" },
+        "diagnosis_user_provided": { "type": "boolean" },
+        "symptoms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "duration": { "type": "string" },
+              "severity": { "type": "string" }
+            }
+          }
+        },
+        "test_results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "test_name": { "type": "string" },
+              "value": { "type": "string" },
+              "unit": { "type": "string" },
+              "result": { "type": "string" },
+              "reference_range": { "type": "string" }
+            }
+          }
+        },
+        "medicines": {
+          "type": "array",
+          "items": { "type": "object", "properties": { "name": { "type": "string" } } }
+        },
+        "tests": {
+          "type": "array",
+          "items": { "type": "object", "properties": { "name": { "type": "string" } } }
+        },
+        "procedures": {
+          "type": "array",
+          "items": { "type": "object", "properties": { "name": { "type": "string" } } }
+        },
+        "bill_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "item_name": { "type": "string" },
+              "category": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "retrieval_gold": {
+      "type": "object",
+      "properties": {
+        "expected_documents": { "type": "array", "items": { "type": "string" } },
+        "expected_corpora": {
+          "type": "array",
+          "items": { "enum": ["icmr", "clinical_establishments", "crc_stg"] }
+        },
+        "must_contain_terms": { "type": "array", "items": { "type": "string" } },
+        "should_use_fallback": { "type": "boolean" }
+      }
+    },
+    "audit_gold": {
+      "type": "object",
+      "properties": {
+        "expected_flag_types": { "type": "array", "items": { "type": "string" } },
+        "forbidden_flag_types": { "type": "array", "items": { "type": "string" } },
+        "diagnosis_supported": { "type": ["boolean", "null"] },
+        "min_flags": { "type": "integer", "minimum": 0 },
+        "rule_based_only": { "type": "boolean" },
+        "require_stg_reference": { "type": "boolean" }
+      }
+    },
+    "reviewer": { "type": "string" },
+    "review_date": { "type": "string" },
+    "notes": { "type": "string" }
+  }
+}
