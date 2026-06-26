@@ -96,6 +96,16 @@ export default function TreatmentAuditSection({ treatmentAuditFlags }) {
         </p>
       )}
 
+      {(treatmentAuditFlags.guideline_sources || []).length > 0 && (
+        <p className="comparison-settings-hint">
+          Guideline sources:{" "}
+          <strong>{treatmentAuditFlags.guideline_sources.join(", ")}</strong>
+          {treatmentAuditFlags.used_fallback
+            ? " (CRC STG used as fallback)"
+            : ""}
+        </p>
+      )}
+
       {alignment && (
         <div className="clinical-alignment-panel">
           <h4>Clinical alignment</h4>

@@ -396,5 +396,7 @@ def analyze_treatment(
         "risk_level": _compute_risk_level(flags),
         "matched_stg_conditions": matched_conditions,
         "clinical_alignment": clinical_alignment,
+        "guideline_sources": retrieval.get("guideline_sources") or [],
+        "used_fallback": bool(retrieval.get("used_fallback")),
         "flags": flags,
     }
