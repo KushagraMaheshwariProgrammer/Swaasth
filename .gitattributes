@@ -1,0 +1,2 @@
+backend/data/stg_index/chroma/** filter=lfs diff=lfs merge=lfs -text
+backend/data/primary_guidelines_index/chroma/** filter=lfs diff=lfs merge=lfs -text

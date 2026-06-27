@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -19,12 +20,16 @@ def _ensure_firebase_initialized() -> None:
     if _initialized:
         return
 
-    rel_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "firebase-service-account.json")
-    cred_path = _backend_root / rel_path
-    if not cred_path.is_file():
-        raise RuntimeError(f"Firebase service account not found at {cred_path}")
+    json_str = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "").strip()
+    if json_str:
+        cred = credentials.Certificate(json.loads(json_str))
+    else:
+        rel_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "firebase-service-account.json")
+        cred_path = _backend_root / rel_path
+        if not cred_path.is_file():
+            raise RuntimeError(f"Firebase service account not found at {cred_path}")
+        cred = credentials.Certificate(str(cred_path))
 
-    cred = credentials.Certificate(str(cred_path))
     firebase_admin.initialize_app(cred)
     _initialized = True
 

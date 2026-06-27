@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
+import sys
 from io import BytesIO
 from typing import Any
 
@@ -16,7 +18,13 @@ from PIL import Image
 from app.services.groq_client import groq_json_chat
 from app.services.json_utils import extract_json_from_text
 
-TESSERACT_PATH = __import__("shutil").which("tesseract") or "/opt/homebrew/bin/tesseract"
+_tess = shutil.which("tesseract")
+if _tess:
+    TESSERACT_PATH = _tess
+elif sys.platform == "darwin":
+    TESSERACT_PATH = "/opt/homebrew/bin/tesseract"
+else:
+    TESSERACT_PATH = "/usr/bin/tesseract"
 pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
 
 GROQ_MODEL = "llama-3.3-70b-versatile"

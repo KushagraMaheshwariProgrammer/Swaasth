@@ -56,16 +56,31 @@ def _dev_logging_enabled() -> bool:
 
 app = FastAPI(title="MedBill Backend")
 
+_DEFAULT_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "https://localhost",
+    "capacitor://localhost",
+    "https://swaasth.in",
+    "https://www.swaasth.in",
+]
+
+
+def _cors_origins() -> list[str]:
+    extra = os.getenv("CORS_ORIGINS", "")
+    origins = list(_DEFAULT_CORS_ORIGINS)
+    for origin in extra.split(","):
+        origin = origin.strip()
+        if origin and origin not in origins:
+            origins.append(origin)
+    return origins
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "https://localhost",
-        "capacitor://localhost",
-    ],
+    allow_origins=_cors_origins(),
     allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
