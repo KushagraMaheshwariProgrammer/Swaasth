@@ -8,7 +8,9 @@ import {
 
 export async function signInWithGoogle(auth, googleProvider) {
   if (Capacitor.isNativePlatform()) {
-    const result = await FirebaseAuthentication.signInWithGoogle();
+    const result = await FirebaseAuthentication.signInWithGoogle({
+      skipNativeAuth: true,
+    });
     const idToken = result.credential?.idToken;
 
     if (!idToken) {

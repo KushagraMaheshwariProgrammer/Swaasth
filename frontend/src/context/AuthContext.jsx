@@ -28,6 +28,7 @@ import {
   getEmailVerificationLinkParams,
   getVerificationErrorMessage,
 } from "../auth/emailVerification";
+import { ensureFirebaseWebAuth } from "../auth/ensureFirebaseWebAuth";
 import { auth } from "../firebase";
 import { syncPendingBills } from "../services/bills";
 import { syncPendingPatients } from "../services/patients";
@@ -70,6 +71,7 @@ export function AuthProvider({ children }) {
 
     const bootstrapAuth = async () => {
       try {
+        await ensureFirebaseWebAuth();
         await getRedirectResult(auth);
       } catch (error) {
         console.error("Google redirect sign-in failed:", error);
@@ -91,10 +93,11 @@ export function AuthProvider({ children }) {
       return undefined;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
       setUser(nextUser);
       setLoading(false);
       if (nextUser && !needsEmailVerification(nextUser)) {
+        await ensureFirebaseWebAuth();
         syncPendingPatients(nextUser.uid).catch((error) => {
           console.error("Background patient sync failed:", error);
         });

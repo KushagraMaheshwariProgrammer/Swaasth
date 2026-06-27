@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import googleServices from "../google-services.json";
 
 const WEB_APP_ID = "1:384794855513:web:4dd4188fef420f1434c948";
@@ -19,12 +20,14 @@ export function getFirebaseConfig() {
 
   const androidClient = getAndroidClient(client);
   const apiKey = androidClient.api_key?.[0]?.current_key;
+  const androidAppId = androidClient.client_info?.mobilesdk_app_id;
 
   if (!apiKey) {
     throw new Error("Invalid google-services.json: missing api_key.");
   }
 
   const projectId = projectInfo.project_id;
+  const useAndroidAppId = Capacitor.isNativePlatform() && androidAppId;
 
   return {
     apiKey,
@@ -32,7 +35,9 @@ export function getFirebaseConfig() {
     projectId,
     storageBucket: projectInfo.storage_bucket,
     messagingSenderId: projectInfo.project_number,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID || WEB_APP_ID,
+    appId:
+      import.meta.env.VITE_FIREBASE_APP_ID ||
+      (useAndroidAppId ? androidAppId : WEB_APP_ID),
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || MEASUREMENT_ID,
   };
 }
