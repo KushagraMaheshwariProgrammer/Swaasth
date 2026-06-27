@@ -1,12 +1,8 @@
-import { Capacitor } from "@capacitor/core";
+import { getApiBase } from "./apiBase";
 
-// Mirrors the API base resolution used in App.jsx so the Aarogya Bhadratha
-// service talks to the same backend on web and Android.
-export const API_BASE =
-  import.meta.env.VITE_API_BASE ??
-  (Capacitor.isNativePlatform() ? "http://10.0.2.2:8000" : "");
-
-const BASE = `${API_BASE}/api/aarogya-bhadratha`;
+function aarogyaBase() {
+  return `${getApiBase()}/api/aarogya-bhadratha`;
+}
 
 const HOSPITAL_SEARCH_STOP = new Set([
   "hospital",
@@ -125,14 +121,14 @@ async function request(url, options) {
 export async function extractAarogyaBill(file) {
   const formData = new FormData();
   formData.append("file", file);
-  return request(`${API_BASE}/api/aarogya-bhadratha/extract-bill`, {
+  return request(`${getApiBase()}/api/aarogya-bhadratha/extract-bill`, {
     method: "POST",
     body: formData,
   });
 }
 
 export async function verifyHospital({ hospitalName, district = "", address = "" }) {
-  return request(`${BASE}/verify-hospital`, {
+  return request(`${aarogyaBase()}/verify-hospital`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -144,7 +140,7 @@ export async function verifyHospital({ hospitalName, district = "", address = ""
 }
 
 export async function compareRates(body) {
-  return request(`${BASE}/compare-rates`, {
+  return request(`${aarogyaBase()}/compare-rates`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -164,23 +160,23 @@ export async function searchHospitals({
   if (speciality) params.set("speciality", speciality);
   params.set("page", String(page));
   params.set("limit", String(limit));
-  return request(`${BASE}/hospitals/search?${params}`);
+  return request(`${aarogyaBase()}/hospitals/search?${params}`);
 }
 
 export async function getDistricts() {
-  return request(`${BASE}/districts`);
+  return request(`${aarogyaBase()}/districts`);
 }
 
 export async function getSpecialities() {
-  return request(`${BASE}/specialities`);
+  return request(`${aarogyaBase()}/specialities`);
 }
 
 export async function getAarogyaStatus() {
-  return request(`${BASE}/status`);
+  return request(`${aarogyaBase()}/status`);
 }
 
 export function reportPdfUrl(reportId) {
-  return `${BASE}/reports/${reportId}/pdf`;
+  return `${aarogyaBase()}/reports/${reportId}/pdf`;
 }
 
 // Render the report PDF from the full client-held report object so it works
@@ -229,5 +225,5 @@ export function buildAarogyaBillEntry(report, patient) {
 }
 
 export async function getReport(reportId) {
-  return request(`${BASE}/reports/${reportId}`);
+  return request(`${aarogyaBase()}/reports/${reportId}`);
 }

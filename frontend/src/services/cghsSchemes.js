@@ -1,11 +1,9 @@
-import { Capacitor } from "@capacitor/core";
+import { getApiBase } from "./apiBase";
 import { backendUnreachableMessage } from "./httpUtils";
 
-export const API_BASE =
-  import.meta.env.VITE_API_BASE ??
-  (Capacitor.isNativePlatform() ? "http://10.0.2.2:8000" : "");
-
-const BASE = `${API_BASE}/api/schemes/cghs`;
+function cghsBase() {
+  return `${getApiBase()}/api/schemes/cghs`;
+}
 
 let cachedCoveredCities = null;
 let cachedCoveredCitiesPromise = null;
@@ -21,7 +19,7 @@ export async function fetchCghsCoveredCities({ forceRefresh = false } = {}) {
   cachedCoveredCitiesPromise = (async () => {
     let response;
     try {
-      response = await fetch(`${BASE}/covered-cities`);
+      response = await fetch(`${cghsBase()}/covered-cities`);
     } catch (error) {
       throw new Error(backendUnreachableMessage());
     }

@@ -1661,7 +1661,8 @@ body {
 }
 
 .history-list-row .history-card,
-.history-list-row .history-list-item-flex {
+.history-list-row .history-list-item-flex,
+.history-list-row .patient-list-card {
   flex: 1;
   min-width: 0;
 }

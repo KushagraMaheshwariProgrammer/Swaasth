@@ -1,16 +1,14 @@
-import { Capacitor } from "@capacitor/core";
+import { getApiBase } from "./apiBase";
 import { backendUnreachableMessage } from "./httpUtils";
 
-export const API_BASE =
-  import.meta.env.VITE_API_BASE ??
-  (Capacitor.isNativePlatform() ? "http://10.0.2.2:8000" : "");
-
-const BASE = `${API_BASE}/api/schemes/pmjay`;
+function pmjayBase() {
+  return `${getApiBase()}/api/schemes/pmjay`;
+}
 
 async function request(path, options = {}) {
   let response;
   try {
-    response = await fetch(`${BASE}${path}`, options);
+    response = await fetch(`${pmjayBase()}${path}`, options);
   } catch {
     throw new Error(backendUnreachableMessage());
   }
