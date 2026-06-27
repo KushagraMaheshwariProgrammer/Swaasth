@@ -1,0 +1,13 @@
+[
+  {
+    "chunk_id": "icmr-malaria-p0001-0001",
+    "condition": "Malaria",
+    "document": "Malaria",
+    "source_file": "malaria.pdf",
+    "chapter": "ICMR",
+    "section_type": "diagnosis",
+    "page_start": 1,
+    "page_end": 1,
+    "text": "Malaria diagnosis requires fever with chills in endemic areas and confirmation by peripheral smear or rapid diagnostic test."
+  }
+]

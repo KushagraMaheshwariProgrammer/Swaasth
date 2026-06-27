@@ -27,4 +27,6 @@ jobs:
           pip install -r backend/requirements.txt pytest
 
       - name: Run backend tests
+        env:
+          PYTHONPATH: backend
         run: pytest backend/tests/ -q --ignore=backend/tests/eval
