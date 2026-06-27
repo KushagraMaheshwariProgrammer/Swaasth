@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.services.guideline_corpus_parser import (
+    GuidelineChunk,
     _title_from_filename,
     build_chunks_from_file,
     load_legacy_icmr_chunks,
@@ -21,7 +22,12 @@ def test_title_from_filename_normalizes_underscores() -> None:
     assert "Diabetes" in _title_from_filename("ICMR_Guidelines_for_Management_of_Type_1_Diabetes.pdf")
 
 
-def test_load_legacy_icmr_chunks_has_entries() -> None:
+def test_load_legacy_icmr_chunks_has_entries(monkeypatch) -> None:
+    fixture = Path(__file__).resolve().parent / "fixtures" / "icmr_index" / "chunks_manifest.json"
+    monkeypatch.setattr(
+        "app.services.guideline_corpus_parser.LEGACY_ICMR_MANIFEST",
+        fixture,
+    )
     chunks = load_legacy_icmr_chunks()
     assert chunks
     assert chunks[0].corpus == "icmr"
