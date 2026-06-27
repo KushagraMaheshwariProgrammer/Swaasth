@@ -43,6 +43,7 @@ export default function ClinicalContextForm({
   onDiagnosisExtracted,
   isUploading = false,
   error = "",
+  continueLabel = "Continue",
 }) {
   const labInputRef = useRef(null);
   const dischargeInputRef = useRef(null);
@@ -384,7 +385,7 @@ export default function ClinicalContextForm({
           disabled={isUploading}
           onClick={onContinue}
         >
-          Continue
+          {continueLabel}
         </button>
       </div>
       {error && <p className="error-text">{error}</p>}

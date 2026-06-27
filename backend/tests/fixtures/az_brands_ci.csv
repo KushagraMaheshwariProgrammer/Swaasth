@@ -1,0 +1,5 @@
+id,name,price(₹),Is_discontinued,manufacturer_name,type,pack_size_label,short_composition1,short_composition2
+1,Crocin Pain Relief Tablet,65.73,FALSE,GlaxoSmithKline Consumer Healthcare,allopathy,strip of 15 tablets,Paracetamol (650mg),
+2,PAN 40 Tablet,155,FALSE,Alkem Laboratories Ltd,allopathy,strip of 15 tablets,Pantoprazole (40mg),
+3,Ecosprin 75 Tablet,5.33,FALSE,USV Ltd,allopathy,strip of 14 tablets,Aspirin (75mg),
+4,Azithral 500 Tablet,132.36,FALSE,Alembic Pharmaceuticals Ltd,allopathy,strip of 5 tablets,Azithromycin (500mg),

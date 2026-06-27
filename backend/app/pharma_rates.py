@@ -271,6 +271,7 @@ def _default_az_csv_path() -> Path | None:
             ("shudhanshusingh", "az-medicine-dataset-of-india"),
             "A_Z_medicines_dataset_of_India.csv",
         ),
+        backend_root / "tests" / "fixtures" / "az_brands_ci.csv",
     ]
     for path in candidates:
         if path and path.exists():
