@@ -1,11 +1,11 @@
 import { getApiBase } from "./apiBase";
 import { buildReportFilename, resolveScheme } from "../data/schemes";
-import { backendUnreachableMessage } from "./httpUtils";
+import { backendUnreachableMessage, fetchBackend } from "./httpUtils";
 
 async function fetchReportPdfBlob(report) {
   let response;
   try {
-    response = await fetch(`${getApiBase()}/api/reports/render-pdf`, {
+    response = await fetchBackend(`${getApiBase()}/api/reports/render-pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(report),

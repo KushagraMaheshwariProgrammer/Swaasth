@@ -1,4 +1,4 @@
-import { backendConnectionHint, getApiBase } from "./apiBase";
+import { backendConnectionHint, ensureApiBase, getApiBase } from "./apiBase";
 import { Capacitor } from "@capacitor/core";
 
 export function backendUnreachableMessage() {
@@ -6,6 +6,34 @@ export function backendUnreachableMessage() {
     return `Could not reach the backend at ${getApiBase() || "(not configured)"}. ${backendConnectionHint()}`;
   }
   return `Could not reach the backend. ${backendConnectionHint()}`;
+}
+
+async function fetchWithNativeRetry(url, options) {
+  try {
+    return await fetch(url, options);
+  } catch (error) {
+    if (!Capacitor.isNativePlatform()) {
+      throw error;
+    }
+    const previousBase = getApiBase();
+    const nextBase = await ensureApiBase({ force: true });
+    if (!nextBase || nextBase === previousBase) {
+      throw error;
+    }
+    const rewrittenUrl = url.replace(previousBase, nextBase);
+    return fetch(rewrittenUrl, options);
+  }
+}
+
+export async function fetchBackend(url, options) {
+  if (Capacitor.isNativePlatform()) {
+    await ensureApiBase();
+  }
+  try {
+    return await fetchWithNativeRetry(url, options);
+  } catch {
+    throw new Error(backendUnreachableMessage());
+  }
 }
 
 /** Parse a fetch Response safely; avoids \"Unexpected end of JSON input\". */
@@ -58,7 +86,10 @@ export async function parseJsonResponse(response) {
 export async function fetchJson(url, options) {
   let response;
   try {
-    response = await fetch(url, options);
+    if (Capacitor.isNativePlatform()) {
+      await ensureApiBase();
+    }
+    response = await fetchWithNativeRetry(url, options);
   } catch {
     throw new Error(backendUnreachableMessage());
   }

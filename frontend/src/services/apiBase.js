@@ -2,6 +2,10 @@ import { Capacitor } from "@capacitor/core";
 
 const STORAGE_KEY = "swaasth_api_base";
 const BACKEND_PORT = 8000;
+const PROBE_TIMEOUT_MS = 3500;
+
+let resolvedApiBase = "";
+let probePromise = null;
 
 function trimBase(url) {
   return String(url || "").trim().replace(/\/$/, "");
@@ -55,28 +59,117 @@ function platformFallbackApiBase() {
   return `http://127.0.0.1:${BACKEND_PORT}`;
 }
 
-function resolveNativeApiBase() {
-  const stored = storedApiBase();
-  if (stored) {
-    return stored;
+function uniqueBases(bases) {
+  const seen = new Set();
+  const ordered = [];
+  for (const base of bases) {
+    const normalized = trimBase(base);
+    if (!normalized || seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    ordered.push(normalized);
+  }
+  return ordered;
+}
+
+/** Ordered candidates for native backend discovery. */
+export function getApiBaseCandidates() {
+  if (!Capacitor.isNativePlatform()) {
+    const webBase = envApiBase() || storedApiBase();
+    return webBase ? [webBase] : [];
   }
 
+  const candidates = [];
+
   if (isAndroidEmulator()) {
-    return platformFallbackApiBase();
+    candidates.push(platformFallbackApiBase());
   }
 
   const env = envApiBase();
   if (env) {
-    return env;
+    candidates.push(env);
   }
 
+  const stored = storedApiBase();
+  if (stored) {
+    candidates.push(stored);
+  }
+
+  if (!isAndroidEmulator()) {
+    candidates.push(platformFallbackApiBase());
+  }
+
+  return uniqueBases(candidates);
+}
+
+function resolveNativeApiBaseSync() {
+  const candidates = getApiBaseCandidates();
+  if (candidates.length) {
+    return candidates[0];
+  }
   return platformFallbackApiBase();
+}
+
+async function probeBackend(base) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${base}/health`, {
+      method: "GET",
+      signal: controller.signal,
+    });
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+/**
+ * Find a reachable backend URL on native (LAN IP changes, emulator vs phone, stale cache).
+ * Caches the working base in memory and localStorage.
+ */
+export async function ensureApiBase({ force = false } = {}) {
+  if (!Capacitor.isNativePlatform()) {
+    return getApiBase();
+  }
+
+  if (resolvedApiBase && !force) {
+    return resolvedApiBase;
+  }
+
+  if (probePromise && !force) {
+    return probePromise;
+  }
+
+  probePromise = (async () => {
+    const candidates = getApiBaseCandidates();
+    for (const base of candidates) {
+      if (await probeBackend(base)) {
+        resolvedApiBase = base;
+        setApiBase(base);
+        return base;
+      }
+    }
+
+    const fallback = resolveNativeApiBaseSync();
+    resolvedApiBase = fallback;
+    return fallback;
+  })();
+
+  try {
+    return await probePromise;
+  } finally {
+    probePromise = null;
+  }
 }
 
 /** Backend root URL. Empty string on web dev uses the Vite proxy. */
 export function getApiBase() {
   if (Capacitor.isNativePlatform()) {
-    return resolveNativeApiBase();
+    return resolvedApiBase || resolveNativeApiBaseSync();
   }
   return envApiBase() || storedApiBase() || "";
 }
@@ -90,7 +183,15 @@ export function setApiBase(url) {
       localStorage.removeItem(STORAGE_KEY);
     }
   }
+  resolvedApiBase = normalized;
   return normalized;
+}
+
+export function clearStoredApiBase() {
+  if (typeof localStorage !== "undefined") {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+  resolvedApiBase = "";
 }
 
 export function backendConnectionHint() {
@@ -100,8 +201,8 @@ export function backendConnectionHint() {
   }
   if (isAndroidEmulator()) {
     return (
-      `Using emulator host ${base}. ` +
-      "Start the backend: cd backend && ./run_dev.sh (listens on 0.0.0.0:8000)."
+      `Tried ${getApiBaseCandidates().join(", ") || base}. ` +
+      "Start the backend: cd backend && ./run_dev.sh (listens on 0.0.0.0:8000), then reopen the app."
     );
   }
   if (base.includes("10.0.2.2")) {
@@ -120,7 +221,8 @@ export function backendConnectionHint() {
   if (isPrivateLanHost(host)) {
     return (
       `Could not reach ${base}. ` +
-      "Ensure ./run_dev.sh is running on your Mac (0.0.0.0:8000) and the phone is on the same Wi‑Fi."
+      "Ensure ./run_dev.sh is running on your Mac (0.0.0.0:8000) and the phone is on the same Wi‑Fi. " +
+      "Then run: cd frontend && npm run native:api-url && npm run build"
     );
   }
   return (

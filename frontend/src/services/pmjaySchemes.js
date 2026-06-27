@@ -1,5 +1,5 @@
 import { getApiBase } from "./apiBase";
-import { backendUnreachableMessage } from "./httpUtils";
+import { backendUnreachableMessage, fetchBackend } from "./httpUtils";
 
 function pmjayBase() {
   return `${getApiBase()}/api/schemes/pmjay`;
@@ -8,7 +8,7 @@ function pmjayBase() {
 async function request(path, options = {}) {
   let response;
   try {
-    response = await fetch(`${pmjayBase()}${path}`, options);
+    response = await fetchBackend(`${pmjayBase()}${path}`, options);
   } catch {
     throw new Error(backendUnreachableMessage());
   }

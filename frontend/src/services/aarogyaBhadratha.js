@@ -1,4 +1,5 @@
 import { getApiBase } from "./apiBase";
+import { backendUnreachableMessage, fetchBackend } from "./httpUtils";
 
 function aarogyaBase() {
   return `${getApiBase()}/api/aarogya-bhadratha`;
@@ -60,19 +61,6 @@ export function isSameHospitalBrand(billName, hospital) {
   return billTokens.every((token) => hay.includes(token));
 }
 
-function backendUnreachableMessage() {
-  if (Capacitor.isNativePlatform()) {
-    return (
-      "Could not reach the Swaasth backend. On your Mac run: cd backend && ./run_dev.sh " +
-      "(it must listen on 0.0.0.0:8000), then try again."
-    );
-  }
-  return (
-    "Could not reach the Swaasth backend. Start it with: cd backend && ./run_dev.sh " +
-    "(port 8000), then try again."
-  );
-}
-
 async function parseJson(response) {
   const text = await response.text();
   let payload = null;
@@ -108,7 +96,7 @@ async function parseJson(response) {
 async function request(url, options) {
   let response;
   try {
-    response = await fetch(url, options);
+    response = await fetchBackend(url, options);
   } catch (error) {
     if (error?.message === "Failed to fetch" || error?.name === "TypeError") {
       throw new Error(backendUnreachableMessage());
