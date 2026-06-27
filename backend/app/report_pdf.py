@@ -928,10 +928,22 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
 """
 
 
+def _story_from_html(html: str) -> Any:
+    """Build a MuPDF Story with bundled fonts for headless Linux CI runners."""
+    import fitz
+
+    try:
+        archive = fitz.Archive()
+        user_css = fitz.css_for_pymupdf_font("ubuntu", archive=archive)
+        return fitz.Story(html=html, user_css=user_css, archive=archive)
+    except Exception:
+        return fitz.Story(html=html)
+
+
 def html_to_pdf(html: str) -> bytes:
     import fitz
 
-    story = fitz.Story(html=html)
+    story = _story_from_html(html)
     stream = io.BytesIO()
     buffer = fitz.DocumentWriter(stream)
     media = fitz.paper_rect("a4")
