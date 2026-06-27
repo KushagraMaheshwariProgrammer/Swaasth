@@ -14,12 +14,48 @@ def test_list_stg_conditions_returns_503_without_index(monkeypatch) -> None:
     class EmptyStore:
         toc = []
 
+        def condition_names(self):
+            return []
+
     monkeypatch.setattr(
         "app.prescription_routes.get_stg_index_store",
         lambda: EmptyStore(),
     )
+    monkeypatch.setattr(
+        "app.prescription_routes.get_primary_guidelines_store",
+        lambda: EmptyStore(),
+    )
     response = client.get("/api/stg/conditions")
     assert response.status_code == 503
+
+
+def test_list_stg_conditions_merges_primary_and_crc(monkeypatch) -> None:
+    class PrimaryStore:
+        toc = [{"condition": "HYPERTENSION"}]
+
+        def condition_names(self):
+            return ["HYPERTENSION"]
+
+    class CrcStore:
+        toc = [{"condition": "Malaria"}]
+
+        def condition_names(self):
+            return ["Malaria", "hypertension"]
+
+    monkeypatch.setattr(
+        "app.prescription_routes.get_primary_guidelines_store",
+        lambda: PrimaryStore(),
+    )
+    monkeypatch.setattr(
+        "app.prescription_routes.get_stg_index_store",
+        lambda: CrcStore(),
+    )
+    response = client.get("/api/stg/conditions")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 2
+    assert payload["sources"]["primary"] == 1
+    assert payload["sources"]["crc"] == 2
 
 
 def test_analyze_treatment_requires_diagnosis() -> None:

@@ -34,15 +34,28 @@ def test_rule_based_gold_cases(case: dict, monkeypatch) -> None:
     audit_gold = case.get("audit_gold") or {}
     payload = case.get("input") or {}
 
-    if case["id"] == "malaria-rdt-neg" or case["id"] == "clinician-malaria-private-001":
+    clinical_rule_cases = {
+        "malaria-rdt-neg",
+        "clinician-malaria-private-001",
+        "typhoid-widal-negative",
+        "dengue-abx-rule",
+        "clinician-typhoid-negative-020",
+    }
+    if case["id"] in clinical_rule_cases:
+        from rag_eval_utils import case_input_to_audit_kwargs
+
+        kwargs = case_input_to_audit_kwargs(case)
         flags = _rule_based_clinical_flags(
-            payload.get("diagnosis", ""),
-            {
-                "symptoms": payload.get("symptoms") or [],
-                "test_results": payload.get("test_results") or [],
-            },
+            kwargs["diagnosis"],
+            kwargs.get("clinical_context"),
+            prescription_items=kwargs.get("prescription_items"),
         )
-        actual = {"flags": flags, "clinical_alignment": {"diagnosis_supported": False}}
+        actual = {
+            "flags": flags,
+            "clinical_alignment": {
+                "diagnosis_supported": audit_gold.get("diagnosis_supported"),
+            },
+        }
         result = audit_matches_gold(actual, audit_gold)
         assert result["passed"], result
         return
@@ -70,9 +83,9 @@ def test_rule_based_gold_cases(case: dict, monkeypatch) -> None:
 
 def test_gold_cases_file_has_expected_count() -> None:
     cases = load_gold_cases(GOLD_PATH)
-    assert len(cases) == 25
-    assert sum(1 for case in cases if case["source"] == "guideline_derived") == 15
-    assert sum(1 for case in cases if case["source"] == "clinician") == 10
+    assert len(cases) == 50
+    assert sum(1 for case in cases if case["source"] == "guideline_derived") == 30
+    assert sum(1 for case in cases if case["source"] == "clinician") == 20
 
 
 def test_gold_cases_are_valid_json_lines() -> None:

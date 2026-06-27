@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from app.services.rag_pipeline import Bm25Index, DEFAULT_EMBED_MODEL, DEFAULT_RETRIEVAL_POOL_K
 from app.services.stg_index import EMBED_MODEL
 from app.services.stg_parser import StgChunk
 
@@ -23,11 +24,13 @@ class PrimaryGuidelinesIndexStore:
         self.toc_path = index_dir / "toc.json"
         self.documents_path = index_dir / "documents.json"
         self.chroma_path = index_dir / "chroma"
+        self.manifest_path = index_dir / "chunks_manifest.json"
         self._toc: list[dict[str, Any]] = []
         self._documents: list[str] = []
         self._client: Any = None
         self._collection: Any = None
         self._embedder: Any = None
+        self._bm25: Bm25Index | None = None
         self._load_metadata()
 
     def _load_metadata(self) -> None:
@@ -243,10 +246,38 @@ class PrimaryGuidelinesIndexStore:
                 results.append(self._chunk_payload(chunk_id, metadata, document, source="toc"))
         return results
 
+    def _ensure_bm25(self) -> Bm25Index:
+        if self._bm25 is None:
+            self._bm25 = Bm25Index(self.manifest_path)
+        return self._bm25
+
+    def keyword_search(self, query: str, top_k: int = DEFAULT_RETRIEVAL_POOL_K) -> list[dict[str, Any]]:
+        results = self._ensure_bm25().search(query, top_k=top_k)
+        enriched: list[dict[str, Any]] = []
+        for item in results:
+            payload = self._chunk_payload(
+                str(item.get("chunk_id") or ""),
+                {
+                    "condition": item.get("condition", ""),
+                    "chapter": item.get("chapter", ""),
+                    "section_type": item.get("section_type", "general"),
+                    "page_start": item.get("page_start"),
+                    "page_end": item.get("page_end"),
+                    "corpus": item.get("corpus", ""),
+                    "source_file": item.get("source_file", ""),
+                    "document": item.get("document", item.get("condition", "")),
+                },
+                str(item.get("text") or ""),
+                source="bm25",
+            )
+            payload["bm25_score"] = item.get("bm25_score")
+            enriched.append(payload)
+        return enriched
+
     def semantic_search(
         self,
         query: str,
-        top_k: int = 8,
+        top_k: int = DEFAULT_RETRIEVAL_POOL_K,
         condition_filter: list[str] | None = None,
         corpus_filter: list[str] | None = None,
     ) -> list[dict[str, Any]]:

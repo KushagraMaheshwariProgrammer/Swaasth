@@ -11,7 +11,8 @@ from typing import Any
 import fitz
 import pytesseract
 from fastapi import HTTPException
-from groq import Groq
+from app.services.groq_client import groq_json_chat
+from app.services.json_utils import extract_json_from_text
 from PIL import Image
 
 TESSERACT_PATH = "/opt/homebrew/bin/tesseract"
@@ -54,220 +55,51 @@ def extract_document_text(file_bytes: bytes, file_type: str) -> str:
     return extract_text_from_image(file_bytes)
 
 
-def extract_json_from_text(raw_text: str) -> dict[str, Any]:
-    cleaned_text = raw_text.strip()
-    try:
-        return json.loads(cleaned_text)
-    except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", cleaned_text, re.DOTALL)
-        if not match:
-            raise HTTPException(
-                status_code=500,
-                detail="Groq returned an invalid response format.",
-            )
-        try:
-            return json.loads(match.group(0))
-        except json.JSONDecodeError as exc:
-            raise HTTPException(
-                status_code=500,
-                detail="Groq returned malformed JSON.",
-            ) from exc
-
-
-def _groq_chat(prompt: str, *, max_tokens: int = 2000) -> dict[str, Any]:
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="GROQ_API_KEY is not set in the environment.",
-        )
-
-    client = Groq(api_key=api_key)
-    try:
-        response = client.chat.completions.create(
-            model=GROQ_MODEL,
-            temperature=0,
-            max_tokens=max_tokens,
-            messages=[{"role": "user", "content": prompt}],
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Groq API request failed: {str(exc)}",
-        ) from exc
-
-    response_text = (response.choices[0].message.content or "").strip()
-    if not response_text:
-        raise HTTPException(status_code=502, detail="Groq returned an empty response.")
-    return extract_json_from_text(response_text)
+def _groq_chat(system: str, user: str, *, max_tokens: int = 2000) -> dict[str, Any]:
+    return groq_json_chat(system, user, max_tokens=max_tokens)
 
 
 def extract_bill_with_groq(extracted_text: str) -> dict[str, Any]:
-    prompt = f"""
-You are helping extract hospital bill line items for Indian patients.
-
-Task:
-1) Decide if the text looks like a medical/hospital bill.
-2) If yes, extract line items into structured JSON.
-3) If no, return an error message.
-
-Return ONLY valid JSON with this exact shape:
-{{
-  "is_medical_bill": true or false,
-  "error": null or "reason text",
-  "hospital_name": null or "string",
-  "line_items": [
-    {{
-      "item_name": "string",
-      "quantity": number,
-      "unit_price": number,
-      "total_price": number,
-      "category": "medicine" | "test" | "procedure" | "other"
-    }}
-  ]
-}}
-
-Rules:
-- Extract the hospital or healthcare provider name from the bill header if present.
-- If unsure quantity/unit_price, infer reasonably from bill text.
-- Keep numeric fields as numbers (not strings).
-- category must be one of: medicine, test, procedure, other.
-- If text is not a medical bill, set is_medical_bill=false and provide error.
-
-Bill text:
-{extracted_text}
-"""
-    return _groq_chat(prompt)
+    system = (
+        "You are helping extract hospital bill line items for Indian patients. "
+        "Return ONLY valid JSON with keys: is_medical_bill, error, hospital_name, line_items. "
+        "Each line item has item_name, quantity, unit_price, total_price, category "
+        "(medicine|test|procedure|other). Keep numeric fields as numbers."
+    )
+    user = f"Bill text:\n{extracted_text}"
+    return _groq_chat(system, user)
 
 
 def extract_prescription_with_groq(extracted_text: str) -> dict[str, Any]:
-    prompt = f"""
-You are helping extract prescription details for Indian patients.
-
-Task:
-1) Decide if the text looks like a medical prescription or doctor's order.
-2) If yes, extract structured prescription data.
-3) If no, return an error message.
-
-Return ONLY valid JSON with this exact shape:
-{{
-  "is_prescription": true or false,
-  "error": null or "reason text",
-  "diagnosis": null or "string",
-  "diagnosis_confidence": "high" | "low" | "missing",
-  "prescriber": null or "string",
-  "prescription_date": null or "string",
-  "medicines": [
-    {{
-      "name": "string",
-      "dose": null or "string",
-      "frequency": null or "string",
-      "duration": null or "string"
-    }}
-  ],
-  "tests": [{{ "name": "string" }}],
-  "procedures": [{{ "name": "string" }}],
-  "symptoms": [
-    {{
-      "name": "string",
-      "duration": null or "string",
-      "severity": null or "string"
-    }}
-  ]
-}}
-
-Rules:
-- If diagnosis is absent, unclear, or only implied, set diagnosis=null and diagnosis_confidence="missing".
-- If diagnosis is explicit, set diagnosis_confidence="high" or "low".
-- Include advised lab tests, imaging, and procedures separately in tests/procedures arrays.
-- Extract symptoms if mentioned on the prescription (chief complaints, clinical notes).
-- Keep medicine names as written on the prescription.
-- If text is not a prescription, set is_prescription=false and provide error.
-
-Prescription text:
-{extracted_text}
-"""
-    return _groq_chat(prompt)
-
-
-    return _groq_chat(prompt)
+    system = (
+        "You are helping extract prescription details for Indian patients. "
+        "Return ONLY valid JSON with keys: is_prescription, error, diagnosis, "
+        "diagnosis_confidence (high|low|missing), prescriber, prescription_date, "
+        "medicines, tests, procedures, symptoms. "
+        "If diagnosis is absent or unclear, set diagnosis=null and diagnosis_confidence=missing."
+    )
+    user = f"Prescription text:\n{extracted_text}"
+    return _groq_chat(system, user)
 
 
 def extract_lab_report_with_groq(extracted_text: str) -> dict[str, Any]:
-    prompt = f"""
-You are helping extract laboratory test results for Indian patients.
-
-Task:
-1) Decide if the text looks like a medical lab report or investigation report.
-2) If yes, extract structured test results.
-3) If no, return an error message.
-
-Return ONLY valid JSON with this exact shape:
-{{
-  "is_lab_report": true or false,
-  "error": null or "reason text",
-  "lab_name": null or "string",
-  "report_date": null or "string",
-  "test_results": [
-    {{
-      "test_name": "string",
-      "value": null or "string",
-      "unit": null or "string",
-      "result": "positive" | "negative" | "normal" | "abnormal" | "high" | "low" | null,
-      "reference_range": null or "string"
-    }}
-  ]
-}}
-
-Rules:
-- Extract all reported investigations with values or qualitative results.
-- Use result=positive/negative for antigen/antibody/microscopy style results when stated.
-- If text is not a lab report, set is_lab_report=false and provide error.
-
-Lab report text:
-{extracted_text}
-"""
-    return _groq_chat(prompt)
+    system = (
+        "You are helping extract laboratory test results for Indian patients. "
+        "Return ONLY valid JSON with keys: is_lab_report, error, lab_name, report_date, "
+        "test_results. Use result=positive/negative for antigen/antibody/microscopy results."
+    )
+    user = f"Lab report text:\n{extracted_text}"
+    return _groq_chat(system, user)
 
 
 def extract_discharge_summary_with_groq(extracted_text: str) -> dict[str, Any]:
-    prompt = f"""
-You are helping extract discharge summary details for Indian patients.
-
-Task:
-1) Decide if the text looks like a hospital discharge summary or clinical note.
-2) If yes, extract diagnosis, symptoms, test results, and procedures.
-3) If no, return an error message.
-
-Return ONLY valid JSON with this exact shape:
-{{
-  "is_discharge_summary": true or false,
-  "error": null or "reason text",
-  "diagnosis": null or "string",
-  "symptoms": [
-    {{ "name": "string", "duration": null or "string", "severity": null or "string" }}
-  ],
-  "test_results": [
-    {{
-      "test_name": "string",
-      "value": null or "string",
-      "unit": null or "string",
-      "result": "positive" | "negative" | "normal" | "abnormal" | "high" | "low" | null,
-      "reference_range": null or "string"
-    }}
-  ],
-  "procedures": [{{ "name": "string" }}]
-}}
-
-Rules:
-- Extract final or provisional diagnosis if present.
-- Include presenting symptoms and significant investigation results from the summary.
-- If text is not a discharge summary, set is_discharge_summary=false and provide error.
-
-Discharge summary text:
-{extracted_text}
-"""
-    return _groq_chat(prompt)
+    system = (
+        "You are helping extract discharge summary details for Indian patients. "
+        "Return ONLY valid JSON with keys: is_discharge_summary, error, diagnosis, "
+        "symptoms, test_results, procedures."
+    )
+    user = f"Discharge summary text:\n{extracted_text}"
+    return _groq_chat(system, user)
 
 
 VALID_TEST_RESULTS = {

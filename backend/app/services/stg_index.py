@@ -7,12 +7,13 @@ import os
 from pathlib import Path
 from typing import Any
 
+from app.services.rag_pipeline import Bm25Index, DEFAULT_EMBED_MODEL, DEFAULT_RETRIEVAL_POOL_K
 from app.services.stg_parser import StgChunk, TocEntry
 
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_INDEX_DIR = _BACKEND_ROOT / "data" / "stg_index"
 COLLECTION_NAME = "stg_guidelines"
-EMBED_MODEL = "BAAI/bge-small-en-v1.5"
+EMBED_MODEL = DEFAULT_EMBED_MODEL
 
 _store: "StgIndexStore | None" = None
 
@@ -22,10 +23,12 @@ class StgIndexStore:
         self.index_dir = index_dir
         self.toc_path = index_dir / "toc.json"
         self.chroma_path = index_dir / "chroma"
+        self.manifest_path = index_dir / "chunks_manifest.json"
         self._toc: list[TocEntry] = []
         self._client: Any = None
         self._collection: Any = None
         self._embedder: Any = None
+        self._bm25: Bm25Index | None = None
         self._load_toc()
 
     def _load_toc(self) -> None:
@@ -165,10 +168,22 @@ class StgIndexStore:
                 )
         return results
 
+    def _ensure_bm25(self) -> Bm25Index:
+        if self._bm25 is None:
+            self._bm25 = Bm25Index(self.manifest_path)
+        return self._bm25
+
+    def keyword_search(self, query: str, top_k: int = DEFAULT_RETRIEVAL_POOL_K) -> list[dict[str, Any]]:
+        results = self._ensure_bm25().search(query, top_k=top_k)
+        for item in results:
+            item["corpus_label"] = "CRC STG"
+            item["guideline_tier"] = "fallback"
+        return results
+
     def semantic_search(
         self,
         query: str,
-        top_k: int = 8,
+        top_k: int = DEFAULT_RETRIEVAL_POOL_K,
         condition_filter: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         self._ensure_client()

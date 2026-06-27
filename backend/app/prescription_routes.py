@@ -17,6 +17,7 @@ from app.services.document_extraction import (
     normalize_clinical_context,
     normalize_prescription_items,
 )
+from app.services.primary_guidelines_index import get_primary_guidelines_store
 from app.services.stg_index import get_stg_index_store
 from app.services.treatment_audit import analyze_treatment
 
@@ -116,17 +117,41 @@ def _clinical_context_from_request(
 
 @router.get("/api/stg/conditions")
 def list_stg_conditions() -> dict[str, Any]:
-    store = get_stg_index_store()
-    if not store.toc:
+    primary_store = get_primary_guidelines_store()
+    crc_store = get_stg_index_store()
+
+    primary_names = primary_store.condition_names() if primary_store.toc else []
+    crc_names = crc_store.condition_names() if crc_store.toc else []
+
+    if not primary_names and not crc_names:
         raise HTTPException(
             status_code=503,
             detail=(
-                "STG index is not built. Run: python backend/scripts/build_stg_index.py"
+                "No guideline indexes are built. Run "
+                "python backend/scripts/build_primary_guidelines_index.py and "
+                "python backend/scripts/build_stg_index.py"
             ),
         )
+
+    merged: list[str] = []
+    seen: set[str] = set()
+    for name in primary_names + crc_names:
+        label = str(name).strip()
+        if not label:
+            continue
+        key = label.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(label)
+
     return {
-        "conditions": store.condition_names(),
-        "count": len(store.toc),
+        "conditions": merged,
+        "count": len(merged),
+        "sources": {
+            "primary": len(primary_names),
+            "crc": len(crc_names),
+        },
     }
 
 

@@ -41,7 +41,7 @@ export default function DiagnosisPrompt({
 
   const suggestions = useMemo(() => {
     const merged = [...COMMON_SUGGESTIONS];
-    for (const name of conditions.slice(0, 200)) {
+    for (const name of conditions.slice(0, 300)) {
       if (!merged.some((item) => item.toLowerCase() === name.toLowerCase())) {
         merged.push(name);
       }
