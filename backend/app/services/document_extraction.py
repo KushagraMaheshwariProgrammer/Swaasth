@@ -11,11 +11,12 @@ from typing import Any
 import fitz
 import pytesseract
 from fastapi import HTTPException
-from app.services.groq_client import groq_json_chat
-from app.services.json_utils import extract_json_from_text
 from PIL import Image
 
-TESSERACT_PATH = "/opt/homebrew/bin/tesseract"
+from app.services.groq_client import groq_json_chat
+from app.services.json_utils import extract_json_from_text
+
+TESSERACT_PATH = __import__("shutil").which("tesseract") or "/opt/homebrew/bin/tesseract"
 pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
 
 GROQ_MODEL = "llama-3.3-70b-versatile"

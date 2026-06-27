@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 DEFAULT_EMBED_MODEL = os.getenv("STG_EMBED_MODEL", "BAAI/bge-base-en-v1.5")
-DEFAULT_RERANK_MODEL = os.getenv("STG_RERANK_MODEL", "BAAI/bge-reranker-v2-m3")
+DEFAULT_RERANK_MODEL = os.getenv("STG_RERANK_MODEL", "BAAI/bge-reranker-base")
 DEFAULT_RETRIEVAL_POOL_K = int(os.getenv("STG_RETRIEVAL_POOL_K", "30"))
 DEFAULT_RERANK_TOP_K = int(os.getenv("STG_RERANK_TOP_K", "12"))
 DEFAULT_MAX_CONTEXT_CHARS = int(os.getenv("STG_MAX_CONTEXT_CHARS", "16000"))
@@ -137,7 +137,11 @@ def rerank_chunks(
     if len(chunks) <= top_k:
         return [dict(chunk) for chunk in chunks]
 
-    reranker = _get_reranker()
+    try:
+        reranker = _get_reranker()
+    except Exception:
+        return [dict(chunk) for chunk in chunks[:top_k]]
+
     documents = [str(chunk.get("text") or "") for chunk in chunks]
     try:
         scores = list(reranker.rerank(query, documents))

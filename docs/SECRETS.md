@@ -87,7 +87,7 @@ Set in `backend/.env` (see `backend/.env.example`):
 | `STG_INDEX_DIR` | `backend/data/stg_index` | CRC STG index location |
 | `PRIMARY_GUIDELINES_INDEX_DIR` | `backend/data/primary_guidelines_index` | Primary guidelines index |
 | `STG_EMBED_MODEL` | `BAAI/bge-base-en-v1.5` | Embedding model (requires rebuild if changed) |
-| `STG_RERANK_MODEL` | `BAAI/bge-reranker-v2-m3` | Cross-encoder reranker |
+| `STG_RERANK_MODEL` | `BAAI/bge-reranker-base` | Cross-encoder reranker |
 | `STG_RETRIEVAL_POOL_K` | `30` | Candidates before reranking |
 | `STG_RERANK_TOP_K` | `12` | Chunks passed to audit LLM |
 | `STG_MAX_CONTEXT_CHARS` | `16000` | Max STG context size |
