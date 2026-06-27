@@ -1018,6 +1018,12 @@ function CheckPage() {
       setClinicalContext(emptyClinicalContext());
     }
     setSelectedPrescriptionFile(file);
+    if (documentMode === "prescription" && selectedPatient) {
+      void handleAnalyzePrescription(file);
+    } else if (documentMode === "prescription" && !selectedPatient) {
+      setError("Select or add a patient first, then upload your prescription.");
+      setBillStep("patient");
+    }
   };
 
   const applyPrescriptionPayload = (payload, userProvidedDiagnosis = false) => {
@@ -1042,7 +1048,52 @@ function CheckPage() {
       setDiagnosis("");
       setDiagnosisUserProvided(false);
     }
-    setClinicalStep("clinical");
+  };
+
+  const routeAfterPrescriptionUpload = async (payload) => {
+    const normalized = normalizePrescriptionPayload(payload);
+    const medicines = normalized.medicines.filter((item) => item.name);
+    const tests = normalized.tests.filter((item) => item.name);
+    const procedures = normalized.procedures.filter((item) => item.name);
+    const hasItems = medicines.length || tests.length || procedures.length;
+
+    if (!hasItems) {
+      setClinicalStep(null);
+      setError(
+        "No medicines, tests, or procedures were detected. Add them manually on the next screen, then run the STG check."
+      );
+      return;
+    }
+
+    setPatientInfo(
+      `Extracted ${medicines.length} medicine(s), ${tests.length} test(s), and ${procedures.length} procedure(s) from your prescription.`
+    );
+
+    const resolvedDiagnosis = normalized.diagnosis.trim();
+    if (documentMode === "combined") {
+      setClinicalStep("clinical");
+      return;
+    }
+
+    if (resolvedDiagnosis) {
+      setClinicalStep(null);
+      await runPrescriptionAnalysis(resolvedDiagnosis, false, {
+        medicines,
+        tests,
+        procedures,
+        meta: {
+          filename: payload.filename,
+          file_type: payload.file_type,
+          prescriber: normalized.prescriber,
+          prescriptionDate: normalized.prescriptionDate,
+          ocr_text: payload.ocr_text || "",
+        },
+        clinicalContext: normalized.clinicalContext,
+      });
+      return;
+    }
+
+    setClinicalStep("diagnosis");
   };
 
   const buildPrescriptionRequestItems = () => ({
@@ -1109,6 +1160,9 @@ function CheckPage() {
       return;
     }
     setClinicalStep(null);
+    if (documentMode === "prescription") {
+      void runPrescriptionAnalysis(diagnosis.trim(), diagnosisUserProvided);
+    }
   };
 
   const handleClinicalBack = () => {
@@ -1174,8 +1228,19 @@ function CheckPage() {
     await runCghsComparison(validItems);
   };
 
-  const runPrescriptionAnalysis = async (resolvedDiagnosis, userProvided) => {
-    const items = buildPrescriptionRequestItems();
+  const runPrescriptionAnalysis = async (
+    resolvedDiagnosis,
+    userProvided,
+    overrides = {}
+  ) => {
+    const items = {
+      medicines:
+        overrides.medicines ??
+        buildPrescriptionRequestItems().medicines,
+      tests: overrides.tests ?? buildPrescriptionRequestItems().tests,
+      procedures:
+        overrides.procedures ?? buildPrescriptionRequestItems().procedures,
+    };
     if (
       !items.medicines.length &&
       !items.tests.length &&
@@ -1187,7 +1252,9 @@ function CheckPage() {
     setError("");
     setIsComparing(true);
     setResult(null);
-    const clinicalPayload = clinicalContextToApiPayload(clinicalContext);
+    const meta = overrides.meta ?? prescriptionMeta;
+    const ctx = overrides.clinicalContext ?? clinicalContext;
+    const clinicalPayload = clinicalContextToApiPayload(ctx);
     try {
       const payload = await analyzeTreatment({
         diagnosis: resolvedDiagnosis,
@@ -1196,22 +1263,24 @@ function CheckPage() {
         symptoms: clinicalPayload.symptoms,
         testResults: clinicalPayload.test_results,
         patient: selectedPatient,
-        ocrText: prescriptionMeta?.ocr_text || "",
+        ocrText: meta?.ocr_text || "",
       });
       const report = {
         ...payload,
+        diagnosis: resolvedDiagnosis,
+        diagnosis_user_provided: userProvided,
         prescription: {
           diagnosis: resolvedDiagnosis,
           diagnosis_user_provided: userProvided,
-          prescriber: prescriptionMeta?.prescriber || null,
-          prescription_date: prescriptionMeta?.prescriptionDate || null,
+          prescriber: meta?.prescriber || null,
+          prescription_date: meta?.prescriptionDate || null,
           medicines: items.medicines,
           tests: items.tests,
           procedures: items.procedures,
         },
-        clinical_context: payload.clinical_context || clinicalContext,
-        filename: prescriptionMeta?.filename || "prescription",
-        file_type: prescriptionMeta?.file_type || "manual",
+        clinical_context: payload.clinical_context || ctx,
+        filename: meta?.filename || "prescription",
+        file_type: meta?.file_type || "manual",
         report_kind: "prescription",
       };
       setResult(report);
@@ -1228,25 +1297,30 @@ function CheckPage() {
     setDiagnosisUserProvided(true);
     setClinicalStep(null);
     setError("");
+    void runPrescriptionAnalysis(value.trim(), true);
   };
 
-  const handleAnalyzePrescription = async () => {
+  const handleAnalyzePrescription = async (fileOverride = null) => {
+    const file =
+      fileOverride instanceof File ? fileOverride : selectedPrescriptionFile;
     if (!selectedPatient) {
       setError("Save a patient profile before uploading a prescription.");
       setBillStep("patient");
       return;
     }
-    if (!selectedPrescriptionFile) {
+    if (!file) {
       setError("Please select your prescription first.");
       return;
     }
     setError("");
+    setPatientInfo("");
     setIsLoading(true);
     setResult(null);
     try {
-      const payload = await uploadPrescription(selectedPrescriptionFile);
+      const payload = await uploadPrescription(file);
       setLoadingProgress(100);
       applyPrescriptionPayload(payload);
+      await routeAfterPrescriptionUpload(payload);
     } catch (err) {
       setError(formatFetchError(err, "Something went wrong during analysis."));
     } finally {
@@ -1307,6 +1381,7 @@ function CheckPage() {
       setHospitalNameEdit(billResponse.hospital?.name_from_bill ?? "");
       setEditableItems(items);
       applyPrescriptionPayload(prescriptionPayload);
+      setClinicalStep("clinical");
     } catch (err) {
       setError(formatFetchError(err, "Something went wrong during analysis."));
     } finally {
@@ -1762,9 +1837,10 @@ function CheckPage() {
                 icon="Rx"
                 title="Drop your prescription here or click to browse"
                 dragTitle="Drop your prescription here"
-                subtitle="Supports PDF, JPG, PNG"
+                subtitle="Upload starts automatically after you choose a file"
                 file={selectedPrescriptionFile}
                 onFileSelect={handlePrescriptionFileSelection}
+                disabled={isLoading || isComparing}
                 onValidationError={(message) => {
                   if (message) {
                     setError(message);
@@ -1774,12 +1850,21 @@ function CheckPage() {
                 }}
               />
 
+              {patientInfo && (
+                <p className="auth-info">{patientInfo}</p>
+              )}
+
               <button
                 type="button"
                 className="analyze-btn"
-                onClick={handleAnalyzePrescription}
+                onClick={() => handleAnalyzePrescription()}
+                disabled={isLoading || isComparing || !selectedPrescriptionFile}
               >
-                Analyze Prescription
+                {isLoading
+                  ? "Reading prescription..."
+                  : isComparing
+                  ? "Checking guidelines..."
+                  : "Analyze Prescription"}
               </button>
               {error && <p className="error-text">{error}</p>}
             </motion.section>
@@ -1797,6 +1882,11 @@ function CheckPage() {
                 clinicalContext={clinicalContext}
                 onChange={setClinicalContext}
                 onContinue={handleClinicalContinue}
+                continueLabel={
+                  documentMode === "prescription"
+                    ? "Check treatment appropriateness"
+                    : "Continue"
+                }
                 onDiagnosisExtracted={(value) => {
                   if (!diagnosis.trim() && value) {
                     setDiagnosis(value);
@@ -2125,6 +2215,14 @@ function CheckPage() {
                   Diagnosis: <strong>{diagnosis}</strong>
                 </p>
               )}
+
+              <button
+                type="button"
+                className="bill-editor-secondary"
+                onClick={() => setClinicalStep("clinical")}
+              >
+                Add symptoms & test results (optional)
+              </button>
 
               <div className="prescription-editor-groups">
                 {[

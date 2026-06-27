@@ -7,6 +7,12 @@ export default function PrescriptionResults({ result, toolbar = null }) {
     return null;
   }
 
+  const diagnosis =
+    result.diagnosis || result.prescription?.diagnosis || "";
+  const diagnosisUserProvided =
+    result.diagnosis_user_provided ??
+    result.prescription?.diagnosis_user_provided ??
+    false;
   const medicines = result.prescription?.medicines || result.medicines || [];
   const tests = result.prescription?.tests || result.tests || [];
   const procedures = result.prescription?.procedures || result.procedures || [];
@@ -17,10 +23,10 @@ export default function PrescriptionResults({ result, toolbar = null }) {
 
       <section className="prescription-summary-card">
         <h2>Prescription review</h2>
-        {result.diagnosis && (
+        {diagnosis && (
           <p className="comparison-context">
-            Diagnosis: <strong>{result.diagnosis}</strong>
-            {result.diagnosis_user_provided ? " (provided by you)" : ""}
+            Diagnosis: <strong>{diagnosis}</strong>
+            {diagnosisUserProvided ? " (provided by you)" : ""}
           </p>
         )}
         {result.prescription?.prescriber && (
