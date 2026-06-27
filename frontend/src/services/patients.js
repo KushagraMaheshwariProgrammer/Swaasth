@@ -3,12 +3,14 @@ import {
   collection,
   deleteDoc,
   doc,
+  enableNetwork,
   getDoc,
-  getDocs,
+  getDocsFromServer,
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { ensureFirebaseWebAuth } from "../auth/ensureFirebaseWebAuth";
+import { auth, db } from "../firebase";
 import { deleteBillsForPatientIds, getBillsForPatientIds } from "./bills";
 import {
   getLocalPatientById,
@@ -322,7 +324,15 @@ function buildFirestorePayload(patientData) {
 }
 
 async function fetchCloudPatients(userId) {
-  const snapshot = await getDocs(patientsCollection(userId));
+  await ensureFirebaseWebAuth();
+  if (!auth.currentUser) {
+    throw Object.assign(new Error("Firebase session expired. Sign out and sign in again."), {
+      code: "auth/user-not-found",
+    });
+  }
+
+  await enableNetwork(db);
+  const snapshot = await getDocsFromServer(patientsCollection(userId));
   return snapshot.docs.map((entry) => ({
     id: entry.id,
     firestoreId: entry.id,
@@ -368,6 +378,9 @@ export function getPatientsLocalSnapshot(userId) {
 
 function patientCloudSyncWarning(error) {
   const code = error?.code || "";
+  if (code === "auth/user-not-found") {
+    return error.message;
+  }
   if (code === "permission-denied") {
     return (
       "Could not load patients from your account (permission denied). " +
@@ -405,12 +418,14 @@ export async function getPatientsWithSyncStatus(userId) {
     cloudWarning = patientCloudSyncWarning(error);
   }
 
+  const patients = mergePatientLists(cloudPatients, localEntries);
+
   syncPendingPatients(userId).catch((error) => {
     console.error("Background patient sync failed:", error);
   });
 
   return {
-    patients: mergePatientLists(cloudPatients, localEntries),
+    patients,
     cloudWarning,
   };
 }

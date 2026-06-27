@@ -329,10 +329,20 @@ export default function PatientsPage() {
             {error && !showAddForm && <p className="error-text">{error}</p>}
 
             {syncMessage && !showAddForm && (
-              <p className="auth-info patient-save-success">{syncMessage}</p>
+              <p
+                className={
+                  syncMessage.includes("Could not") ||
+                  syncMessage.includes("permission") ||
+                  syncMessage.includes("expired")
+                    ? "error-text"
+                    : "auth-info patient-save-success"
+                }
+              >
+                {syncMessage}
+              </p>
             )}
 
-            {!loading && !patients.length && !showAddForm && !syncMessage && (
+            {!loading && !patients.length && !showAddForm && !error && !syncMessage && (
               <p className="auth-info">
                 No patients yet. Tap &quot;Add patients&quot; to create a profile.
               </p>
