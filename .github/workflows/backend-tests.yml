@@ -15,13 +15,22 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      HF_HUB_OFFLINE: "1"
+      TOKENIZERS_PARALLELISM: "false"
     steps:
       - uses: actions/checkout@v4
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y tesseract-ocr libgl1 libglib2.0-0
+          sudo apt-get install -y \
+            tesseract-ocr \
+            libgl1 \
+            libglib2.0-0 \
+            libgomp1 \
+            fonts-dejavu-core \
+            fontconfig
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -36,4 +45,4 @@ jobs:
           pip install -r backend/requirements.txt pytest
 
       - name: Run backend tests
-        run: pytest -q --ignore=backend/tests/eval
+        run: python -m pytest --tb=short -ra --ignore=backend/tests/eval
