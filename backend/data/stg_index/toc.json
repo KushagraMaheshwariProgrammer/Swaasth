@@ -1,0 +1,2337 @@
+[
+  {
+    "condition": "Acute Fever",
+    "book_page": 1,
+    "chapter": "Common Diseases"
+  },
+  {
+    "condition": "Fever in Children",
+    "book_page": 3,
+    "chapter": "Common Diseases"
+  },
+  {
+    "condition": "Fever of Unknown Origin",
+    "book_page": 10,
+    "chapter": "Common Diseases"
+  },
+  {
+    "condition": "Anaemia",
+    "book_page": 13,
+    "chapter": "Common Diseases"
+  },
+  {
+    "condition": "Dizziness and Vertigo",
+    "book_page": 16,
+    "chapter": "Common Diseases"
+  },
+  {
+    "condition": "Syncope",
+    "book_page": 18,
+    "chapter": "Common Diseases"
+  },
+  {
+    "condition": "Jaundice",
+    "book_page": 22,
+    "chapter": "Common Diseases"
+  },
+  {
+    "condition": "Acute Viral Hepatitis",
+    "book_page": 24,
+    "chapter": "Common Diseases"
+  },
+  {
+    "condition": "Tuberculosis",
+    "book_page": 29,
+    "chapter": "Common Diseases"
+  },
+  {
+    "condition": "Malaria",
+    "book_page": 58,
+    "chapter": "Common Diseases"
+  },
+  {
+    "condition": "Dengue",
+    "book_page": 64,
+    "chapter": "Common Diseases"
+  },
+  {
+    "condition": "Chikungunya",
+    "book_page": 75,
+    "chapter": "Common Diseases"
+  },
+  {
+    "condition": "Typhoid or Enteric Fever",
+    "book_page": 76,
+    "chapter": "Common Diseases"
+  },
+  {
+    "condition": "Acute Rheumatic Fever",
+    "book_page": 82,
+    "chapter": "Common Diseases"
+  },
+  {
+    "condition": "Cardiopulmonary Resuscitation (CPR)",
+    "book_page": 86,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Basic Life Support (BLS)",
+    "book_page": 89,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Advanced Cardiac Life Support (ACLS)",
+    "book_page": 100,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Anaphylaxis",
+    "book_page": 109,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Burns Burns",
+    "book_page": 114,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Burns of Special Types",
+    "book_page": 124,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Shock",
+    "book_page": 128,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Fluid and Electrolyte Imbalance Fluid and Electrolyte Imbalance and Replacement (in Adults)",
+    "book_page": 133,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Hypernatraemia",
+    "book_page": 133,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Hyponatraemia",
+    "book_page": 134,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Hypokalaemia",
+    "book_page": 135,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Hyperkalaemia",
+    "book_page": 135,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Volume Changes: Volume Deficit",
+    "book_page": 137,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Volume Excess",
+    "book_page": 139,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Infections Sepsis",
+    "book_page": 140,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Stridor",
+    "book_page": 150,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Trauma Trauma",
+    "book_page": 157,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Triage and Intitial Management and Care of a Trauma Patient",
+    "book_page": 158,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Thoracic Trauma",
+    "book_page": 166,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Spinal Trauma",
+    "book_page": 168,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Head Injury",
+    "book_page": 170,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Coma",
+    "book_page": 174,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Fractures",
+    "book_page": 177,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Pelvic Fractures",
+    "book_page": 184,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Urethral Injuries",
+    "book_page": 187,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Female Urethral Injuries",
+    "book_page": 190,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Blunt Abdominal Trauma",
+    "book_page": 191,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Penetrating Stab Injuries",
+    "book_page": 192,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Chemical Burns or Injuries of the Eye",
+    "book_page": 194,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Black Eye",
+    "book_page": 195,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Foreign Body Foreign Body in the Eye",
+    "book_page": 197,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Foreign Bodies in Ear, Nose and Throat",
+    "book_page": 198,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Foreign Bodies in the Nose",
+    "book_page": 199,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Foreign Body in the Ear",
+    "book_page": 200,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Foreign Body in the Airway",
+    "book_page": 202,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Foreign Body in the Oesophagus",
+    "book_page": 204,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Button Battery Injuries",
+    "book_page": 205,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Poisoning Poisoning",
+    "book_page": 208,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Organophosphorus Poisoning",
+    "book_page": 214,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Aluminium Phosphide and Phosphine Poisoning",
+    "book_page": 216,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Phenol",
+    "book_page": 217,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Hydrocarbons (Kerosene, Petrol)",
+    "book_page": 219,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Carbon Monoxide",
+    "book_page": 221,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Oleander Poisoning",
+    "book_page": 223,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Ethylene Glycol and Methanol",
+    "book_page": 223,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Dhatura Poisoning",
+    "book_page": 225,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Opioid Intoxication",
+    "book_page": 226,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Animal Bites Animal Bites",
+    "book_page": 228,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Dog Bites (Rabies)",
+    "book_page": 228,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Insect and Arachnid Bites and Stings Causing Skin Diseases",
+    "book_page": 234,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Scorpion Sting/Bite",
+    "book_page": 235,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Snake Bite",
+    "book_page": 238,
+    "chapter": "Emergencies"
+  },
+  {
+    "condition": "Hypertension",
+    "book_page": 255,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Acute Coronary Syndrome",
+    "book_page": 265,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Angina Pectoris",
+    "book_page": 266,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Unstable Angina",
+    "book_page": 267,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Myocardial Infarction (MI)",
+    "book_page": 268,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Cardiomyopathy",
+    "book_page": 273,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Heart Failure",
+    "book_page": 273,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Acute Heart Failure",
+    "book_page": 275,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Venous Thrombosis",
+    "book_page": 278,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Pulmonary Embolism/Infarction",
+    "book_page": 280,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Infective Endocarditis",
+    "book_page": 282,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Acute Pericarditis",
+    "book_page": 287,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Arrhythmia",
+    "book_page": 289,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Tachyarrhythmia",
+    "book_page": 290,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Supraventricular Tachycardia",
+    "book_page": 290,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Ventricular Tachycardia",
+    "book_page": 291,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Atrial Fibrillation",
+    "book_page": 293,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Bradyarrhythmias and Blocks",
+    "book_page": 294,
+    "chapter": "Cardiovascular Diseases"
+  },
+  {
+    "condition": "Bleeding Disorders",
+    "book_page": 297,
+    "chapter": "Blood Diseases"
+  },
+  {
+    "condition": "Platelet Disorders",
+    "book_page": 302,
+    "chapter": "Blood Diseases"
+  },
+  {
+    "condition": "Thrombocytopenia",
+    "book_page": 302,
+    "chapter": "Blood Diseases"
+  },
+  {
+    "condition": "Platelet Function Defects",
+    "book_page": 306,
+    "chapter": "Blood Diseases"
+  },
+  {
+    "condition": "Coagulation Disorders",
+    "book_page": 307,
+    "chapter": "Blood Diseases"
+  },
+  {
+    "condition": "Haemophilia",
+    "book_page": 308,
+    "chapter": "Blood Diseases"
+  },
+  {
+    "condition": "Sickle Cell Disease (SCD)",
+    "book_page": 310,
+    "chapter": "Blood Diseases"
+  },
+  {
+    "condition": "Thalassaemia",
+    "book_page": 317,
+    "chapter": "Blood Diseases"
+  },
+  {
+    "condition": "β-Thalassaemia Intermedia",
+    "book_page": 317,
+    "chapter": "Blood Diseases"
+  },
+  {
+    "condition": "β-Thalassaemia Major",
+    "book_page": 318,
+    "chapter": "Blood Diseases"
+  },
+  {
+    "condition": "Pneumonia",
+    "book_page": 323,
+    "chapter": "Respiratory Diseases"
+  },
+  {
+    "condition": "Asthma",
+    "book_page": 328,
+    "chapter": "Respiratory Diseases"
+  },
+  {
+    "condition": "Chronic Obstructive Pulmonary Disease (COPD)",
+    "book_page": 339,
+    "chapter": "Respiratory Diseases"
+  },
+  {
+    "condition": "Bronchiectasis",
+    "book_page": 344,
+    "chapter": "Respiratory Diseases"
+  },
+  {
+    "condition": "Cor Pulmonale",
+    "book_page": 347,
+    "chapter": "Respiratory Diseases"
+  },
+  {
+    "condition": "Lung Abscess",
+    "book_page": 347,
+    "chapter": "Respiratory Diseases"
+  },
+  {
+    "condition": "Pleural Effusion",
+    "book_page": 349,
+    "chapter": "Respiratory Diseases"
+  },
+  {
+    "condition": "Pneumothorax",
+    "book_page": 352,
+    "chapter": "Respiratory Diseases"
+  },
+  {
+    "condition": "Influenza-Like Illness (ILI)/Severe Acute Respiratory Infection (SARI)/COVID-19",
+    "book_page": 353,
+    "chapter": "Respiratory Diseases"
+  },
+  {
+    "condition": "Influenza",
+    "book_page": 370,
+    "chapter": "Respiratory Diseases"
+  },
+  {
+    "condition": "COVID-19-Associated Mucormycosis (CAM)",
+    "book_page": 374,
+    "chapter": "Respiratory Diseases"
+  },
+  {
+    "condition": "Recurrent Oral Aphthous Ulcers",
+    "book_page": 378,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Acute Oropharyngo-Oesophageal Candidiasis",
+    "book_page": 379,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Dyspepsia",
+    "book_page": 380,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Gastro-Oesophageal Reflux Disease (GERD)",
+    "book_page": 383,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Peptic Ulcer",
+    "book_page": 387,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Vomiting",
+    "book_page": 391,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Constipation",
+    "book_page": 392,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Irritable Bowel Syndrome",
+    "book_page": 397,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Acute Diarrhoea/Gastroenteritis",
+    "book_page": 399,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "GI Manifestations of Coronavirus Disease 2019 (COVID-19)",
+    "book_page": 404,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Chronic Diarrhoea",
+    "book_page": 405,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Tropical Sprue",
+    "book_page": 405,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Coeliac Disease (Coeliac sprue or Gluten-sensitive Enteropathy)",
+    "book_page": 406,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Lactose Intolerance",
+    "book_page": 407,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Ulcerative Colitis",
+    "book_page": 409,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Amoebic Liver Abscess (ALA)",
+    "book_page": 412,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Pyogenic Liver Abscess",
+    "book_page": 414,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Acute Pancreatitis",
+    "book_page": 415,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Chronic Pancreatitis",
+    "book_page": 418,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "Gastrointestinal Bleeding",
+    "book_page": 421,
+    "chapter": "Gastrointestinal Diseases"
+  },
+  {
+    "condition": "and Parasitic Diseases",
+    "book_page": 426,
+    "chapter": "Infections – Bacterial, Viral"
+  },
+  {
+    "condition": "Tetanus",
+    "book_page": 426,
+    "chapter": "Infections – Bacterial, Viral"
+  },
+  {
+    "condition": "HIV/AIDS and Opportunistic Infections HIV and AIDS",
+    "book_page": 430,
+    "chapter": "Infections – Bacterial, Viral"
+  },
+  {
+    "condition": "Prevention of Parent-to-Child Transmission (PPTCT) of HIV",
+    "book_page": 436,
+    "chapter": "Infections – Bacterial, Viral"
+  },
+  {
+    "condition": "Assessment for Initiation of Co- Trimoxazole (CPT) Prophylaxis and ART",
+    "book_page": 442,
+    "chapter": "Infections – Bacterial, Viral"
+  },
+  {
+    "condition": "Occupational HIV Exposure and HIV Post-Exposure Prophylaxis (PEP)",
+    "book_page": 454,
+    "chapter": "Infections – Bacterial, Viral"
+  },
+  {
+    "condition": "Co-Infection with Tuberculosis and HIV",
+    "book_page": 463,
+    "chapter": "Infections – Bacterial, Viral"
+  },
+  {
+    "condition": "Opportunistic Infections",
+    "book_page": 467,
+    "chapter": "Infections – Bacterial, Viral"
+  },
+  {
+    "condition": "Rickettsial Diseases (Scrub Typhus)",
+    "book_page": 474,
+    "chapter": "Infections – Bacterial, Viral"
+  },
+  {
+    "condition": "Parasitic Diseases Parasitic Diseases – Intestinal Protozoal Infections",
+    "book_page": 478,
+    "chapter": "Infections – Bacterial, Viral"
+  },
+  {
+    "condition": "Worm Infestation",
+    "book_page": 480,
+    "chapter": "Infections – Bacterial, Viral"
+  },
+  {
+    "condition": "Ascariasis (Roundworm Infestation)",
+    "book_page": 481,
+    "chapter": "Infections – Bacterial, Viral"
+  },
+  {
+    "condition": "Enterobiasis",
+    "book_page": 482,
+    "chapter": "Infections – Bacterial, Viral"
+  },
+  {
+    "condition": "Leishmaniasis",
+    "book_page": 483,
+    "chapter": "Infections – Bacterial, Viral"
+  },
+  {
+    "condition": "Palliative Care",
+    "book_page": 488,
+    "chapter": "Tumours/Carcinoma and"
+  },
+  {
+    "condition": "Screening and Early Diagnosis of Cancers",
+    "book_page": 488,
+    "chapter": "Tumours/Carcinoma and"
+  },
+  {
+    "condition": "Cancer Screening Tests",
+    "book_page": 489,
+    "chapter": "Tumours/Carcinoma and"
+  },
+  {
+    "condition": "Breast Cancer",
+    "book_page": 489,
+    "chapter": "Tumours/Carcinoma and"
+  },
+  {
+    "condition": "Cervical Cancer",
+    "book_page": 490,
+    "chapter": "Tumours/Carcinoma and"
+  },
+  {
+    "condition": "Colon and Rectal Cancer and Polyps",
+    "book_page": 491,
+    "chapter": "Tumours/Carcinoma and"
+  },
+  {
+    "condition": "Lung Cancer",
+    "book_page": 492,
+    "chapter": "Tumours/Carcinoma and"
+  },
+  {
+    "condition": "Other Screening Tests",
+    "book_page": 492,
+    "chapter": "Tumours/Carcinoma and"
+  },
+  {
+    "condition": "Ovarian Cancer",
+    "book_page": 492,
+    "chapter": "Tumours/Carcinoma and"
+  },
+  {
+    "condition": "Prostate Cancer",
+    "book_page": 493,
+    "chapter": "Tumours/Carcinoma and"
+  },
+  {
+    "condition": "Oral Cancers",
+    "book_page": 493,
+    "chapter": "Tumours/Carcinoma and"
+  },
+  {
+    "condition": "Carcinoma Cervix",
+    "book_page": 498,
+    "chapter": "Tumours/Carcinoma and"
+  },
+  {
+    "condition": "Carcinoma Breast",
+    "book_page": 505,
+    "chapter": "Tumours/Carcinoma and"
+  },
+  {
+    "condition": "Testicular Tumours",
+    "book_page": 511,
+    "chapter": "Tumours/Carcinoma and"
+  },
+  {
+    "condition": "Palliative Care Palliative Care",
+    "book_page": 513,
+    "chapter": "Tumours/Carcinoma and"
+  },
+  {
+    "condition": "Diseases",
+    "book_page": 529,
+    "chapter": "Central Nervous System"
+  },
+  {
+    "condition": "Headache",
+    "book_page": 529,
+    "chapter": "Central Nervous System"
+  },
+  {
+    "condition": "Migraine",
+    "book_page": 531,
+    "chapter": "Central Nervous System"
+  },
+  {
+    "condition": "Neurocysticercosis (NCC)",
+    "book_page": 536,
+    "chapter": "Central Nervous System"
+  },
+  {
+    "condition": "Epilepsy",
+    "book_page": 539,
+    "chapter": "Central Nervous System"
+  },
+  {
+    "condition": "Status Epilepticus",
+    "book_page": 547,
+    "chapter": "Central Nervous System"
+  },
+  {
+    "condition": "Acute Bacterial Meningitis",
+    "book_page": 551,
+    "chapter": "Central Nervous System"
+  },
+  {
+    "condition": "Tuberculous Meningitis",
+    "book_page": 555,
+    "chapter": "Central Nervous System"
+  },
+  {
+    "condition": "Herpes Simplex Encephalitis",
+    "book_page": 557,
+    "chapter": "Central Nervous System"
+  },
+  {
+    "condition": "Japanese Encephalitis",
+    "book_page": 559,
+    "chapter": "Central Nervous System"
+  },
+  {
+    "condition": "Stroke",
+    "book_page": 560,
+    "chapter": "Central Nervous System"
+  },
+  {
+    "condition": "Acute Inflammatory Demyelinating Neuropathy/Guillain–Barré Syndrome (GBS)",
+    "book_page": 570,
+    "chapter": "Central Nervous System"
+  },
+  {
+    "condition": "Dementia",
+    "book_page": 573,
+    "chapter": "Central Nervous System"
+  },
+  {
+    "condition": "Parkinson’s Disease",
+    "book_page": 575,
+    "chapter": "Central Nervous System"
+  },
+  {
+    "condition": "Myasthenia Gravis",
+    "book_page": 578,
+    "chapter": "Central Nervous System"
+  },
+  {
+    "condition": "Nephrotic Syndrome",
+    "book_page": 584,
+    "chapter": "Genitourinary Diseases"
+  },
+  {
+    "condition": "Acute Kidney Injury",
+    "book_page": 588,
+    "chapter": "Genitourinary Diseases"
+  },
+  {
+    "condition": "Chronic Kidney Disease",
+    "book_page": 593,
+    "chapter": "Genitourinary Diseases"
+  },
+  {
+    "condition": "Urinary Tract Infections (UTIs)",
+    "book_page": 600,
+    "chapter": "Genitourinary Diseases"
+  },
+  {
+    "condition": "Hypothyroidism",
+    "book_page": 605,
+    "chapter": "Hormonal Disorders"
+  },
+  {
+    "condition": "Hyperthyroidism",
+    "book_page": 608,
+    "chapter": "Hormonal Disorders"
+  },
+  {
+    "condition": "Hypocalcaemia",
+    "book_page": 611,
+    "chapter": "Hormonal Disorders"
+  },
+  {
+    "condition": "Hypercalcaemia",
+    "book_page": 613,
+    "chapter": "Hormonal Disorders"
+  },
+  {
+    "condition": "Diabetes Mellitus",
+    "book_page": 615,
+    "chapter": "Hormonal Disorders"
+  },
+  {
+    "condition": "Prevention and Management of Diabetes Complications",
+    "book_page": 625,
+    "chapter": "Hormonal Disorders"
+  },
+  {
+    "condition": "Diabetic Ketoacidosis",
+    "book_page": 630,
+    "chapter": "Hormonal Disorders"
+  },
+  {
+    "condition": "Non-Ketotic Hyperosmolar Coma",
+    "book_page": 632,
+    "chapter": "Hormonal Disorders"
+  },
+  {
+    "condition": "Hypoglycaemia",
+    "book_page": 633,
+    "chapter": "Hormonal Disorders"
+  },
+  {
+    "condition": "Adrenal Insufficiency (AI) and Adrenal Crisis",
+    "book_page": 635,
+    "chapter": "Hormonal Disorders"
+  },
+  {
+    "condition": "Cushing’s Syndrome",
+    "book_page": 637,
+    "chapter": "Hormonal Disorders"
+  },
+  {
+    "condition": "Erectile Dysfunction",
+    "book_page": 639,
+    "chapter": "Hormonal Disorders"
+  },
+  {
+    "condition": "Acute Otitis Media (AOM)",
+    "book_page": 641,
+    "chapter": "ENT Diseases"
+  },
+  {
+    "condition": "Chronic Otitis Media (Active Mucosal or Tubotympanic Type)",
+    "book_page": 644,
+    "chapter": "ENT Diseases"
+  },
+  {
+    "condition": "Otitis Media with Effusion",
+    "book_page": 645,
+    "chapter": "ENT Diseases"
+  },
+  {
+    "condition": "Wax",
+    "book_page": 646,
+    "chapter": "ENT Diseases"
+  },
+  {
+    "condition": "Otomycosis",
+    "book_page": 647,
+    "chapter": "ENT Diseases"
+  },
+  {
+    "condition": "External Ear Furunculosis",
+    "book_page": 648,
+    "chapter": "ENT Diseases"
+  },
+  {
+    "condition": "Sore Throat",
+    "book_page": 649,
+    "chapter": "ENT Diseases"
+  },
+  {
+    "condition": "Upper Respiratory Tract Infection (URTI)",
+    "book_page": 649,
+    "chapter": "ENT Diseases"
+  },
+  {
+    "condition": "Acute Rhinosinusitis",
+    "book_page": 652,
+    "chapter": "ENT Diseases"
+  },
+  {
+    "condition": "Allergic Rhinitis",
+    "book_page": 655,
+    "chapter": "ENT Diseases"
+  },
+  {
+    "condition": "Furunculosis of Nose (Vestibulitis)",
+    "book_page": 658,
+    "chapter": "ENT Diseases"
+  },
+  {
+    "condition": "Epistaxis",
+    "book_page": 660,
+    "chapter": "ENT Diseases"
+  },
+  {
+    "condition": "Acute Tonsillitis",
+    "book_page": 662,
+    "chapter": "ENT Diseases"
+  },
+  {
+    "condition": "Peritonsillar Abscess",
+    "book_page": 662,
+    "chapter": "ENT Diseases"
+  },
+  {
+    "condition": "Acute Parotitis",
+    "book_page": 664,
+    "chapter": "ENT Diseases"
+  },
+  {
+    "condition": "Facial Paralysis",
+    "book_page": 665,
+    "chapter": "ENT Diseases"
+  },
+  {
+    "condition": "Stye (Hordeolum Externum)",
+    "book_page": 667,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Chalazion",
+    "book_page": 668,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Vitamin A Deficiency (Xerophthalmia)",
+    "book_page": 668,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Red Eye",
+    "book_page": 670,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Herpes Zoster Ophthalmicus (HZO)",
+    "book_page": 679,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Rhinosporidiosis Oculi (Ocular Rhino)",
+    "book_page": 682,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Painful Red Eye",
+    "book_page": 683,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Glaucoma",
+    "book_page": 683,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Congenital Glaucoma/Buphthalmos",
+    "book_page": 683,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Angle-Closure Glaucoma – Acute",
+    "book_page": 684,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Angle-Closure Glaucoma – Chronic 686 Primary Open-Angle Glaucoma",
+    "book_page": 686,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Corneal Ulcer (Ulcerative Keratitis)",
+    "book_page": 688,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Cataract",
+    "book_page": 692,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Dry Eyes Syndrome and Computer Vision Syndrome",
+    "book_page": 694,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Refractive Errors",
+    "book_page": 696,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Strabismus (Squint)",
+    "book_page": 697,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Iridocyclitis (Anterior Uveitis)",
+    "book_page": 698,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Orbital Cellulitis",
+    "book_page": 700,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Sudden Painless Visual Loss",
+    "book_page": 703,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Endophthalmitis",
+    "book_page": 704,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Optic Neuritis",
+    "book_page": 706,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Diabetic Retinopathy",
+    "book_page": 707,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Retinal Detachment",
+    "book_page": 709,
+    "chapter": "Eye Diseases"
+  },
+  {
+    "condition": "Skin and Soft-Tissue Infections",
+    "book_page": 711,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Purulent Infections",
+    "book_page": 711,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Cellulitis and Erysipelas",
+    "book_page": 714,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Leprosy",
+    "book_page": 718,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Cutaneous Tuberculosis",
+    "book_page": 721,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Scabies",
+    "book_page": 724,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Pediculosis (Lice Infestation)",
+    "book_page": 726,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Myiasis (Maggots)",
+    "book_page": 727,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Onychomycosis",
+    "book_page": 728,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Candidiasis",
+    "book_page": 730,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Tinea Capitis",
+    "book_page": 732,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Tinea Corporis and Cruris",
+    "book_page": 733,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Tinea Pedis/Manuum and Tinea Cruris",
+    "book_page": 734,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Superficial Fungal Infections",
+    "book_page": 735,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Diaper Dermatitis",
+    "book_page": 737,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Eczema and Dermatitis",
+    "book_page": 738,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Miliaria (Prickly Heat)",
+    "book_page": 740,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Acne Vulgaris",
+    "book_page": 742,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Alopecia Areata",
+    "book_page": 744,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Pityrosporum Infections of the Skin",
+    "book_page": 745,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Pityriasis Alba (Patchy Hypochromia)",
+    "book_page": 747,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Chickenpox or Varicella",
+    "book_page": 747,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Herpes Zoster (Shingles)",
+    "book_page": 748,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Herpes Simplex",
+    "book_page": 749,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Molluscum Contagiosum",
+    "book_page": 751,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Viral Warts",
+    "book_page": 752,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Lichen Planus",
+    "book_page": 753,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Psoriasis",
+    "book_page": 755,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Vitiligo",
+    "book_page": 757,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Melasma",
+    "book_page": 759,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Albinism",
+    "book_page": 760,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Acute Urticaria",
+    "book_page": 761,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Cutaneous Reactions to Drugs",
+    "book_page": 761,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Dermatological Emergencies",
+    "book_page": 763,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Sexually Transmitted Infection (Syndromic Approach)",
+    "book_page": 766,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Urethritis and Cervicitis",
+    "book_page": 771,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Urethral Discharge",
+    "book_page": 773,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Vaginal Discharge",
+    "book_page": 773,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Genital Ulcers",
+    "book_page": 775,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Inguinal Bubo",
+    "book_page": 780,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Scrotal Swelling",
+    "book_page": 780,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Oral and Anal STI",
+    "book_page": 782,
+    "chapter": "Skin Diseases"
+  },
+  {
+    "condition": "Normal and High-Risk Pregnancy Normal and High-Risk Pregnancy",
+    "book_page": 785,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "High-Risk Pregnancies",
+    "book_page": 789,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Labour and its Management",
+    "book_page": 791,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "First Stage of Labour",
+    "book_page": 795,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Second Stage of Labour",
+    "book_page": 799,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Third Stage of Labour",
+    "book_page": 800,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Fourth Stage of Labour",
+    "book_page": 801,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Operative Vaginal Delivery and Caesarean Section",
+    "book_page": 801,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Caesarean Section",
+    "book_page": 803,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Postpartum Care",
+    "book_page": 808,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Postpartum Haemorrhage",
+    "book_page": 811,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Puerperium Pyrexia and Sepsis",
+    "book_page": 817,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Pregnancy with COVID-19",
+    "book_page": 820,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Nausea and Vomiting in Pregnancy",
+    "book_page": 829,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Bleeding in First Trimester of Pregnancy (Abortion)",
+    "book_page": 832,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Threatened Abortion",
+    "book_page": 834,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Septic Abortion",
+    "book_page": 835,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Ectopic Pregnancy",
+    "book_page": 836,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Medical Termination of Pregnancy (MTP)",
+    "book_page": 838,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Medical Disorders Complicating Pregnancy Anaemia in Pregnancy",
+    "book_page": 841,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Megaloblastic Anaemia in Pregnancy",
+    "book_page": 843,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Urinary Tract Infection in Pregnancy",
+    "book_page": 844,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Hypertensive Disorders of Pregnancy",
+    "book_page": 846,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Pre-Eclampsia",
+    "book_page": 847,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Eclampsia",
+    "book_page": 854,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Pregnancy with Heart Disease",
+    "book_page": 857,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Diabetes in Pregnancy",
+    "book_page": 862,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Obstetric Disorders Complicating Pregnancy Preterm Labour",
+    "book_page": 868,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Premature Rupture of Membranes",
+    "book_page": 873,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Antepartum Haemorrhage",
+    "book_page": 875,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Post-Term Pregnancy",
+    "book_page": 880,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Contraception",
+    "book_page": 882,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Gynaecological Disorders Vaginal Discharge",
+    "book_page": 890,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Pelvic Inflammatory Disease",
+    "book_page": 890,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Dysmenorrhoea",
+    "book_page": 894,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Premenstrual Syndrome (PMS)",
+    "book_page": 895,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Polycystic Ovarian Syndrome (PCOS)",
+    "book_page": 896,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Abnormal Uterine Bleeding",
+    "book_page": 901,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Menopause",
+    "book_page": 905,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Postmenopausal Bleeding",
+    "book_page": 908,
+    "chapter": "Obstetrics and Gynaecology\t785"
+  },
+  {
+    "condition": "Psychotic and Mood Disorders Schizophrenia and Acute Psychotic Disorder",
+    "book_page": 910,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Bipolar Affective Disorder",
+    "book_page": 914,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Depression",
+    "book_page": 918,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Psychiatric Illnesses in Children Mental and Behavioural Problems in Children",
+    "book_page": 922,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Depression in Children",
+    "book_page": 923,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Attention-Deficit/Hyperactivity Disorder (ADHD)",
+    "book_page": 924,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Mental Retardation (MR)/ Intellectual Disability",
+    "book_page": 926,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Patients with Suicidal Risk",
+    "book_page": 927,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Anxiety Disorders Mixed Anxiety Depression",
+    "book_page": 927,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Generalized Anxiety Disorder",
+    "book_page": 928,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Panic Disorder",
+    "book_page": 930,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Social Phobia or Social Anxiety Disorder",
+    "book_page": 931,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Obsessive Compulsive Disorder",
+    "book_page": 933,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Acute Stress Disorder",
+    "book_page": 936,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Post-Traumatic Stress Disorder (PTSD)",
+    "book_page": 937,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Sleep Disorder Insomnia",
+    "book_page": 938,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Substance Use Disorders Alcohol Use Disorder",
+    "book_page": 940,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Opioid Dependence Syndrome",
+    "book_page": 943,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Cannabis Use Disorder",
+    "book_page": 945,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Nicotine Dependence",
+    "book_page": 948,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Psychiatric Emergencies Patients with a Suicide Risk",
+    "book_page": 950,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Delirium Tremens",
+    "book_page": 953,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Patients with Acute Agitation",
+    "book_page": 954,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Patients with Extrapyramidal Syndrome (EPS)",
+    "book_page": 955,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Neuroleptic Malignant Syndrome",
+    "book_page": 957,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Lithium Toxicity",
+    "book_page": 958,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Valproate Toxicity",
+    "book_page": 959,
+    "chapter": "Psychiatric Conditions"
+  },
+  {
+    "condition": "Osteoarthritis (OA) of the Knee",
+    "book_page": 962,
+    "chapter": "Bone and Joint Diseases"
+  },
+  {
+    "condition": "Rheumatoid Arthritis (RA)",
+    "book_page": 966,
+    "chapter": "Bone and Joint Diseases"
+  },
+  {
+    "condition": "Gout",
+    "book_page": 971,
+    "chapter": "Bone and Joint Diseases"
+  },
+  {
+    "condition": "Spondylosis",
+    "book_page": 974,
+    "chapter": "Bone and Joint Diseases"
+  },
+  {
+    "condition": "Low Back Pain",
+    "book_page": 974,
+    "chapter": "Bone and Joint Diseases"
+  },
+  {
+    "condition": "Cervical Spondylosis",
+    "book_page": 977,
+    "chapter": "Bone and Joint Diseases"
+  },
+  {
+    "condition": "Sprains",
+    "book_page": 978,
+    "chapter": "Bone and Joint Diseases"
+  },
+  {
+    "condition": "Ankle Sprain",
+    "book_page": 979,
+    "chapter": "Bone and Joint Diseases"
+  },
+  {
+    "condition": "Osteoporosis",
+    "book_page": 981,
+    "chapter": "Bone and Joint Diseases"
+  },
+  {
+    "condition": "Acute Pyogenic Osteomyelitis",
+    "book_page": 986,
+    "chapter": "Bone and Joint Diseases"
+  },
+  {
+    "condition": "Acute Septic Arthritis",
+    "book_page": 989,
+    "chapter": "Bone and Joint Diseases"
+  },
+  {
+    "condition": "Medical Care of the Surgical Patient",
+    "book_page": 992,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Postoperative Care",
+    "book_page": 995,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Perisurgical Antibiotic Prophylaxis",
+    "book_page": 998,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Postoperative Wound Infection",
+    "book_page": 1004,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Wound Care",
+    "book_page": 1005,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Frostbite",
+    "book_page": 1009,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Varicose Veins",
+    "book_page": 1014,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Peripheral Arterial Diseases",
+    "book_page": 1015,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Cervical Lymphadenopathy",
+    "book_page": 1018,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Abscess",
+    "book_page": 1021,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Breast Abscess",
+    "book_page": 1023,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Thyroid Swelling",
+    "book_page": 1024,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Dysphagia",
+    "book_page": 1027,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Acute Abdominal Conditions Acute Abdomen",
+    "book_page": 1028,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Appendicitis",
+    "book_page": 1031,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Cholelithiasis",
+    "book_page": 1032,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Urolithiasis",
+    "book_page": 1034,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Retention of Urine",
+    "book_page": 1038,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Urinary Retention and Benign Prostatic Hyperplasia",
+    "book_page": 1041,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Inguinal Hernia",
+    "book_page": 1043,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Scrotal Swellings",
+    "book_page": 1044,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Fissure-in-ANO",
+    "book_page": 1046,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Fistula-in-ANO",
+    "book_page": 1047,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Haemorrhoids",
+    "book_page": 1048,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Paediatric Surgical Conditions Paediatric Surgical Conditions",
+    "book_page": 1050,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Undescended Testis",
+    "book_page": 1051,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Anorectal Malformations",
+    "book_page": 1052,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Clubfoot",
+    "book_page": 1053,
+    "chapter": "Surgery"
+  },
+  {
+    "condition": "Emergency Triage Assessment and Treatment",
+    "book_page": 1057,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Essential Newborn Care",
+    "book_page": 1059,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Common Clinical Problems in Newborns",
+    "book_page": 1066,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Low Birth Weight Babies",
+    "book_page": 1068,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Neonatal Jaundice",
+    "book_page": 1072,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Immunization Schedule",
+    "book_page": 1080,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Cerebral Palsy",
+    "book_page": 1091,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Fluid and Electrolytes",
+    "book_page": 1095,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Iron Deficiency Anaemia (IDA)",
+    "book_page": 1100,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Protein Energy Malnutrition (PEM)",
+    "book_page": 1101,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Nutritional Rickets",
+    "book_page": 1111,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Pica",
+    "book_page": 1112,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Breath Holding Spells",
+    "book_page": 1113,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Primary Nocturnal Enuresis",
+    "book_page": 1113,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Wheezy Child",
+    "book_page": 1115,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Acute Bronchiolitis",
+    "book_page": 1118,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Oral Thrush (Oral Candidiasis)",
+    "book_page": 1128,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Recurrent Abdominal Pain of Childhood (RAP)",
+    "book_page": 1132,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Acute Diarrhoea",
+    "book_page": 1134,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Measles",
+    "book_page": 1142,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Mumps",
+    "book_page": 1144,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Acute Flaccid Paralysis (AFP)",
+    "book_page": 1145,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Pertussis (Whooping Cough)",
+    "book_page": 1149,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Cardiac Failure",
+    "book_page": 1150,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Diabetes Mellitus (DM)",
+    "book_page": 1153,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Urinary Tract Infection (UTI)",
+    "book_page": 1164,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Acute Glomerulonephritis (Post-Streptococcal)",
+    "book_page": 1170,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Nephrotic Syndrome (NS)",
+    "book_page": 1171,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Neonatal Seizures",
+    "book_page": 1176,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Acute Symptomatic Seizures",
+    "book_page": 1177,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Febrile Seizures",
+    "book_page": 1179,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Neurocysticercosis",
+    "book_page": 1181,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Acute Encephalitis Syndrome",
+    "book_page": 1184,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Acute Meningoencephalitis",
+    "book_page": 1186,
+    "chapter": "Paediatric Conditions"
+  },
+  {
+    "condition": "Traumatic Injuries",
+    "book_page": 1192,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Tooth Luxation",
+    "book_page": 1193,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Tooth Avulsion",
+    "book_page": 1193,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Maxillofacial Injury",
+    "book_page": 1195,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Temporomandibular Joint Disorder (TMD)",
+    "book_page": 1198,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Temporomandibular Joint (TMJ) Dislocation",
+    "book_page": 1200,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Halitosis",
+    "book_page": 1201,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Tooth Hypersensitivity",
+    "book_page": 1202,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Toothache",
+    "book_page": 1203,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Impacted Teeth",
+    "book_page": 1205,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Post Dental Procedure Complications",
+    "book_page": 1206,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Fainting on Dental Chair (Syncope)",
+    "book_page": 1206,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Orofacial Infection",
+    "book_page": 1207,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Dental Abscess",
+    "book_page": 1208,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Periapical Abscess",
+    "book_page": 1208,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Lateral Periodontal Abscess",
+    "book_page": 1209,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Dental Caries",
+    "book_page": 1210,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Gingivitis",
+    "book_page": 1211,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Periodontitis",
+    "book_page": 1212,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Juvenile Periodontitis",
+    "book_page": 1213,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Inflammatory Gingival Enlargements",
+    "book_page": 1214,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Antibiotic Prophylaxis in Oral Health Care",
+    "book_page": 1214,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Oral Potentially Malignant Disorders (OPMD)",
+    "book_page": 1216,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Mouth Ulcers",
+    "book_page": 1218,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Oral Candidiasis or Thrush",
+    "book_page": 1218,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Leucoplakia",
+    "book_page": 1219,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Oral Lichen Planus",
+    "book_page": 1220,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Teething/Care of Teeth in Children",
+    "book_page": 1222,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Good Oral Hygiene",
+    "book_page": 1223,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Toothbrushing Technique",
+    "book_page": 1224,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Appendices Appendix I: Local Anaesthetics",
+    "book_page": 1225,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Appendix II: Infection Prevention and Control: Basic Components 1232 Appendix III: Drugs and Pregnancy 1248 Appendix IV: Drug Use in Lactating Mother",
+    "book_page": 1257,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Appendix V: Drug Use in Patients with Hepatic Impairment",
+    "book_page": 1261,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Appendix VI: Drug Use in Patients with Renal Impairment",
+    "book_page": 1266,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Appendix VII: Drug Use in Glucose- 6-Phosphate Dehydrogenase (G6PD) Deficiency",
+    "book_page": 1269,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Appendix VIII: Managing Adverse Drug Reactions",
+    "book_page": 1273,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Appendix IX: Safe Use of Radiological Contrast Media",
+    "book_page": 1279,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Appendix X: Serological Markers 1288 Appendix XI: Oxygen Therapy",
+    "book_page": 1295,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Appendix XII: Clinically Important Drug–Drug Interactions",
+    "book_page": 1304,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Appendix XIII: The Clinical Use of Blood and Blood Safety",
+    "book_page": 1312,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Appendix XIV: Critical/Panic Laboratory Value",
+    "book_page": 1322,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "Index",
+    "book_page": 1333,
+    "chapter": "Dental Conditions"
+  },
+  {
+    "condition": "risk when administered by the wrong route or when other system errors occur and are involved in a high percentage of medication errors/sentinel events/high risk for abuse, error or other adverse outcomes, e.g., medications with a low therapeutic index (Lithium, Digoxin, Phenytoin, Carbamazepine, Valproic acid, Table 3. Error-prone abbreviations, symbols and dose designations. Abbreviation Intended meaning Misinterpre­ tation Abbreviation Intended meaning Misinterpre­ tation @ at",
+    "book_page": 2,
+    "chapter": "Patients receiving high-risk medicines: These are medicines that present a high"
+  },
+  {
+    "condition": "1.0 mL 1 mL 10 mL + Plus/and",
+    "book_page": 4,
+    "chapter": "Patients receiving high-risk medicines: These are medicines that present a high"
+  },
+  {
+    "condition": "Global implications in the wake of the COVID-19 pandemic. World Med Health Policy.",
+    "book_page": 2022,
+    "chapter": "Venkatesh U, Aravind GP, Velmurugan AA. Telemedicine practice guidelines in India:"
+  },
+  {
+    "condition": "C h a p t e r",
+    "book_page": 1,
+    "chapter": "ISMP List of High-Alert Medications in Community/Ambulatory Care Setting. https://scchc.org/"
+  },
+  {
+    "condition": "Chapter 1 Common Diseases",
+    "book_page": 3,
+    "chapter": "ISMP List of High-Alert Medications in Community/Ambulatory Care Setting. https://scchc.org/"
+  },
+  {
+    "condition": "day 2 and 5 mg/kg on day",
+    "book_page": 3,
+    "chapter": "Chloroquine: 25 mg/kg divided over 3 days, i.e. 10 mg/kg on day 1, 10 mg/kg on"
+  },
+  {
+    "condition": "Day",
+    "book_page": 1,
+    "chapter": "Primaquine: 0.25 mg/kg daily for 14 days"
+  },
+  {
+    "condition": "1–4",
+    "book_page": 1,
+    "chapter": "Primaquine: 0.25 mg/kg daily for 14 days"
+  },
+  {
+    "condition": "1/2",
+    "book_page": 1,
+    "chapter": "Primaquine: 0.25 mg/kg daily for 14 days"
+  },
+  {
+    "condition": "5–8",
+    "book_page": 2,
+    "chapter": "Primaquine: 0.25 mg/kg daily for 14 days"
+  },
+  {
+    "condition": "9–14",
+    "book_page": 3,
+    "chapter": "Primaquine: 0.25 mg/kg daily for 14 days"
+  },
+  {
+    "condition": "1.5",
+    "book_page": 4,
+    "chapter": "Primaquine: 0.25 mg/kg daily for 14 days"
+  },
+  {
+    "condition": "≥15",
+    "book_page": 4,
+    "chapter": "Primaquine: 0.25 mg/kg daily for 14 days"
+  },
+  {
+    "condition": "Pregnancy",
+    "book_page": 4,
+    "chapter": "Primaquine: 0.25 mg/kg daily for 14 days"
+  },
+  {
+    "condition": "1 (25 mg) 1–4 (Yellow Blister) 1 (50 mg) 1 (500 mg + 25 mg) 1 (50 mg)",
+    "book_page": 1,
+    "chapter": "Primaquine: 0.75 mg/kg body weight on day 2."
+  },
+  {
+    "condition": "1 (50 mg) 5–8 (Green Blister) 1 (100 mg) 1 (750 mg + 37.5 mg) 1 (100 mg)",
+    "book_page": 2,
+    "chapter": "Primaquine: 0.75 mg/kg body weight on day 2."
+  },
+  {
+    "condition": "1 (100 mg) 9–14 (Red Blister) 1 (150 mg) 2 (500 mg + 25 mg) 1 (150 mg)",
+    "book_page": 4,
+    "chapter": "Primaquine: 0.75 mg/kg body weight on day 2."
+  },
+  {
+    "condition": "1 (150 mg) ≥15 (White Blister) 1 (200 mg) 2 (750 mg + 37.5 mg) 1 (200 mg)",
+    "book_page": 6,
+    "chapter": "Primaquine: 0.75 mg/kg body weight on day 2."
+  },
+  {
+    "condition": "If parenteral quinine therapy needs to be continued beyond 48 hours, reduce dose to",
+    "book_page": 7,
+    "chapter": "Primaquine: 0.75 mg/kg body weight on day 2."
+  }
+]

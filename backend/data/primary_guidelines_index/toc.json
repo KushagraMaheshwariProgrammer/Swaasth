@@ -1,0 +1,512 @@
+[
+  {
+    "condition": "Breast Cancer",
+    "corpus": "icmr",
+    "source_file": "Breast_Cancer.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Buccal Mucosa Cancer final pdf 9.6.14",
+    "corpus": "icmr",
+    "source_file": "Buccal Mucosa Cancer final pdf 9.6.14.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Cancer Monographs-new",
+    "corpus": "icmr",
+    "source_file": "Cancer_Monographs-new.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Colorectal Cancer 0",
+    "corpus": "icmr",
+    "source_file": "Colorectal Cancer_0.html",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Consensus Document for The Management of Cancer Cervix 0",
+    "corpus": "icmr",
+    "source_file": "Consensus Document for The Management of Cancer Cervix_0.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Consensus 2",
+    "corpus": "icmr",
+    "source_file": "Consensus_2.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Consensus Document 1",
+    "corpus": "icmr",
+    "source_file": "Consensus_Document_1.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Rickettsial Diseases",
+    "corpus": "icmr",
+    "source_file": "DHR-ICMR Guidelines on Ricketesial Diseases.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Esophagus final ICMR2014 0",
+    "corpus": "icmr",
+    "source_file": "Esophagus final ICMR2014_0.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "GALLBLADDER CANCER 0",
+    "corpus": "icmr",
+    "source_file": "GALLBLADDER CANCER_0.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "GUCBB F",
+    "corpus": "icmr",
+    "source_file": "GUCBB_F.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Gastric Cancer Final pdf for farrow 0",
+    "corpus": "icmr",
+    "source_file": "Gastric Cancer Final pdf for farrow_0.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "ICMR Diagnosis and Management",
+    "corpus": "icmr",
+    "source_file": "ICMR - Diagnosis and Managmemnt.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Type 2 Diabetes Mellitus",
+    "corpus": "icmr",
+    "source_file": "ICMR_GuidelinesType2diabetes2018_0.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Type 1 Diabetes Mellitus",
+    "corpus": "icmr",
+    "source_file": "ICMR_Guidelines_for_Management_of_Type_1_Diabetes.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Immunophenotyping of Hematolymphoid Neoplasms 0 (1)",
+    "corpus": "icmr",
+    "source_file": "Immunophenotyping of Hematolymphoid Neoplasms_0 (1).pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Immunophenotyping of Hematolymphoid Neoplasms 0",
+    "corpus": "icmr",
+    "source_file": "Immunophenotyping of Hematolymphoid Neoplasms_0.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Pulmonary Tuberculosis",
+    "corpus": "icmr",
+    "source_file": "Index-TB Guidelines - green colour 2594164.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Larynx and Hypopharynx Cancers 0",
+    "corpus": "icmr",
+    "source_file": "Larynx and Hypopharynx Cancers_0.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "MSS Myelodysplastic Syndrome MDS",
+    "corpus": "icmr",
+    "source_file": "MSS_Myelodysplastic_Syndrome_MDS.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Multiple Myeloma 0",
+    "corpus": "icmr",
+    "source_file": "Multiple Myeloma_0.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "NARI Guideline 2022",
+    "corpus": "icmr",
+    "source_file": "NARI_Guideline_2022.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "NHL-HG 29.06.2016 0",
+    "corpus": "icmr",
+    "source_file": "NHL-HG 29.06.2016_0.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Ovarian Cancer",
+    "corpus": "icmr",
+    "source_file": "Ovarian_Cancer.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "PEDIATRIC LYMPHOMAS AND SOLID TUMORS 0",
+    "corpus": "icmr",
+    "source_file": "PEDIATRIC_LYMPHOMAS_AND_SOLID_TUMORS_0.html",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Prostate Cancer Consensus Doc",
+    "corpus": "icmr",
+    "source_file": "Prostate_Cancer_Consensus_Doc.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "RB Document",
+    "corpus": "icmr",
+    "source_file": "RB_Document.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "RB Guidelines",
+    "corpus": "icmr",
+    "source_file": "RB_Guidelines.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "ICMR Revised Guidelines",
+    "corpus": "icmr",
+    "source_file": "Revised_ICMR_Guidelines_2_December.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "SARCOMA AND OSTEOSARCOMA final pdf 0",
+    "corpus": "icmr",
+    "source_file": "SARCOMA AND OSTEOSARCOMA final pdf_0.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Treatment Guidelines 2019",
+    "corpus": "icmr",
+    "source_file": "Treatment_Guidelines_2019_Final.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Uterine Cancer",
+    "corpus": "icmr",
+    "source_file": "Uterine_Cancer.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "cancer 0",
+    "corpus": "icmr",
+    "source_file": "cancer_0.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "consensu 3",
+    "corpus": "icmr",
+    "source_file": "consensu_3.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "tongue",
+    "corpus": "icmr",
+    "source_file": "tongue.pdf",
+    "chapter": "ICMR"
+  },
+  {
+    "condition": "Acute Respiratory Infection in Children",
+    "corpus": "clinical_establishments",
+    "source_file": "Acute Respiratory Infection in Children.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "Alcohol Dependence",
+    "corpus": "clinical_establishments",
+    "source_file": "Alcohol Dependence.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "Burn Injuries",
+    "corpus": "clinical_establishments",
+    "source_file": "Burn Injuries.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "CARDIOVASCULAR DISEASES",
+    "corpus": "clinical_establishments",
+    "source_file": "CARDIOVASCULAR DISEASES.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "CHIKUNGUNYA FEVER",
+    "corpus": "clinical_establishments",
+    "source_file": "CHIKUNGUNYA FEVER.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "CRITICAL CARE",
+    "corpus": "clinical_establishments",
+    "source_file": "CRITICAL CARE.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "Dental caries",
+    "corpus": "clinical_establishments",
+    "source_file": "Dental caries.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "Diabetic foot",
+    "corpus": "clinical_establishments",
+    "source_file": "Diabetic foot.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "Dry Eye Disease",
+    "corpus": "clinical_establishments",
+    "source_file": "Dry Eye Disease.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "ENCEPHALITIS",
+    "corpus": "clinical_establishments",
+    "source_file": "ENCEPHALITIS.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "ENCEPHALOMYELITIS",
+    "corpus": "clinical_establishments",
+    "source_file": "ENCEPHALOMYELITIS.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "ENDOCRINOLOGY",
+    "corpus": "clinical_establishments",
+    "source_file": "ENDOCRINOLOGY.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "FLUOROSIS",
+    "corpus": "clinical_establishments",
+    "source_file": "FLUOROSIS.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "GASTROENTEROLOGICAL DISEASES",
+    "corpus": "clinical_establishments",
+    "source_file": "GASTROENTEROLOGICAL DISEASES.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "GASTROINTESTINAL SURGERY",
+    "corpus": "clinical_establishments",
+    "source_file": "GASTROINTESTINAL SURGERY.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "GENERAL SURGERY",
+    "corpus": "clinical_establishments",
+    "source_file": "GENERAL SURGERY.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "HYPERTENSION",
+    "corpus": "clinical_establishments",
+    "source_file": "HYPERTENSION.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "INTERVENTIONAL RADIOLOGY",
+    "corpus": "clinical_establishments",
+    "source_file": "INTERVENTIONAL RADIOLOGY.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "Jaundice in New Born",
+    "corpus": "clinical_establishments",
+    "source_file": "Jaundice in New Born .pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "LABORATORY MEDICINES",
+    "corpus": "clinical_establishments",
+    "source_file": "LABORATORY MEDICINES.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "LYMPHATIC FILARIASIS",
+    "corpus": "clinical_establishments",
+    "source_file": "LYMPHATIC FILARIASIS.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "Leprosy",
+    "corpus": "clinical_establishments",
+    "source_file": "Leprosy.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "Leptospirosis",
+    "corpus": "clinical_establishments",
+    "source_file": "Leptospirosis.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "Low birth weight babies",
+    "corpus": "clinical_establishments",
+    "source_file": "Low birth weight babies.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "Major Trauma",
+    "corpus": "clinical_establishments",
+    "source_file": "Major Trauma.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "Mental Health Programme",
+    "corpus": "clinical_establishments",
+    "source_file": "Mental Health Programme.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "NON RESPIRATORY INFECTIOUS MEDICAL CONDITIONS",
+    "corpus": "clinical_establishments",
+    "source_file": "NON RESPIRATORY INFECTIOUS MEDICAL CONDITIONS.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "OBSTETRICS n GYNAECOLOGY",
+    "corpus": "clinical_establishments",
+    "source_file": "OBSTETRICS n GYNAECOLOGY.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "ONCOLOGY",
+    "corpus": "clinical_establishments",
+    "source_file": "ONCOLOGY.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "OPTHALMOLOGY",
+    "corpus": "clinical_establishments",
+    "source_file": "OPTHALMOLOGY.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "ORGAN TRANSPLANT- LIVER",
+    "corpus": "clinical_establishments",
+    "source_file": "ORGAN TRANSPLANT- LIVER.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "ORTHOPAEDICS",
+    "corpus": "clinical_establishments",
+    "source_file": "ORTHOPAEDICS.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "OTORHINOLARYNGOLOGY (ENT)",
+    "corpus": "clinical_establishments",
+    "source_file": "OTORHINOLARYNGOLOGY (ENT).pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "Osteoarthritis Knee",
+    "corpus": "clinical_establishments",
+    "source_file": "Osteoarthritis Knee.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "PEDIATRICS n PEDIATRIC SURGERY",
+    "corpus": "clinical_establishments",
+    "source_file": "PEDIATRICS n PEDIATRIC SURGERY.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "RESPIRATORY DISEASES",
+    "corpus": "clinical_establishments",
+    "source_file": "RESPIRATORY DISEASES.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "RTI STI",
+    "corpus": "clinical_establishments",
+    "source_file": "RTI STI.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "Recurrent Spontaneous Abortion",
+    "corpus": "clinical_establishments",
+    "source_file": "Recurrent Spontaneous Abortion.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "Sinusitis in Adults",
+    "corpus": "clinical_establishments",
+    "source_file": "Sinusitis in Adults.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "Snakebite",
+    "corpus": "clinical_establishments",
+    "source_file": "Snakebite.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "TB care",
+    "corpus": "clinical_establishments",
+    "source_file": "TB care.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "UROLOGY",
+    "corpus": "clinical_establishments",
+    "source_file": "UROLOGY.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "Viral Hepatitis",
+    "corpus": "clinical_establishments",
+    "source_file": "Viral Hepatitis.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "antimicrobial Use in Infectious Diseases",
+    "corpus": "clinical_establishments",
+    "source_file": "antimicrobial Use in Infectious Diseases.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "ear conditions",
+    "corpus": "clinical_establishments",
+    "source_file": "ear conditions.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "eye surgery",
+    "corpus": "clinical_establishments",
+    "source_file": "eye surgery.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "haemodialysis",
+    "corpus": "clinical_establishments",
+    "source_file": "haemodialysis.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "kala-azar",
+    "corpus": "clinical_establishments",
+    "source_file": "kala-azar.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "malaria",
+    "corpus": "clinical_establishments",
+    "source_file": "malaria.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  },
+  {
+    "condition": "rabies",
+    "corpus": "clinical_establishments",
+    "source_file": "rabies.pdf",
+    "chapter": "Clinical Establishments Act STG"
+  }
+]
