@@ -3,20 +3,26 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any
 
 from fastapi import HTTPException
-from groq import Groq
 
-from app.services.document_extraction import extract_json_from_text
+from app.services.groq_client import groq_json_chat
 from app.services.primary_guidelines_index import get_primary_guidelines_store
+from app.services.rag_pipeline import (
+    DEFAULT_MAX_CONTEXT_CHARS,
+    DEFAULT_RERANK_TOP_K,
+    DEFAULT_RETRIEVAL_POOL_K,
+    build_context_text,
+    prefilter_titles_by_embedding,
+    reciprocal_rank_fusion,
+    rerank_chunks,
+)
 from app.services.stg_index import get_stg_index_store
 
-GROQ_MODEL = "llama-3.3-70b-versatile"
-MAX_CONTEXT_CHARS = 8000
 MIN_PRIMARY_CONTEXT_CHARS = 1500
 MAX_PRIMARY_DISTANCE = 0.85
+TITLE_PREFILTER_K = 50
 
 PRIORITY_SECTIONS = {
     "diagnosis",
@@ -31,30 +37,11 @@ PRIORITY_SECTIONS = {
 }
 
 
-def _groq_json(prompt: str) -> dict[str, Any]:
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="GROQ_API_KEY is not set in the environment.",
-        )
-    client = Groq(api_key=api_key)
-    try:
-        response = client.chat.completions.create(
-            model=GROQ_MODEL,
-            temperature=0,
-            max_tokens=800,
-            messages=[{"role": "user", "content": prompt}],
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Groq API request failed: {str(exc)}",
-        ) from exc
-    text = (response.choices[0].message.content or "").strip()
-    if not text:
+def _groq_json(system: str, user: str) -> dict[str, Any]:
+    parsed = groq_json_chat(system, user, max_tokens=800)
+    if not parsed:
         return {"matched_conditions": []}
-    return extract_json_from_text(text)
+    return parsed
 
 
 def map_diagnosis_to_primary_documents(diagnosis: str, limit: int = 4) -> list[str]:
@@ -63,28 +50,27 @@ def map_diagnosis_to_primary_documents(diagnosis: str, limit: int = 4) -> list[s
     if not document_names:
         return []
 
-    sample = document_names[:300]
-    prompt = f"""
-Map the patient diagnosis to up to {limit} matching guideline document titles from
-India's ICMR and Clinical Establishments Act standard treatment guidelines.
-
-Return ONLY valid JSON:
-{{
-  "matched_conditions": ["Document Title 1", "Document Title 2"]
-}}
-
-Rules:
-- Use exact document titles from the provided list whenever possible.
-- Prefer ICMR and Clinical Establishments Act STG documents that best match the diagnosis.
-- Return at most {limit} names.
-- If no reasonable match exists, return an empty list.
-
-Patient diagnosis: {diagnosis}
-
-Available guideline documents (subset):
-{json.dumps(sample, ensure_ascii=False)}
-"""
-    parsed = _groq_json(prompt)
+    sample = prefilter_titles_by_embedding(
+        diagnosis,
+        document_names,
+        top_k=TITLE_PREFILTER_K,
+        embed_fn=store.embed_texts,
+    )
+    system = (
+        "Map the patient diagnosis to matching guideline document titles from "
+        "India's ICMR and Clinical Establishments Act standard treatment guidelines. "
+        "Return ONLY valid JSON with key matched_conditions as a list of strings. "
+        "Use exact document titles from the provided list whenever possible. "
+        "Prefer ICMR and Clinical Establishments Act STG documents that best match "
+        f"the diagnosis. Return at most {limit} names. "
+        "If no reasonable match exists, return an empty list."
+    )
+    user = (
+        f"Patient diagnosis: {diagnosis}\n\n"
+        f"Available guideline documents (subset):\n"
+        f"{json.dumps(sample, ensure_ascii=False)}"
+    )
+    parsed = _groq_json(system, user)
     matched = parsed.get("matched_conditions") or []
     if not isinstance(matched, list):
         return []
@@ -107,27 +93,26 @@ def map_diagnosis_to_stg_conditions(diagnosis: str, limit: int = 3) -> list[str]
     if not condition_names:
         return []
 
-    sample = condition_names[:400]
-    prompt = f"""
-Map the patient diagnosis to up to {limit} matching condition names from India's
-CRC Standard Treatment Guidelines table of contents.
-
-Return ONLY valid JSON:
-{{
-  "matched_conditions": ["Condition Name 1", "Condition Name 2"]
-}}
-
-Rules:
-- Use exact condition names from the provided list whenever possible.
-- Prefer the closest clinical match; return at most {limit} names.
-- If no reasonable match exists, return an empty list.
-
-Patient diagnosis: {diagnosis}
-
-Available STG conditions (subset):
-{json.dumps(sample, ensure_ascii=False)}
-"""
-    parsed = _groq_json(prompt)
+    sample = prefilter_titles_by_embedding(
+        diagnosis,
+        condition_names,
+        top_k=TITLE_PREFILTER_K,
+        embed_fn=store.embed_texts,
+    )
+    system = (
+        "Map the patient diagnosis to matching condition names from India's "
+        "CRC Standard Treatment Guidelines table of contents. "
+        "Return ONLY valid JSON with key matched_conditions as a list of strings. "
+        "Use exact condition names from the provided list whenever possible. "
+        f"Prefer the closest clinical match; return at most {limit} names. "
+        "If no reasonable match exists, return an empty list."
+    )
+    user = (
+        f"Patient diagnosis: {diagnosis}\n\n"
+        f"Available STG conditions (subset):\n"
+        f"{json.dumps(sample, ensure_ascii=False)}"
+    )
+    parsed = _groq_json(system, user)
     matched = parsed.get("matched_conditions") or []
     if not isinstance(matched, list):
         return []
@@ -167,25 +152,6 @@ def _prioritize_chunks(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         else:
             other.append(chunk)
     return priority + other
-
-
-def _build_context_text(chunks: list[dict[str, Any]]) -> str:
-    parts: list[str] = []
-    total = 0
-    for chunk in chunks:
-        corpus_label = chunk.get("corpus_label") or chunk.get("chapter") or "Guidelines"
-        header = (
-            f"[{corpus_label} | {chunk.get('condition', '')} | "
-            f"{chunk.get('section_type', 'general')} | "
-            f"pages {chunk.get('page_start', '?')}-{chunk.get('page_end', '?')}]"
-        )
-        body = str(chunk.get("text") or "").strip()
-        block = f"{header}\n{body}"
-        if total + len(block) > MAX_CONTEXT_CHARS:
-            break
-        parts.append(block)
-        total += len(block)
-    return "\n\n---\n\n".join(parts)
 
 
 def _symptom_names(symptoms: list[Any] | None) -> list[str]:
@@ -256,11 +222,43 @@ def _primary_is_sufficient(chunks: list[dict[str, Any]]) -> bool:
     return True
 
 
+def _hybrid_retrieve_chunks(
+    store: Any,
+    semantic_query: str,
+    matched_labels: list[str],
+    *,
+    pool_k: int = DEFAULT_RETRIEVAL_POOL_K,
+    rerank_top_k: int = DEFAULT_RERANK_TOP_K,
+    enrich_fn: Any = None,
+) -> list[dict[str, Any]]:
+    toc_chunks = store.get_chunks_for_conditions(matched_labels, limit_per_condition=12)
+    for chunk in toc_chunks:
+        chunk["source"] = "toc"
+
+    semantic_chunks = store.semantic_search(
+        semantic_query,
+        top_k=pool_k,
+        condition_filter=matched_labels or None,
+    )
+    if not semantic_chunks:
+        semantic_chunks = store.semantic_search(semantic_query, top_k=pool_k)
+
+    keyword_chunks = store.keyword_search(semantic_query, top_k=pool_k)
+
+    fused = reciprocal_rank_fusion([toc_chunks, semantic_chunks, keyword_chunks])
+    reranked = rerank_chunks(semantic_query, fused, top_k=rerank_top_k)
+    prioritized = _prioritize_chunks(reranked)
+
+    if enrich_fn:
+        return [enrich_fn(chunk) for chunk in prioritized]
+    return prioritized
+
+
 def _retrieve_primary_context(
     diagnosis: str,
     semantic_query: str,
     *,
-    top_k: int = 10,
+    top_k: int = DEFAULT_RETRIEVAL_POOL_K,
 ) -> dict[str, Any]:
     store = get_primary_guidelines_store()
     if not store.is_ready:
@@ -271,19 +269,12 @@ def _retrieve_primary_context(
         }
 
     matched_documents = map_diagnosis_to_primary_documents(diagnosis)
-    toc_chunks = store.get_chunks_for_conditions(
-        matched_documents,
-        limit_per_condition=12,
-    )
-    semantic_chunks = store.semantic_search(
+    chunks = _hybrid_retrieve_chunks(
+        store,
         semantic_query,
-        top_k=top_k,
-        condition_filter=matched_documents or None,
+        matched_documents,
+        pool_k=top_k,
     )
-    if not semantic_chunks:
-        semantic_chunks = store.semantic_search(semantic_query, top_k=top_k)
-
-    chunks = _prioritize_chunks(_dedupe_chunks(toc_chunks + semantic_chunks))
     guideline_sources = sorted(
         {
             str(chunk.get("corpus_label") or "")
@@ -302,28 +293,27 @@ def _retrieve_crc_fallback_context(
     diagnosis: str,
     semantic_query: str,
     *,
-    top_k: int = 10,
+    top_k: int = DEFAULT_RETRIEVAL_POOL_K,
 ) -> dict[str, Any]:
     store = get_stg_index_store()
     if not store.is_ready:
         return {"matched_conditions": [], "chunks": []}
 
     matched_conditions = map_diagnosis_to_stg_conditions(diagnosis)
-    toc_chunks = store.get_chunks_for_conditions(matched_conditions, limit_per_condition=16)
-    semantic_chunks = store.semantic_search(
-        semantic_query,
-        top_k=top_k,
-        condition_filter=matched_conditions or None,
-    )
-    if not semantic_chunks:
-        semantic_chunks = store.semantic_search(semantic_query, top_k=top_k)
 
-    chunks = []
-    for chunk in _prioritize_chunks(_dedupe_chunks(toc_chunks + semantic_chunks)):
-        enriched = dict(chunk)
-        enriched["corpus_label"] = "CRC STG"
-        enriched["guideline_tier"] = "fallback"
-        chunks.append(enriched)
+    def enrich(chunk: dict[str, Any]) -> dict[str, Any]:
+        item = dict(chunk)
+        item["corpus_label"] = "CRC STG"
+        item["guideline_tier"] = "fallback"
+        return item
+
+    chunks = _hybrid_retrieve_chunks(
+        store,
+        semantic_query,
+        matched_conditions,
+        pool_k=top_k,
+        enrich_fn=enrich,
+    )
 
     return {
         "matched_conditions": matched_conditions,
@@ -337,7 +327,7 @@ def retrieve_stg_context(
     *,
     symptoms: list[Any] | None = None,
     test_results: list[dict[str, Any]] | None = None,
-    top_k: int = 10,
+    top_k: int = DEFAULT_RETRIEVAL_POOL_K,
 ) -> dict[str, Any]:
     semantic_query = _build_semantic_query(
         diagnosis,
@@ -389,7 +379,7 @@ def retrieve_stg_context(
         "matched_primary_documents": primary.get("matched_documents") or [],
         "matched_crc_conditions": fallback_matched,
         "chunks": merged_chunks,
-        "context_text": _build_context_text(merged_chunks),
+        "context_text": build_context_text(merged_chunks, max_chars=DEFAULT_MAX_CONTEXT_CHARS),
         "guideline_sources": guideline_sources,
         "primary_chunk_count": len(primary_chunks),
         "fallback_chunk_count": len(fallback_chunks),

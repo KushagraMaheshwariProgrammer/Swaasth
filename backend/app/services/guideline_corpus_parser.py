@@ -15,6 +15,10 @@ import pytesseract
 from PIL import Image
 
 from app.services.document_extraction import TESSERACT_PATH
+from app.services.icmr_corpus_curator import (
+    normalize_document_title,
+    should_exclude_document,
+)
 from app.services.stg_parser import SECTION_HEADERS, _merge_small_chunks, _split_page_into_sections
 
 pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
@@ -251,19 +255,29 @@ def load_legacy_icmr_chunks() -> list[GuidelineChunk]:
 
     payload = json.loads(LEGACY_ICMR_MANIFEST.read_text(encoding="utf-8"))
     chunks: list[GuidelineChunk] = []
+    seen_docs: set[str] = set()
     for item in payload:
         if not isinstance(item, dict):
             continue
         text = str(item.get("text") or "").strip()
         if len(text) < 40:
             continue
+        source_file = str(item.get("source_file") or "")
+        raw_title = str(item.get("document") or item.get("condition") or "")
+        if should_exclude_document(raw_title, source_file):
+            continue
+        document_title = normalize_document_title(raw_title)
+        if source_file and source_file in seen_docs:
+            pass
+        elif source_file:
+            seen_docs.add(source_file)
         chunks.append(
             GuidelineChunk(
                 chunk_id=str(item.get("chunk_id") or ""),
-                condition=str(item.get("document") or item.get("condition") or ""),
+                condition=document_title,
                 corpus="icmr",
-                document=str(item.get("document") or item.get("condition") or ""),
-                source_file=str(item.get("source_file") or ""),
+                document=document_title,
+                source_file=source_file,
                 chapter="ICMR",
                 section_type=str(item.get("section_type") or "general"),
                 page_start=int(item.get("page_start") or 0),

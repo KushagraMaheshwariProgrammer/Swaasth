@@ -8,12 +8,10 @@ from difflib import SequenceMatcher
 from typing import Any
 
 from fastapi import HTTPException
-from groq import Groq
 
-from app.services.document_extraction import extract_json_from_text
+from app.services.groq_client import groq_json_chat
+from app.services.rag_pipeline import validate_stg_citations
 from app.services.stg_retrieval import retrieve_stg_context
-
-GROQ_MODEL = "llama-3.3-70b-versatile"
 
 FILLER_WORDS = {
     "a",
@@ -32,6 +30,19 @@ FILLER_WORDS = {
 
 MALARIA_MARKERS = ("malaria", "plasmodium")
 MALARIA_TEST_MARKERS = ("malaria", "rdt", "smear", "parasite", "mp", "rapid diagnostic")
+DENGUE_MARKERS = ("dengue",)
+DENGUE_TEST_MARKERS = ("dengue", "ns1", "igg", "igm", "platelet")
+ANTIBIOTIC_MARKERS = (
+    "azithromycin",
+    "ceftriaxone",
+    "meropenem",
+    "amoxicillin",
+    "ciprofloxacin",
+    "levofloxacin",
+    "doxycycline",
+)
+TYPHOID_MARKERS = ("typhoid", "enteric fever", "salmonella typhi")
+TYPHOID_TEST_MARKERS = ("widal", "typhidot", "blood culture", "salmonella")
 
 
 def _normalize_name(text: str) -> str:
@@ -89,6 +100,11 @@ def _has_clinical_data(clinical_context: dict[str, Any] | None) -> bool:
     return bool(_symptom_names(clinical_context) or _test_results(clinical_context))
 
 
+def _contains_marker(text: str, markers: tuple[str, ...]) -> bool:
+    normalized = _normalize_name(text)
+    return any(marker in normalized for marker in markers)
+
+
 def _rule_based_bill_prescription_flags(
     bill_items: list[dict[str, Any]],
     prescription_items: list[dict[str, Any]],
@@ -135,6 +151,7 @@ def _rule_based_bill_prescription_flags(
 def _rule_based_clinical_flags(
     diagnosis: str,
     clinical_context: dict[str, Any] | None,
+    prescription_items: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     if not clinical_context:
         return []
@@ -142,6 +159,7 @@ def _rule_based_clinical_flags(
     flags: list[dict[str, Any]] = []
     diagnosis_norm = _normalize_name(diagnosis)
     results = _test_results(clinical_context)
+    rx_names = _collect_item_names(prescription_items or [])
 
     if any(marker in diagnosis_norm for marker in MALARIA_MARKERS):
         for result in results:
@@ -169,6 +187,64 @@ def _rule_based_clinical_flags(
                 )
                 break
 
+    if any(marker in diagnosis_norm for marker in TYPHOID_MARKERS):
+        for result in results:
+            test_name = _normalize_name(str(result.get("test_name") or ""))
+            if not any(marker in test_name for marker in TYPHOID_TEST_MARKERS):
+                continue
+            qualitative = str(result.get("result") or "").lower()
+            if qualitative == "negative":
+                flags.append(
+                    {
+                        "type": "DIAGNOSIS_TEST_MISMATCH",
+                        "severity": "HIGH",
+                        "item": diagnosis,
+                        "category": "diagnosis",
+                        "reason": (
+                            f"Diagnosis is '{diagnosis}' but "
+                            f"{result.get('test_name')} is reported negative."
+                        ),
+                        "recommendation": (
+                            "Ask the clinician to reconcile the typhoid diagnosis "
+                            "with the negative serological or culture result."
+                        ),
+                        "stg_reference": None,
+                    }
+                )
+                break
+
+    if any(marker in diagnosis_norm for marker in DENGUE_MARKERS):
+        dengue_evidence = any(
+            _contains_marker(str(result.get("test_name") or ""), DENGUE_TEST_MARKERS)
+            and str(result.get("result") or "").lower() in {"positive", "low", "high"}
+            for result in results
+        ) or any(marker in _normalize_name(name) for name in _symptom_names(clinical_context))
+        if dengue_evidence:
+            for rx_name in rx_names:
+                rx_norm = _normalize_name(rx_name)
+                if not any(abx in rx_norm for abx in ANTIBIOTIC_MARKERS):
+                    continue
+                if "doxycycline" in rx_norm and "leptospirosis" not in diagnosis_norm:
+                    continue
+                flags.append(
+                    {
+                        "type": "NOT_INDICATED_MEDICINE",
+                        "severity": "MEDIUM",
+                        "item": rx_name,
+                        "category": "prescription",
+                        "reason": (
+                            f"'{rx_name}' is prescribed for '{diagnosis}' without "
+                            "documented bacterial coinfection evidence."
+                        ),
+                        "recommendation": (
+                            "Confirm whether antibiotics are indicated per dengue STG "
+                            "before continuing broad-spectrum therapy."
+                        ),
+                        "stg_reference": None,
+                    }
+                )
+                break
+
     return flags
 
 
@@ -186,6 +262,46 @@ def _compute_risk_level(flags: list[dict[str, Any]]) -> str:
     return "MEDIUM"
 
 
+_TRIANGLE_AUDIT_SYSTEM = """
+You are reviewing a clinical case against India's Standard Treatment Guidelines (STG).
+
+Return ONLY valid JSON with this shape:
+{
+  "clinical_alignment": {
+    "diagnosis_supported": true or false or null,
+    "supporting_evidence": ["string"],
+    "missing_evidence": ["string"]
+  },
+  "flags": [
+    {
+      "type": "DIAGNOSIS_UNSUPPORTED|DIAGNOSIS_TEST_MISMATCH|MISSING_REQUIRED_INVESTIGATION|PRESCRIPTION_CLINICAL_MISMATCH|UNNECESSARY_TEST|UNNECESSARY_PROCEDURE|NOT_INDICATED_MEDICINE|EXCESSIVE_WORKUP|PRESCRIBED_NOT_IN_STG|INSUFFICIENT_STG_EVIDENCE",
+      "severity": "MEDIUM|HIGH",
+      "item": "string",
+      "category": "diagnosis|investigation|prescription",
+      "reason": "string",
+      "recommendation": "string",
+      "stg_reference": {
+        "condition": "string",
+        "section": "string",
+        "page": number or null
+      }
+    }
+  ]
+}
+
+Rules:
+- Evaluate the TRIANGLE: diagnosis vs symptoms/test results vs prescription/bill items.
+- Flag diagnosis unsupported by symptoms/results per STG (DIAGNOSIS_UNSUPPORTED).
+- Flag test results that contradict the diagnosis (DIAGNOSIS_TEST_MISMATCH).
+- Flag missing investigations required by STG before diagnosis/treatment (MISSING_REQUIRED_INVESTIGATION).
+- Flag prescription/bill items not indicated given the full clinical picture.
+- Every flag MUST include stg_reference when citing STG.
+- Do not claim fraud; use guideline-based language.
+- If clinical data is empty, set diagnosis_supported=null and avoid diagnosis-specific flags.
+- Do not emit INSUFFICIENT_STG_EVIDENCE unless truly unable to decide.
+""".strip()
+
+
 def _groq_triangle_audit(
     *,
     diagnosis: str,
@@ -196,52 +312,9 @@ def _groq_triangle_audit(
     bill_items: list[str],
     context_text: str,
     matched_conditions: list[str],
+    retrieval_chunks: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    api_key = __import__("os").getenv("GROQ_API_KEY")
-    if not api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="GROQ_API_KEY is not set in the environment.",
-        )
-
-    prompt = f"""
-You are reviewing a clinical case against India's Standard Treatment Guidelines (STG).
-
-Return ONLY valid JSON:
-{{
-  "clinical_alignment": {{
-    "diagnosis_supported": true or false or null,
-    "supporting_evidence": ["string"],
-    "missing_evidence": ["string"]
-  }},
-  "flags": [
-    {{
-      "type": "DIAGNOSIS_UNSUPPORTED|DIAGNOSIS_TEST_MISMATCH|MISSING_REQUIRED_INVESTIGATION|PRESCRIPTION_CLINICAL_MISMATCH|UNNECESSARY_TEST|UNNECESSARY_PROCEDURE|NOT_INDICATED_MEDICINE|EXCESSIVE_WORKUP|PRESCRIBED_NOT_IN_STG|INSUFFICIENT_STG_EVIDENCE",
-      "severity": "MEDIUM|HIGH",
-      "item": "string",
-      "category": "diagnosis|investigation|prescription",
-      "reason": "string",
-      "recommendation": "string",
-      "stg_reference": {{
-        "condition": "string",
-        "section": "string",
-        "page": number or null
-      }}
-    }}
-  ]
-}}
-
-Rules:
-- Evaluate the TRIANGLE: diagnosis vs symptoms/test results vs prescription/bill items.
-- Flag diagnosis unsupported by symptoms/results per STG (DIAGNOSIS_UNSUPPORTED).
-- Flag test results that contradict the diagnosis (DIAGNOSIS_TEST_MISMATCH).
-- Flag missing investigations required by STG before diagnosis/treatment (MISSING_REQUIRED_INVESTIGATION).
-- Flag prescription/bill items not indicated given the full clinical picture (PRESCRIPTION_CLINICAL_MISMATCH, UNNECESSARY_TEST, etc.).
-- Every flag MUST include stg_reference when citing STG.
-- Do not claim fraud; use guideline-based language.
-- If clinical data is empty, set diagnosis_supported=null and avoid diagnosis-specific flags.
-- Do not emit INSUFFICIENT_STG_EVIDENCE unless truly unable to decide.
-
+    user = f"""
 Diagnosis: {diagnosis}
 Diagnosis user-provided: {diagnosis_user_provided}
 Matched STG conditions: {json.dumps(matched_conditions)}
@@ -260,31 +333,16 @@ Billed items (optional):
 
 STG excerpts:
 {context_text}
-"""
-    client = Groq(api_key=api_key)
-    try:
-        response = client.chat.completions.create(
-            model=GROQ_MODEL,
-            temperature=0,
-            max_tokens=3000,
-            messages=[{"role": "user", "content": prompt}],
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Groq API request failed: {str(exc)}",
-        ) from exc
+""".strip()
 
-    text = (response.choices[0].message.content or "").strip()
-    if not text:
-        return {"flags": [], "clinical_alignment": {}}
-    parsed = extract_json_from_text(text)
+    parsed = groq_json_chat(_TRIANGLE_AUDIT_SYSTEM, user, max_tokens=3000)
     flags = parsed.get("flags") or []
     if not isinstance(flags, list):
         flags = []
     alignment = parsed.get("clinical_alignment") or {}
     if not isinstance(alignment, dict):
         alignment = {}
+    flags = validate_stg_citations(flags, retrieval_chunks)
     return {"flags": flags, "clinical_alignment": alignment}
 
 
@@ -318,10 +376,17 @@ def analyze_treatment(
     )
     matched_conditions = retrieval.get("matched_conditions") or []
     context_text = retrieval.get("context_text") or ""
+    retrieval_chunks = retrieval.get("chunks") or []
 
     flags: list[dict[str, Any]] = []
     flags.extend(_rule_based_bill_prescription_flags(bill_items, prescription_items))
-    flags.extend(_rule_based_clinical_flags(diagnosis, clinical_context))
+    flags.extend(
+        _rule_based_clinical_flags(
+            diagnosis,
+            clinical_context,
+            prescription_items=prescription_items,
+        )
+    )
 
     clinical_alignment: dict[str, Any] = {
         "diagnosis_supported": None,
@@ -357,6 +422,7 @@ def analyze_treatment(
             bill_items=bill_names,
             context_text=context_text,
             matched_conditions=matched_conditions,
+            retrieval_chunks=retrieval_chunks,
         )
         clinical_alignment = audit_result.get("clinical_alignment") or clinical_alignment
         for flag in audit_result.get("flags") or []:

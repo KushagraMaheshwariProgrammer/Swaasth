@@ -8,6 +8,7 @@ groq
 python-dotenv
 fastembed
 chromadb
+rank-bm25
 openpyxl
 pdfplumber
 pandas

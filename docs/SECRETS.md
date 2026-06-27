@@ -48,11 +48,68 @@ Then run `npm run setup:env` if you are missing local `.env` files.
 
 ## STG index (prescription appropriateness)
 
+The treatment audit uses a hybrid RAG pipeline over Indian Standard Treatment Guidelines:
+
+1. **Primary index** — ICMR + Clinical Establishments Act STG (`primary_guidelines_index`)
+2. **Fallback index** — CRC Standard Treatment Guidelines (`stg_index`)
+
+### Source files
+
+| Path | Purpose |
+|------|---------|
+| `backend/data/Standard Treatment Guidelines/STG.pdf` | CRC STG source PDF |
+| `backend/data/icmr_index/chunks_manifest.json` | Legacy ICMR parsed chunks |
+| `backend/data/Standard Treatment Guidelines/Clinical Estabilishments Act STG/` | CEA source PDFs (optional if manifest exists) |
+| `backend/data/icmr_document_curator.json` | ICMR title aliases and exclusion patterns |
+
+### Build indexes (required once per machine / after model changes)
+
+```bash
+cd backend
+pip install -r requirements.txt
+python scripts/build_primary_guidelines_index.py
+python scripts/build_stg_index.py
+```
+
+This writes gitignored directories:
+
+- `backend/data/primary_guidelines_index/` — combined ICMR + CEA Chroma index
+- `backend/data/stg_index/` — CRC STG Chroma index
+
+Embeddings use `fastembed` locally (no extra API key). Default embedding model is `BAAI/bge-base-en-v1.5`.
+
+### Optional environment variables
+
+Set in `backend/.env` (see `backend/.env.example`):
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `STG_INDEX_DIR` | `backend/data/stg_index` | CRC STG index location |
+| `PRIMARY_GUIDELINES_INDEX_DIR` | `backend/data/primary_guidelines_index` | Primary guidelines index |
+| `STG_EMBED_MODEL` | `BAAI/bge-base-en-v1.5` | Embedding model (requires rebuild if changed) |
+| `STG_RERANK_MODEL` | `BAAI/bge-reranker-v2-m3` | Cross-encoder reranker |
+| `STG_RETRIEVAL_POOL_K` | `30` | Candidates before reranking |
+| `STG_RERANK_TOP_K` | `12` | Chunks passed to audit LLM |
+| `STG_MAX_CONTEXT_CHARS` | `16000` | Max STG context size |
+
+### Evaluation (optional)
+
+```bash
+cd backend
+python scripts/eval_rag_retrieval.py
+python scripts/eval_rag_audit.py --runs 3
+pytest tests/test_rag_pipeline.py tests/test_rag_eval_regression.py -q
+```
+
+---
+
+## Legacy STG-only build (CRC fallback index only)
+
 Place the CRC Standard Treatment Guidelines PDF at:
 
 `backend/data/Standard Treatment Guidelines/STG.pdf`
 
-Then build the local vector index once:
+Then build the CRC vector index:
 
 ```bash
 cd backend && python scripts/build_stg_index.py
