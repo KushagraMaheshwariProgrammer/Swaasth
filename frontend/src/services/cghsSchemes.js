@@ -1,5 +1,5 @@
 import { getApiBase } from "./apiBase";
-import { backendUnreachableMessage } from "./httpUtils";
+import { backendUnreachableMessage, fetchBackend } from "./httpUtils";
 
 function cghsBase() {
   return `${getApiBase()}/api/schemes/cghs`;
@@ -19,7 +19,7 @@ export async function fetchCghsCoveredCities({ forceRefresh = false } = {}) {
   cachedCoveredCitiesPromise = (async () => {
     let response;
     try {
-      response = await fetch(`${cghsBase()}/covered-cities`);
+      response = await fetchBackend(`${cghsBase()}/covered-cities`);
     } catch (error) {
       throw new Error(backendUnreachableMessage());
     }

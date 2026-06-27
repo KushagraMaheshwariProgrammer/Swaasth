@@ -32,6 +32,11 @@ import PrescriptionResults from "./components/PrescriptionResults";
 import TermsAndConditionsModal from "./components/TermsAndConditionsModal";
 import DragAndDropUpload from "./components/DragAndDropUpload";
 import { getApiBase } from "./services/apiBase";
+import {
+  backendUnreachableMessage,
+  fetchBackend,
+  parseJsonResponse,
+} from "./services/httpUtils";
 import { createPatient, getPatients, getPatientsLocalSnapshot } from "./services/patients";
 import { markLocalBillSynced, persistLocalBill, saveBill } from "./services/bills";
 import {
@@ -42,7 +47,6 @@ import {
   normalizePrescriptionPayload,
   uploadPrescription,
 } from "./services/prescriptions";
-import { backendUnreachableMessage, parseJsonResponse } from "./services/httpUtils";
 import {
   getCities,
   getStateOptions,
@@ -747,7 +751,7 @@ function CheckPage() {
     lastCompareRef.current = { validItems, locationOverride, metaOverride };
 
     try {
-      const response = await fetch(`${getApiBase()}/compare-bill`, {
+      const response = await fetchBackend(`${getApiBase()}/compare-bill`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1353,7 +1357,7 @@ function CheckPage() {
         hospital_type: hospitalType,
       });
       const [billResponse, prescriptionPayload] = await Promise.all([
-        fetch(`${getApiBase()}/upload-bill?${params}`, {
+        fetchBackend(`${getApiBase()}/upload-bill?${params}`, {
           method: "POST",
           body: billFormData,
         }).then((response) => parseJsonResponse(response)),
@@ -1410,7 +1414,7 @@ function CheckPage() {
         city,
         hospital_type: hospitalType,
       });
-      const response = await fetch(`${getApiBase()}/upload-bill?${params}`, {
+      const response = await fetchBackend(`${getApiBase()}/upload-bill?${params}`, {
         method: "POST",
         body: formData,
       });
