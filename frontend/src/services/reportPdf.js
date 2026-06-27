@@ -1,27 +1,11 @@
-import { Capacitor } from "@capacitor/core";
+import { getApiBase } from "./apiBase";
 import { buildReportFilename, resolveScheme } from "../data/schemes";
-
-export const API_BASE =
-  import.meta.env.VITE_API_BASE ??
-  (Capacitor.isNativePlatform() ? "http://10.0.2.2:8000" : "");
-
-function backendUnreachableMessage() {
-  if (Capacitor.isNativePlatform()) {
-    return (
-      "Could not reach the Swaasth backend. On your Mac run: cd backend && ./run_dev.sh " +
-      "(it must listen on 0.0.0.0:8000), then try again."
-    );
-  }
-  return (
-    "Could not reach the Swaasth backend. Start it with: cd backend && ./run_dev.sh " +
-    "(port 8000), then try again."
-  );
-}
+import { backendUnreachableMessage } from "./httpUtils";
 
 async function fetchReportPdfBlob(report) {
   let response;
   try {
-    response = await fetch(`${API_BASE}/api/reports/render-pdf`, {
+    response = await fetch(`${getApiBase()}/api/reports/render-pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(report),

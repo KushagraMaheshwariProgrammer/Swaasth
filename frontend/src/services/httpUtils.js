@@ -1,13 +1,11 @@
+import { backendConnectionHint, getApiBase } from "./apiBase";
 import { Capacitor } from "@capacitor/core";
 
 export function backendUnreachableMessage() {
   if (Capacitor.isNativePlatform()) {
-    return (
-      "Could not reach the backend. On your Mac run: cd backend && ./run_dev.sh " +
-      "(must listen on 0.0.0.0:8000), then reopen the app."
-    );
+    return `Could not reach the backend at ${getApiBase() || "(not configured)"}. ${backendConnectionHint()}`;
   }
-  return "Could not reach the backend. Start it on port 8000 and refresh.";
+  return `Could not reach the backend. ${backendConnectionHint()}`;
 }
 
 /** Parse a fetch Response safely; avoids \"Unexpected end of JSON input\". */

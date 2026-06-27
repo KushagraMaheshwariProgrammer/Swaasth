@@ -7,9 +7,11 @@
     "dev": "npm run sync:locations && vite",
     "sync:locations": "node scripts/sync-locations.mjs",
     "sync:firebase": "cp google-services.json android/app/google-services.json",
-    "build": "npm run sync:locations && npm run sync:firebase && vite build && npx cap sync android",
+    "build": "npm run sync:locations && npm run sync:firebase && npm run native:api-url && vite build && npx cap sync android",
+    "build:emulator": "npm run sync:locations && npm run sync:firebase && SWAASTH_BUILD_TARGET=emulator npm run native:api-url && vite build && npx cap sync android",
     "preview": "vite preview",
-    "cap:sync": "npm run sync:firebase && npx cap sync android"
+    "native:api-url": "node scripts/sync-native-api-url.mjs",
+    "cap:sync": "npm run sync:firebase && npm run native:api-url && vite build && npx cap sync android"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",

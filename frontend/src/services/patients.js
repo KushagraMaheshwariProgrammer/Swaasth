@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import {
   collection,
   deleteDoc,
@@ -19,7 +20,7 @@ import {
   removeLocalPatient,
 } from "./localPatientStore";
 
-const FIRESTORE_TIMEOUT_MS = 5000;
+const FIRESTORE_TIMEOUT_MS = Capacitor.isNativePlatform() ? 15000 : 5000;
 
 function patientsCollection(userId) {
   return collection(db, "users", userId, "patients");
@@ -365,25 +366,53 @@ export function getPatientsLocalSnapshot(userId) {
   return mergePatientLists([], getLocalPatients(userId));
 }
 
+function patientCloudSyncWarning(error) {
+  const code = error?.code || "";
+  if (code === "permission-denied") {
+    return (
+      "Could not load patients from your account (permission denied). " +
+      "Deploy Firestore rules: npm run deploy:firestore-rules"
+    );
+  }
+  if (code === "unavailable") {
+    return "Could not reach Firebase. Showing patients saved on this device.";
+  }
+  const message = error?.message || "";
+  if (/timed out/i.test(message)) {
+    return "Account sync is slow. Showing patients saved on this device.";
+  }
+  return "Could not sync patients from your account. Showing data saved on this device.";
+}
+
 export async function getPatients(userId) {
+  const { patients } = await getPatientsWithSyncStatus(userId);
+  return patients;
+}
+
+export async function getPatientsWithSyncStatus(userId) {
   if (!userId) {
-    return [];
+    return { patients: [], cloudWarning: null };
   }
 
   const localEntries = getLocalPatients(userId);
 
   let cloudPatients = [];
+  let cloudWarning = null;
   try {
     cloudPatients = await withTimeout(fetchCloudPatients(userId), FIRESTORE_TIMEOUT_MS);
   } catch (error) {
     console.error("Failed to load patients from Firebase:", error);
+    cloudWarning = patientCloudSyncWarning(error);
   }
 
   syncPendingPatients(userId).catch((error) => {
     console.error("Background patient sync failed:", error);
   });
 
-  return mergePatientLists(cloudPatients, localEntries);
+  return {
+    patients: mergePatientLists(cloudPatients, localEntries),
+    cloudWarning,
+  };
 }
 
 function collectPatientIdVariants(userId, patientId) {

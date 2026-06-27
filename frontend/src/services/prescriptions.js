@@ -1,9 +1,5 @@
-import { Capacitor } from "@capacitor/core";
+import { getApiBase } from "./apiBase";
 import { fetchJson } from "./httpUtils";
-
-const API_BASE =
-  import.meta.env.VITE_API_BASE ??
-  (Capacitor.isNativePlatform() ? "http://10.0.2.2:8000" : "");
 
 export function emptyClinicalContext() {
   return {
@@ -98,7 +94,7 @@ export function clinicalContextToApiPayload(clinicalContext) {
 export async function uploadPrescription(file) {
   const formData = new FormData();
   formData.append("file", file);
-  return fetchJson(`${API_BASE}/upload-prescription`, {
+  return fetchJson(`${getApiBase()}/upload-prescription`, {
     method: "POST",
     body: formData,
   });
@@ -108,14 +104,14 @@ export async function uploadClinicalDocument(file, documentType) {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("document_type", documentType);
-  return fetchJson(`${API_BASE}/upload-clinical-document`, {
+  return fetchJson(`${getApiBase()}/upload-clinical-document`, {
     method: "POST",
     body: formData,
   });
 }
 
 export async function fetchStgConditions() {
-  const payload = await fetchJson(`${API_BASE}/api/stg/conditions`);
+  const payload = await fetchJson(`${getApiBase()}/api/stg/conditions`);
   return payload?.conditions || [];
 }
 
@@ -131,7 +127,7 @@ export async function analyzeTreatment({
   patient = null,
   ocrText = "",
 }) {
-  return fetchJson(`${API_BASE}/analyze-treatment`, {
+  return fetchJson(`${getApiBase()}/analyze-treatment`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

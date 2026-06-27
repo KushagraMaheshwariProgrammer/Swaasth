@@ -31,7 +31,7 @@ import DiagnosisPrompt from "./components/DiagnosisPrompt";
 import PrescriptionResults from "./components/PrescriptionResults";
 import TermsAndConditionsModal from "./components/TermsAndConditionsModal";
 import DragAndDropUpload from "./components/DragAndDropUpload";
-import { Capacitor } from "@capacitor/core";
+import { getApiBase } from "./services/apiBase";
 import { createPatient, getPatients, getPatientsLocalSnapshot } from "./services/patients";
 import { markLocalBillSynced, persistLocalBill, saveBill } from "./services/bills";
 import {
@@ -42,7 +42,7 @@ import {
   normalizePrescriptionPayload,
   uploadPrescription,
 } from "./services/prescriptions";
-import { parseJsonResponse } from "./services/httpUtils";
+import { backendUnreachableMessage, parseJsonResponse } from "./services/httpUtils";
 import {
   getCities,
   getStateOptions,
@@ -54,21 +54,9 @@ import {
 } from "./services/locations";
 import { validateUploadFile } from "./utils/fileUpload";
 
-// Web dev: leave VITE_API_BASE unset to use the Vite proxy (/api → :8000).
-// Android emulator: uses http://10.0.2.2:8000 (your Mac's localhost).
-const API_BASE =
-  import.meta.env.VITE_API_BASE ??
-  (Capacitor.isNativePlatform() ? "http://10.0.2.2:8000" : "");
-
 function formatFetchError(err, fallback) {
   if (err?.message === "Failed to fetch") {
-    if (Capacitor.isNativePlatform()) {
-      return (
-        "Could not reach the backend. On your Mac run: cd backend && ./run_dev.sh " +
-        "(must listen on 0.0.0.0:8000), then reopen the app."
-      );
-    }
-    return "Could not reach the backend. Start it on port 8000 and refresh.";
+    return backendUnreachableMessage();
   }
   return err?.message || fallback;
 }
@@ -214,7 +202,12 @@ function ProtectedRoute({ children }) {
   }
 
   if (!termsAccepted) {
-    return null;
+    return (
+      <div className="auth-loading">
+        <div className="spinner-conic" aria-hidden="true" />
+        <p>Loading your account...</p>
+      </div>
+    );
   }
 
   return children;
@@ -754,7 +747,7 @@ function CheckPage() {
     lastCompareRef.current = { validItems, locationOverride, metaOverride };
 
     try {
-      const response = await fetch(`${API_BASE}/compare-bill`, {
+      const response = await fetch(`${getApiBase()}/compare-bill`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1360,7 +1353,7 @@ function CheckPage() {
         hospital_type: hospitalType,
       });
       const [billResponse, prescriptionPayload] = await Promise.all([
-        fetch(`${API_BASE}/upload-bill?${params}`, {
+        fetch(`${getApiBase()}/upload-bill?${params}`, {
           method: "POST",
           body: billFormData,
         }).then((response) => parseJsonResponse(response)),
@@ -1417,7 +1410,7 @@ function CheckPage() {
         city,
         hospital_type: hospitalType,
       });
-      const response = await fetch(`${API_BASE}/upload-bill?${params}`, {
+      const response = await fetch(`${getApiBase()}/upload-bill?${params}`, {
         method: "POST",
         body: formData,
       });

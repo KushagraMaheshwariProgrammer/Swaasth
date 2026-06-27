@@ -5,7 +5,11 @@ import {
   indexedDBLocalPersistence,
   initializeAuth,
 } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+} from "firebase/firestore";
 import { getFirebaseConfig } from "./firebaseConfig";
 
 const firebaseConfig = getFirebaseConfig();
@@ -33,4 +37,14 @@ function createAuth() {
 }
 
 export const auth = createAuth();
-export const db = getFirestore(app);
+
+function createFirestore() {
+  if (Capacitor.isNativePlatform()) {
+    return initializeFirestore(app, {
+      localCache: persistentLocalCache(),
+    });
+  }
+  return getFirestore(app);
+}
+
+export const db = createFirestore();

@@ -1,0 +1,65 @@
+[debug] [2026-06-27T12:57:22.888Z] ----------------------------------------------------------------------
+[debug] [2026-06-27T12:57:22.889Z] Command:       /opt/homebrew/Cellar/node@22/22.22.3/bin/node /Users/kushagramaheshwari/.npm/_npx/7750544ccf494d8b/node_modules/.bin/firebase deploy --only firestore:rules
+[debug] [2026-06-27T12:57:22.889Z] CLI Version:   15.22.3
+[debug] [2026-06-27T12:57:22.889Z] Platform:      darwin
+[debug] [2026-06-27T12:57:22.889Z] Node Version:  v22.22.3
+[debug] [2026-06-27T12:57:22.890Z] Detected Agent: cursor
+[debug] [2026-06-27T12:57:22.890Z] Time:          Sat Jun 27 2026 18:27:22 GMT+0530 (India Standard Time)
+[debug] [2026-06-27T12:57:22.890Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-06-27T12:57:22.891Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2026-06-27T12:57:23.600Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-06-27T12:57:23.600Z] > authorizing via signed-in user (ptkushagra@gmail.com)
+[debug] [2026-06-27T12:57:23.600Z] [iam] checking project swaasth-5bf90 for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]
+[debug] [2026-06-27T12:57:23.600Z] Checked if tokens are valid: false, expires at: 1782543336896
+[debug] [2026-06-27T12:57:23.600Z] Checked if tokens are valid: false, expires at: 1782543336896
+[debug] [2026-06-27T12:57:23.600Z] > refreshing access token with scopes: []
+[debug] [2026-06-27T12:57:23.601Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-06-27T12:57:23.601Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-06-27T12:57:24.115Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-06-27T12:57:24.115Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-06-27T12:57:24.130Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/swaasth-5bf90:testIamPermissions [none]
+[debug] [2026-06-27T12:57:24.130Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/swaasth-5bf90:testIamPermissions  x-goog-user-project=swaasth-5bf90
+[debug] [2026-06-27T12:57:24.130Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/swaasth-5bf90:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[debug] [2026-06-27T12:57:24.201Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2026-06-27T12:57:24.201Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2026-06-27T12:57:25.628Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/swaasth-5bf90:testIamPermissions 200
+[debug] [2026-06-27T12:57:25.628Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/swaasth-5bf90:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[info] 
+[info] === Deploying to 'swaasth-5bf90'...
+[info] 
+[info] i  deploying firestore 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2026-06-27T12:57:25.631Z] Checked if tokens are valid: true, expires at: 1782568643115
+[debug] [2026-06-27T12:57:25.631Z] Checked if tokens are valid: true, expires at: 1782568643115
+[debug] [2026-06-27T12:57:25.632Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/swaasth-5bf90/databases/(default) [none]
+[debug] [2026-06-27T12:57:27.400Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/swaasth-5bf90/databases/(default) 200
+[debug] [2026-06-27T12:57:27.401Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/swaasth-5bf90/databases/(default) {"name":"projects/swaasth-5bf90/databases/(default)","uid":"462ab3ef-cde8-4fa8-bd79-f97e3159e56d","createTime":"2026-06-04T22:48:19.011766Z","updateTime":"2026-06-04T22:48:19.011766Z","locationId":"nam5","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"3600s","earliestVersionTime":"2026-06-27T11:57:27.272671Z","appEngineIntegrationMode":"DISABLED","keyPrefix":"s","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_DISABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"realtimeUpdatesMode":"REALTIME_UPDATES_MODE_ENABLED","etag":"ILiGuqO8p5UDMOXBuonX7pQD"}
+[info] i  cloud.firestore: checking firestore.rules for compilation errors... 
+[debug] [2026-06-27T12:57:27.402Z] Checked if tokens are valid: true, expires at: 1782568643115
+[debug] [2026-06-27T12:57:27.402Z] Checked if tokens are valid: true, expires at: 1782568643115
+[debug] [2026-06-27T12:57:27.402Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/swaasth-5bf90:test [none]
+[debug] [2026-06-27T12:57:27.402Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/swaasth-5bf90:test [omitted]
+[debug] [2026-06-27T12:57:28.164Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/swaasth-5bf90:test 200
+[debug] [2026-06-27T12:57:28.164Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/swaasth-5bf90:test {}
+[info] ✔  cloud.firestore: rules file firestore.rules compiled successfully 
+[debug] [2026-06-27T12:57:28.165Z] Checked if tokens are valid: true, expires at: 1782568643115
+[debug] [2026-06-27T12:57:28.165Z] Checked if tokens are valid: true, expires at: 1782568643115
+[debug] [2026-06-27T12:57:28.165Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/swaasth-5bf90/releases pageSize=10&pageToken=
+[debug] [2026-06-27T12:57:34.480Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/swaasth-5bf90/releases 503
+[debug] [2026-06-27T12:57:34.480Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/swaasth-5bf90/releases {"error":{"code":503,"message":"The service is currently unavailable.","status":"UNAVAILABLE"}}
+[error] 
+[error] Error: Request to https://firebaserules.googleapis.com/v1/projects/swaasth-5bf90/releases?pageSize=10&pageToken= had HTTP Error: 503, The service is currently unavailable.
+[debug] [2026-06-27T12:57:34.714Z] Error Context: {
+  "body": {
+    "error": {
+      "code": 503,
+      "message": "The service is currently unavailable.",
+      "status": "UNAVAILABLE"
+    }
+  },
+  "response": {
+    "statusCode": 503
+  }
+}

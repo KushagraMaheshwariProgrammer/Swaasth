@@ -22,6 +22,7 @@ import {
   getPatientBills,
   getPatients,
   getPatientsLocalSnapshot,
+  getPatientsWithSyncStatus,
   updatePatient,
 } from "../services/patients";
 
@@ -63,8 +64,11 @@ export default function PatientsPage() {
       setLoading(true);
     }
     try {
-      const list = await getPatients(user.uid);
+      const { patients: list, cloudWarning } = await getPatientsWithSyncStatus(user.uid);
       setPatients(list);
+      if (cloudWarning) {
+        setSyncMessage(cloudWarning);
+      }
     } catch (err) {
       setError(err.message || "Unable to load patients.");
     } finally {
