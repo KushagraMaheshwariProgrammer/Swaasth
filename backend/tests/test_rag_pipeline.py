@@ -5,8 +5,10 @@ from __future__ import annotations
 from app.services.rag_pipeline import (
     Bm25Index,
     build_context_text,
+    format_guideline_basis,
     prefilter_titles_by_embedding,
     reciprocal_rank_fusion,
+    sanitize_display_text,
     validate_stg_citations,
 )
 
@@ -37,6 +39,61 @@ def test_bm25_finds_acronym_terms(tmp_path) -> None:
     assert results[0]["chunk_id"] == "c1"
 
 
+def test_sanitize_display_text_strips_ocr_glyphs() -> None:
+    raw = "4.1.1 Definition \uf0a7 The term upper respiratory tract infections"
+    cleaned = sanitize_display_text(raw)
+    assert "\uf0a7" not in cleaned
+    assert "Definition" in cleaned
+    assert "upper respiratory tract infections" in cleaned
+
+
+def test_format_guideline_basis_returns_clean_source_label() -> None:
+    chunk = {
+        "corpus_label": "ICMR",
+        "condition": "Treatment Guidelines 2019",
+        "text": (
+            "35 CHAPTER: 4 Management of Respiratory tract infections (RTI) "
+            "4.1.1 Definition \uf0a7 The term upper respiratory tract infections"
+        ),
+    }
+    basis = format_guideline_basis(chunk)
+    assert basis.startswith("Based on ICMR guidelines")
+    assert "CHAPTER" not in basis
+    assert "\uf0a7" not in basis
+    assert "Definition" not in basis
+
+
+def test_validate_stg_citations_preserves_llm_plain_basis() -> None:
+    chunks = [
+        {
+            "condition": "Malaria",
+            "document": "Malaria",
+            "section_type": "diagnosis",
+            "page_start": 10,
+            "page_end": 12,
+            "text": "Diagnostic criteria for malaria.",
+        }
+    ]
+    flags = [
+        {
+            "type": "UNNECESSARY_TEST",
+            "reason": "Test not indicated.",
+            "guideline_basis": (
+                "Malaria should be confirmed with a blood test before starting treatment."
+            ),
+            "stg_reference": {
+                "condition": "Fake Condition",
+                "section": "diagnosis",
+                "page": 10,
+            },
+        }
+    ]
+    validated = validate_stg_citations(flags, chunks)
+    assert validated[0]["guideline_basis"] == (
+        "Malaria should be confirmed with a blood test before starting treatment."
+    )
+
+
 def test_validate_stg_citations_strips_ungrounded_reference() -> None:
     chunks = [
         {
@@ -61,7 +118,9 @@ def test_validate_stg_citations_strips_ungrounded_reference() -> None:
     ]
     validated = validate_stg_citations(flags, chunks)
     assert validated[0]["stg_reference"] is None
-    assert "could not be verified" in validated[0]["reason"].lower()
+    assert validated[0].get("guideline_basis")
+    assert validated[0]["guideline_basis"].startswith("Based on")
+    assert "could not be verified" not in validated[0]["reason"].lower()
 
 
 def test_validate_stg_citations_keeps_grounded_reference() -> None:
@@ -88,6 +147,8 @@ def test_validate_stg_citations_keeps_grounded_reference() -> None:
     ]
     validated = validate_stg_citations(flags, chunks)
     assert validated[0]["stg_reference"]["condition"] == "HYPERTENSION"
+    assert validated[0].get("guideline_basis")
+    assert validated[0]["guideline_basis"].startswith("Based on")
 
 
 def test_build_context_text_respects_char_budget() -> None:

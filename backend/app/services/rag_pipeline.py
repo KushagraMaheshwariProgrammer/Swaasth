@@ -266,6 +266,104 @@ def _reference_matches_chunk(reference: dict[str, Any], chunk: dict[str, Any]) -
     return True
 
 
+def _score_chunk_relevance(flag: dict[str, Any], chunk: dict[str, Any]) -> float:
+    item = _normalize_label(str(flag.get("item") or ""))
+    reason = _normalize_label(str(flag.get("reason") or ""))
+    text = _normalize_label(str(chunk.get("text") or ""))
+    score = 0.0
+    for token in item.split():
+        if len(token) > 3 and token in text:
+            score += 2.0
+    for token in reason.split():
+        if len(token) > 4 and token in text:
+            score += 0.5
+    section = _normalize_label(str(chunk.get("section_type") or ""))
+    if section in {"treatment", "diagnosis", "investigations", "general"}:
+        score += 0.3
+    return score
+
+
+def _find_supporting_chunk(
+    flag: dict[str, Any],
+    chunks: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    if not chunks:
+        return None
+    scored = sorted(
+        ((chunk, _score_chunk_relevance(flag, chunk)) for chunk in chunks),
+        key=lambda pair: pair[1],
+        reverse=True,
+    )
+    best_chunk, best_score = scored[0]
+    if best_score >= 1.0:
+        return best_chunk
+    return chunks[0]
+
+
+_OCR_GLYPH_PATTERN = re.compile(
+    r"[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f"
+    r"\uf000-\uf0ff\u25a0-\u25ff\u2580-\u259f]+"
+)
+_SECTION_NUMBER_PATTERN = re.compile(
+    r"\b\d+(?:\.\d+){1,3}\b|\bCHAPTER\s*:?\s*\d+\b",
+    re.IGNORECASE,
+)
+
+
+def sanitize_display_text(text: str) -> str:
+    """Strip OCR artifacts and control characters from user-facing audit text."""
+    cleaned = str(text or "")
+    cleaned = _OCR_GLYPH_PATTERN.sub(" ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def _friendly_source_name(corpus_label: str) -> str:
+    label = str(corpus_label or "").strip().lower()
+    if not label or label in {"government guidelines", "guidelines"}:
+        return "government treatment guidelines"
+    if label == "icmr":
+        return "ICMR guidelines"
+    if label == "crc stg":
+        return "CRC Standard Treatment Guidelines"
+    if "clinical establishments" in label:
+        return "Clinical Establishments Act guidelines"
+    if "icmr" in label:
+        return "ICMR guidelines"
+    return str(corpus_label or "government treatment guidelines").strip()
+
+
+def _friendly_condition_name(condition: str) -> str:
+    name = sanitize_display_text(condition)
+    name = _SECTION_NUMBER_PATTERN.sub("", name)
+    name = re.sub(r"\s+", " ", name).strip(" .,-")
+    return name
+
+
+def format_guideline_basis(chunk: dict[str, Any], *, excerpt_max: int = 220) -> str:
+    """Return a short source attribution label (no raw OCR excerpt)."""
+    del excerpt_max  # kept for backward compatibility with callers
+    source = _friendly_source_name(
+        str(chunk.get("corpus_label") or chunk.get("chapter") or "").strip()
+    )
+    condition = _friendly_condition_name(
+        str(chunk.get("condition") or chunk.get("document") or "")
+    )
+    if condition:
+        return f"Based on {source} for {condition}."
+    return f"Based on {source}."
+
+
+def _strip_citation_verification_suffix(reason: str) -> str:
+    cleaned = re.sub(
+        r"\s*\(STG citation could not be verified[^)]*\)\.?",
+        "",
+        reason,
+        flags=re.IGNORECASE,
+    )
+    return cleaned.strip()
+
+
 def validate_stg_citations(
     flags: list[dict[str, Any]],
     chunks: list[dict[str, Any]],
@@ -276,19 +374,32 @@ def validate_stg_citations(
             continue
         item = dict(flag)
         reference = item.get("stg_reference")
-        if not reference or not isinstance(reference, dict):
-            validated.append(item)
-            continue
+        matched_chunk: dict[str, Any] | None = None
 
-        grounded = any(_reference_matches_chunk(reference, chunk) for chunk in chunks)
-        if grounded:
-            validated.append(item)
-            continue
+        if reference and isinstance(reference, dict):
+            for chunk in chunks:
+                if _reference_matches_chunk(reference, chunk):
+                    matched_chunk = chunk
+                    break
 
-        reason = str(item.get("reason") or "").strip()
-        suffix = " (STG citation could not be verified against retrieved excerpts.)"
-        if suffix.strip() not in reason:
-            item["reason"] = f"{reason}{suffix}".strip()
-        item["stg_reference"] = None
+            if not matched_chunk:
+                item["stg_reference"] = None
+                item["reason"] = _strip_citation_verification_suffix(
+                    str(item.get("reason") or "")
+                )
+
+        existing_basis = sanitize_display_text(str(item.get("guideline_basis") or ""))
+        if existing_basis:
+            item["guideline_basis"] = existing_basis
+        elif matched_chunk:
+            item["guideline_basis"] = format_guideline_basis(matched_chunk)
+        else:
+            support = _find_supporting_chunk(item, chunks)
+            if support:
+                item["guideline_basis"] = format_guideline_basis(support)
+
+        item["reason"] = sanitize_display_text(str(item.get("reason") or ""))
+        item["recommendation"] = sanitize_display_text(str(item.get("recommendation") or ""))
+
         validated.append(item)
     return validated
