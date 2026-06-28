@@ -6,7 +6,7 @@
     "chapter": "ICMR"
   },
   {
-    "condition": "Buccal Mucosa Cancer final pdf 9.6.14",
+    "condition": "Buccal Mucosa Cancer",
     "corpus": "icmr",
     "source_file": "Buccal Mucosa Cancer final pdf 9.6.14.pdf",
     "chapter": "ICMR"
@@ -18,13 +18,13 @@
     "chapter": "ICMR"
   },
   {
-    "condition": "Colorectal Cancer 0",
+    "condition": "Colorectal Cancer",
     "corpus": "icmr",
     "source_file": "Colorectal Cancer_0.html",
     "chapter": "ICMR"
   },
   {
-    "condition": "Consensus Document for The Management of Cancer Cervix 0",
+    "condition": "Cancer Cervix",
     "corpus": "icmr",
     "source_file": "Consensus Document for The Management of Cancer Cervix_0.pdf",
     "chapter": "ICMR"
@@ -36,7 +36,7 @@
     "chapter": "ICMR"
   },
   {
-    "condition": "Consensus Document 1",
+    "condition": "Hepatocellular Carcinoma",
     "corpus": "icmr",
     "source_file": "Consensus_Document_1.pdf",
     "chapter": "ICMR"
@@ -48,25 +48,25 @@
     "chapter": "ICMR"
   },
   {
-    "condition": "Esophagus final ICMR2014 0",
+    "condition": "Esophageal Cancer",
     "corpus": "icmr",
     "source_file": "Esophagus final ICMR2014_0.pdf",
     "chapter": "ICMR"
   },
   {
-    "condition": "GALLBLADDER CANCER 0",
+    "condition": "Gallbladder Cancer",
     "corpus": "icmr",
     "source_file": "GALLBLADDER CANCER_0.pdf",
     "chapter": "ICMR"
   },
   {
-    "condition": "GUCBB F",
+    "condition": "Umbilical Cord Blood Banking Collection, Processing, Testing, Storage, Banking and Release for Clinical Application (2023)",
     "corpus": "icmr",
     "source_file": "GUCBB_F.pdf",
     "chapter": "ICMR"
   },
   {
-    "condition": "Gastric Cancer Final pdf for farrow 0",
+    "condition": "Gastric Cancer",
     "corpus": "icmr",
     "source_file": "Gastric Cancer Final pdf for farrow_0.pdf",
     "chapter": "ICMR"
@@ -90,13 +90,13 @@
     "chapter": "ICMR"
   },
   {
-    "condition": "Immunophenotyping of Hematolymphoid Neoplasms 0 (1)",
+    "condition": "Immunophenotyping of Hematolymphoid Neoplasms",
     "corpus": "icmr",
     "source_file": "Immunophenotyping of Hematolymphoid Neoplasms_0 (1).pdf",
     "chapter": "ICMR"
   },
   {
-    "condition": "Immunophenotyping of Hematolymphoid Neoplasms 0",
+    "condition": "Immunophenotyping of Hematolymphoid Neoplasms",
     "corpus": "icmr",
     "source_file": "Immunophenotyping of Hematolymphoid Neoplasms_0.pdf",
     "chapter": "ICMR"
@@ -108,19 +108,19 @@
     "chapter": "ICMR"
   },
   {
-    "condition": "Larynx and Hypopharynx Cancers 0",
+    "condition": "Larynx and Hypopharynx Cancers",
     "corpus": "icmr",
     "source_file": "Larynx and Hypopharynx Cancers_0.pdf",
     "chapter": "ICMR"
   },
   {
-    "condition": "MSS Myelodysplastic Syndrome MDS",
+    "condition": "Myelodysplastic Syndrome (mds)",
     "corpus": "icmr",
     "source_file": "MSS_Myelodysplastic_Syndrome_MDS.pdf",
     "chapter": "ICMR"
   },
   {
-    "condition": "Multiple Myeloma 0",
+    "condition": "Multiple Myeloma",
     "corpus": "icmr",
     "source_file": "Multiple Myeloma_0.pdf",
     "chapter": "ICMR"
@@ -132,31 +132,31 @@
     "chapter": "ICMR"
   },
   {
-    "condition": "NHL-HG 29.06.2016 0",
+    "condition": "Non Hodgkin’s Lymphoma (High Grade)",
     "corpus": "icmr",
     "source_file": "NHL-HG 29.06.2016_0.pdf",
     "chapter": "ICMR"
   },
   {
-    "condition": "Ovarian Cancer",
+    "condition": "Epithelial Ovarian Cancer",
     "corpus": "icmr",
     "source_file": "Ovarian_Cancer.pdf",
     "chapter": "ICMR"
   },
   {
-    "condition": "PEDIATRIC LYMPHOMAS AND SOLID TUMORS 0",
+    "condition": "PEDIATRIC LYMPHOMAS AND SOLID TUMORS",
     "corpus": "icmr",
     "source_file": "PEDIATRIC_LYMPHOMAS_AND_SOLID_TUMORS_0.html",
     "chapter": "ICMR"
   },
   {
-    "condition": "Prostate Cancer Consensus Doc",
+    "condition": "Prostate Cancer an",
     "corpus": "icmr",
     "source_file": "Prostate_Cancer_Consensus_Doc.pdf",
     "chapter": "ICMR"
   },
   {
-    "condition": "RB Document",
+    "condition": "Retinoblastoma \\/)",
     "corpus": "icmr",
     "source_file": "RB_Document.pdf",
     "chapter": "ICMR"
@@ -174,7 +174,7 @@
     "chapter": "ICMR"
   },
   {
-    "condition": "SARCOMA AND OSTEOSARCOMA final pdf 0",
+    "condition": "Soft Tissue Sarcoma and Osteosarcoma",
     "corpus": "icmr",
     "source_file": "SARCOMA AND OSTEOSARCOMA final pdf_0.pdf",
     "chapter": "ICMR"
@@ -192,19 +192,19 @@
     "chapter": "ICMR"
   },
   {
-    "condition": "cancer 0",
+    "condition": "cancer",
     "corpus": "icmr",
     "source_file": "cancer_0.pdf",
     "chapter": "ICMR"
   },
   {
-    "condition": "consensu 3",
+    "condition": "Pancreatic Cancer",
     "corpus": "icmr",
     "source_file": "consensu_3.pdf",
     "chapter": "ICMR"
   },
   {
-    "condition": "tongue",
+    "condition": "Tongue Cancer",
     "corpus": "icmr",
     "source_file": "tongue.pdf",
     "chapter": "ICMR"
@@ -468,7 +468,7 @@
     "chapter": "Clinical Establishments Act STG"
   },
   {
-    "condition": "antimicrobial Use in Infectious Diseases",
+    "condition": "Antimicrobial Use in Infectious Diseases",
     "corpus": "clinical_establishments",
     "source_file": "antimicrobial Use in Infectious Diseases.pdf",
     "chapter": "Clinical Establishments Act STG"
@@ -486,19 +486,19 @@
     "chapter": "Clinical Establishments Act STG"
   },
   {
-    "condition": "haemodialysis",
+    "condition": "Haemodialysis",
     "corpus": "clinical_establishments",
     "source_file": "haemodialysis.pdf",
     "chapter": "Clinical Establishments Act STG"
   },
   {
-    "condition": "kala-azar",
+    "condition": "Kala-azar",
     "corpus": "clinical_establishments",
     "source_file": "kala-azar.pdf",
     "chapter": "Clinical Establishments Act STG"
   },
   {
-    "condition": "malaria",
+    "condition": "Malaria",
     "corpus": "clinical_establishments",
     "source_file": "malaria.pdf",
     "chapter": "Clinical Establishments Act STG"
