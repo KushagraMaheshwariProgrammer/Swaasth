@@ -81,11 +81,15 @@ def _slugify(value: str) -> str:
     return re.sub(r"[\s_]+", "-", cleaned).strip("-") or "document"
 
 
-def _title_from_filename(filename: str) -> str:
+def _raw_title_from_filename(filename: str) -> str:
     stem = Path(filename).stem
     cleaned = re.sub(r"[_]+", " ", stem)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned or filename
+
+
+def _title_from_filename(filename: str) -> str:
+    return normalize_document_title(_raw_title_from_filename(filename))
 
 
 def _ocr_page_image(page: fitz.Page) -> str:
@@ -204,11 +208,17 @@ def build_chunks_from_file(
     if suffix not in SUPPORTED_SUFFIXES:
         return []
 
-    document_title = _title_from_filename(file_path.name)
+    filename_title = _raw_title_from_filename(file_path.name)
     if suffix == ".pdf":
         pages = extract_pdf_pages(file_path, use_ocr_fallback=use_ocr_fallback)
     else:
         pages = extract_html_text(file_path)
+
+    cover_text = pages[0][1] if pages else ""
+    document_title = normalize_document_title(
+        filename_title,
+        cover_text=cover_text or None,
+    )
 
     return _chunks_from_pages(
         corpus=corpus,
@@ -249,13 +259,42 @@ def build_chunks_from_directory(
     return chunks
 
 
+def _resolve_legacy_document_title(
+    source_file: str,
+    raw_title: str,
+    cover_text_by_source: dict[str, str],
+) -> str:
+    cover_text = cover_text_by_source.get(source_file, "")
+    return normalize_document_title(
+        raw_title,
+        cover_text=cover_text or None,
+    )
+
+
 def load_legacy_icmr_chunks() -> list[GuidelineChunk]:
     if not LEGACY_ICMR_MANIFEST.exists():
         return []
 
     payload = json.loads(LEGACY_ICMR_MANIFEST.read_text(encoding="utf-8"))
+    cover_text_by_source: dict[str, str] = {}
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        source_file = str(item.get("source_file") or "")
+        if not source_file:
+            continue
+        page_start = int(item.get("page_start") or 0)
+        if page_start not in (0, 1):
+            continue
+        text = str(item.get("text") or "").strip()
+        if len(text) < 40:
+            continue
+        existing = cover_text_by_source.get(source_file, "")
+        if not existing or len(text) > len(existing):
+            cover_text_by_source[source_file] = text
+
     chunks: list[GuidelineChunk] = []
-    seen_docs: set[str] = set()
+    title_by_source: dict[str, str] = {}
     for item in payload:
         if not isinstance(item, dict):
             continue
@@ -266,11 +305,15 @@ def load_legacy_icmr_chunks() -> list[GuidelineChunk]:
         raw_title = str(item.get("document") or item.get("condition") or "")
         if should_exclude_document(raw_title, source_file):
             continue
-        document_title = normalize_document_title(raw_title)
-        if source_file and source_file in seen_docs:
-            pass
-        elif source_file:
-            seen_docs.add(source_file)
+
+        if source_file not in title_by_source:
+            title_by_source[source_file] = _resolve_legacy_document_title(
+                source_file,
+                raw_title,
+                cover_text_by_source,
+            )
+        document_title = title_by_source[source_file]
+
         chunks.append(
             GuidelineChunk(
                 chunk_id=str(item.get("chunk_id") or ""),

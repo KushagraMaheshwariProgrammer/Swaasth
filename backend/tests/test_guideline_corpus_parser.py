@@ -11,6 +11,7 @@ from app.services.guideline_corpus_parser import (
     GuidelineChunk,
     build_chunks_from_file,
     build_primary_guideline_corpus,
+    load_legacy_icmr_chunks,
 )
 
 
@@ -75,3 +76,40 @@ def test_build_primary_guideline_corpus_combines_icmr_and_cea(monkeypatch) -> No
     corpora = {chunk.corpus for chunk in chunks}
     assert "icmr" in corpora
     assert "clinical_establishments" in corpora
+
+
+def test_load_legacy_icmr_chunks_rewrites_buccal_mucosa_title(monkeypatch, tmp_path) -> None:
+    manifest = tmp_path / "chunks_manifest.json"
+    manifest.write_text(
+        """
+[
+  {
+    "chunk_id": "icmr-buccal-mucosa-cancer-final-pdf-9-6-14-p0001-1835",
+    "document": "Buccal Mucosa Cancer final pdf 9.6.14",
+    "source_file": "Buccal Mucosa Cancer final pdf 9.6.14.pdf",
+    "section_type": "general",
+    "page_start": 1,
+    "page_end": 1,
+    "text": "Indian Council of Medical Research\\n2014\\nCONSENSUS DOCUMENT FOR\\nMANAGEMENT\\nOF BUCCAL MUCOSA CANCER\\nPrepared as an outcome of ICMR Subcommittee on Buccal Mucosa Cancer"
+  },
+  {
+    "chunk_id": "icmr-buccal-mucosa-cancer-final-pdf-9-6-14-p0002-1836",
+    "document": "Buccal Mucosa Cancer final pdf 9.6.14",
+    "source_file": "Buccal Mucosa Cancer final pdf 9.6.14.pdf",
+    "section_type": "general",
+    "page_start": 2,
+    "page_end": 2,
+    "text": "Follow-up management recommendations for buccal mucosa cancer patients in India."
+  }
+]
+""".strip(),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "app.services.guideline_corpus_parser.LEGACY_ICMR_MANIFEST",
+        manifest,
+    )
+
+    chunks = load_legacy_icmr_chunks()
+    assert chunks
+    assert {chunk.document for chunk in chunks} == {"Buccal Mucosa Cancer"}
