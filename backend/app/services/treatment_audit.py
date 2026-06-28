@@ -10,7 +10,12 @@ from typing import Any
 from fastapi import HTTPException
 
 from app.services.groq_client import groq_json_chat
-from app.services.rag_pipeline import validate_stg_citations
+from app.services.rag_pipeline import (
+    _find_supporting_chunk,
+    format_guideline_basis,
+    sanitize_display_text,
+    validate_stg_citations,
+)
 from app.services.stg_retrieval import retrieve_stg_context
 
 FILLER_WORDS = {
@@ -180,7 +185,7 @@ def _rule_based_clinical_flags(
                         ),
                         "recommendation": (
                             "Ask the clinician to reconcile the diagnosis with the "
-                            "negative malaria test result using STG criteria."
+                            "negative malaria test result using standard diagnostic criteria."
                         ),
                         "stg_reference": None,
                     }
@@ -237,8 +242,9 @@ def _rule_based_clinical_flags(
                             "documented bacterial coinfection evidence."
                         ),
                         "recommendation": (
-                            "Confirm whether antibiotics are indicated per dengue STG "
-                            "before continuing broad-spectrum therapy."
+                            "Ask your doctor whether antibiotics are needed. For dengue, "
+                            "antibiotics are usually not given unless there is clear "
+                            "evidence of a bacterial infection."
                         ),
                         "stg_reference": None,
                     }
@@ -262,8 +268,74 @@ def _compute_risk_level(flags: list[dict[str, Any]]) -> str:
     return "MEDIUM"
 
 
+_USER_FACING_REPLACEMENTS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        re.compile(
+            r"review and revise prescription according to stg guidelines?",
+            re.IGNORECASE,
+        ),
+        (
+            "Ask your doctor whether this medicine is necessary for your condition "
+            "and whether a simpler or standard alternative is available."
+        ),
+    ),
+    (
+        re.compile(
+            r"conduct necessary investigations as per stg guidelines?",
+            re.IGNORECASE,
+        ),
+        (
+            "Ask your doctor which tests are needed to confirm the diagnosis "
+            "before starting or continuing treatment."
+        ),
+    ),
+    (re.compile(r"\bper stg\b", re.IGNORECASE), "per government treatment guidelines"),
+    (
+        re.compile(r"\baccording to stg\b", re.IGNORECASE),
+        "based on government treatment guidelines",
+    ),
+    (re.compile(r"\bstg criteria\b", re.IGNORECASE), "standard diagnostic criteria"),
+    (re.compile(r"\bstg guidelines?\b", re.IGNORECASE), "government treatment guidelines"),
+)
+
+
+def _polish_user_facing_text(text: str) -> str:
+    cleaned = str(text or "").strip()
+    if not cleaned:
+        return cleaned
+    for pattern, replacement in _USER_FACING_REPLACEMENTS:
+        cleaned = pattern.sub(replacement, cleaned)
+    return cleaned.strip()
+
+
+def _polish_flags_for_users(
+    flags: list[dict[str, Any]],
+    chunks: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    polished: list[dict[str, Any]] = []
+    for flag in flags:
+        if not isinstance(flag, dict):
+            continue
+        item = dict(flag)
+        item["reason"] = _polish_user_facing_text(item.get("reason") or "")
+        item["recommendation"] = _polish_user_facing_text(item.get("recommendation") or "")
+        basis = sanitize_display_text(str(item.get("guideline_basis") or ""))
+        if basis:
+            item["guideline_basis"] = _polish_user_facing_text(basis)
+        elif chunks:
+            support = _find_supporting_chunk(item, chunks)
+            if support:
+                item["guideline_basis"] = format_guideline_basis(support)
+        polished.append(item)
+    return polished
+
+
 _TRIANGLE_AUDIT_SYSTEM = """
-You are reviewing a clinical case against India's Standard Treatment Guidelines (STG).
+You are reviewing a clinical case against India's government treatment guidelines
+(ICMR, Clinical Establishments Act STG, and CRC Standard Treatment Guidelines fallback).
+
+The reader is a patient or caregiver who does NOT have access to guideline documents.
+Write reasons and recommendations they can act on immediately.
 
 Return ONLY valid JSON with this shape:
 {
@@ -280,6 +352,7 @@ Return ONLY valid JSON with this shape:
       "category": "diagnosis|investigation|prescription",
       "reason": "string",
       "recommendation": "string",
+      "guideline_basis": "string",
       "stg_reference": {
         "condition": "string",
         "section": "string",
@@ -291,11 +364,20 @@ Return ONLY valid JSON with this shape:
 
 Rules:
 - Evaluate the TRIANGLE: diagnosis vs symptoms/test results vs prescription/bill items.
-- Flag diagnosis unsupported by symptoms/results per STG (DIAGNOSIS_UNSUPPORTED).
-- Flag test results that contradict the diagnosis (DIAGNOSIS_TEST_MISMATCH).
-- Flag missing investigations required by STG before diagnosis/treatment (MISSING_REQUIRED_INVESTIGATION).
-- Flag prescription/bill items not indicated given the full clinical picture.
-- Every flag MUST include stg_reference when citing STG.
+- Base every flag on the supplied guideline excerpts only.
+- Reasons must explain the clinical concern in plain language.
+- Recommendations must be concrete actions for the patient, for example:
+  "Ask your doctor whether antibiotics are needed for a viral URTI" or
+  "Request a malaria RDT before starting antimalarial treatment".
+- Every flag MUST include guideline_basis: one short plain-language sentence
+  explaining what the government guidelines say about this issue. Write at an
+  8th-grade reading level. No section numbers, no symbols, no jargon, no quotes
+  from the document, and no instruction to read guideline documents.
+  Example: "Most colds and throat infections are caused by viruses, so
+  antibiotics are usually not needed."
+- NEVER tell the user to read, review, or consult STG documents.
+- NEVER use vague recommendations like "revise per STG" or "follow STG guidelines".
+- Every flag MUST include stg_reference when citing a guideline excerpt.
 - Do not claim fraud; use guideline-based language.
 - If clinical data is empty, set diagnosis_supported=null and avoid diagnosis-specific flags.
 - Do not emit INSUFFICIENT_STG_EVIDENCE unless truly unable to decide.
@@ -317,7 +399,7 @@ def _groq_triangle_audit(
     user = f"""
 Diagnosis: {diagnosis}
 Diagnosis user-provided: {diagnosis_user_provided}
-Matched STG conditions: {json.dumps(matched_conditions)}
+Matched government guideline topics: {json.dumps(matched_conditions)}
 
 Symptoms:
 {json.dumps(symptoms, ensure_ascii=False)}
@@ -331,7 +413,7 @@ Prescribed / ordered items:
 Billed items (optional):
 {json.dumps(bill_items, ensure_ascii=False)}
 
-STG excerpts:
+Government guideline excerpts (ICMR / Clinical Establishments / CRC STG fallback):
 {context_text}
 """.strip()
 
@@ -343,6 +425,7 @@ STG excerpts:
     if not isinstance(alignment, dict):
         alignment = {}
     flags = validate_stg_citations(flags, retrieval_chunks)
+    flags = _polish_flags_for_users(flags, retrieval_chunks)
     return {"flags": flags, "clinical_alignment": alignment}
 
 
@@ -403,7 +486,7 @@ def analyze_treatment(
                 "category": "diagnosis",
                 "reason": (
                     "No symptoms or test results were provided, so diagnosis support "
-                    "could not be fully assessed against STG."
+                    "could not be fully assessed against government treatment guidelines."
                 ),
                 "recommendation": (
                     "Add symptoms and lab results for a stronger clinical triangle check."
@@ -439,6 +522,7 @@ def analyze_treatment(
                 else:
                     flag["category"] = "prescription"
             flags.append(flag)
+        flags = _polish_flags_for_users(flags, retrieval_chunks)
     elif not matched_conditions:
         flags.append(
             {
@@ -448,7 +532,7 @@ def analyze_treatment(
                 "category": "diagnosis",
                 "reason": (
                     f"Could not map diagnosis '{diagnosis}' to a condition in the "
-                    "Standard Treatment Guidelines index."
+                    "government treatment guidelines index."
                 ),
                 "recommendation": (
                     "Confirm the diagnosis spelling or choose a closer condition name."
@@ -456,6 +540,8 @@ def analyze_treatment(
                 "stg_reference": None,
             }
         )
+
+    flags = _polish_flags_for_users(flags, retrieval_chunks)
 
     return {
         "flags_count": len(flags),

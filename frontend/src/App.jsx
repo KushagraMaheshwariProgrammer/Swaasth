@@ -1057,7 +1057,7 @@ function CheckPage() {
     if (!hasItems) {
       setClinicalStep(null);
       setError(
-        "No medicines, tests, or procedures were detected. Add them manually on the next screen, then run the STG check."
+        "No medicines, tests, or procedures were detected. Add them manually on the next screen, then run the treatment appropriateness check."
       );
       return;
     }

@@ -36,7 +36,6 @@ function groupFlags(flags) {
 
 function FlagCard({ flag, index }) {
   const meta = getAuditSeverityMeta(flag.severity);
-  const reference = flag.stg_reference;
   return (
     <article
       key={`${flag.type || "flag"}-${flag.item || "item"}-${index}`}
@@ -48,11 +47,9 @@ function FlagCard({ flag, index }) {
       </div>
       <p className="audit-flag-type">{flag.type?.replaceAll("_", " ") || "--"}</p>
       <p className="audit-flag-reason">{flag.reason}</p>
-      {reference && (
+      {flag.guideline_basis && (
         <p className="audit-flag-reference">
-          STG: {reference.condition || "--"}
-          {reference.section ? ` · ${reference.section}` : ""}
-          {reference.page != null ? ` · p.${reference.page}` : ""}
+          <strong>Why this matters:</strong> {flag.guideline_basis}
         </p>
       )}
       <p className="audit-flag-recommendation">
@@ -75,7 +72,7 @@ export default function TreatmentAuditSection({ treatmentAuditFlags }) {
   return (
     <section className="audit-section treatment-audit-section">
       <div className="audit-section-header">
-        <h3>Treatment Appropriateness (STG)</h3>
+        <h3>Treatment Appropriateness Check</h3>
         <div className="audit-summary-badges">
           <span
             className={getAuditRiskMeta(treatmentAuditFlags.risk_level).className}
@@ -91,7 +88,7 @@ export default function TreatmentAuditSection({ treatmentAuditFlags }) {
 
       {matched.length > 0 && (
         <p className="comparison-settings-hint">
-          Matched STG condition{matched.length === 1 ? "" : "s"}:{" "}
+          Matched condition{matched.length === 1 ? "" : "s"}:{" "}
           <strong>{matched.join(", ")}</strong>
         </p>
       )}
@@ -101,7 +98,7 @@ export default function TreatmentAuditSection({ treatmentAuditFlags }) {
           Guideline sources:{" "}
           <strong>{treatmentAuditFlags.guideline_sources.join(", ")}</strong>
           {treatmentAuditFlags.used_fallback
-            ? " (CRC STG used as fallback)"
+            ? " (CRC guidelines used as fallback)"
             : ""}
         </p>
       )}
@@ -137,8 +134,8 @@ export default function TreatmentAuditSection({ treatmentAuditFlags }) {
       )}
 
       <p className="treatment-audit-disclaimer">
-        Guideline-based indication check, not a substitute for clinical judgment.
-        Based on CRC Standard Treatment Guidelines, 7th ed. (Wolters Kluwer).
+        Recommendations are based on ICMR, Clinical Establishments Act, and CRC
+        Standard Treatment Guidelines. This is not a substitute for clinical judgment.
       </p>
 
       {flags.length ? (
@@ -162,7 +159,7 @@ export default function TreatmentAuditSection({ treatmentAuditFlags }) {
       ) : (
         <p className="audit-empty-state">
           No tests, procedures, or medicines flagged as unnecessary for this
-          diagnosis based on the retrieved STG excerpts.
+          diagnosis based on the retrieved government guideline excerpts.
         </p>
       )}
     </section>

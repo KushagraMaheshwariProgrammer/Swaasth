@@ -727,12 +727,7 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
     treatment_flags = treatment_audit.get("flags") or []
     treatment_rows = []
     for flag in treatment_flags:
-        reference = flag.get("stg_reference") or {}
-        ref_text = reference.get("condition") or ""
-        if reference.get("section"):
-            ref_text = f"{ref_text} · {reference.get('section')}"
-        if reference.get("page") is not None:
-            ref_text = f"{ref_text} · p.{reference.get('page')}"
+        basis = flag.get("guideline_basis") or ""
         treatment_rows.append(
             "<tr>"
             f"<td>{escape(str(flag.get('item', '')))}</td>"
@@ -740,7 +735,7 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
             f"<td>{escape(str(flag.get('severity', '')))}</td>"
             f"<td>{escape(str(flag.get('reason', '')))}</td>"
             f"<td>{escape(str(flag.get('recommendation', '')))}</td>"
-            f"<td>{escape(ref_text)}</td>"
+            f"<td>{escape(str(basis))}</td>"
             "</tr>"
         )
 
@@ -830,11 +825,11 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
   <h2>Suspicious / Unnecessary Charges</h2>
   {"<table><tr><th>Item</th><th>Type</th><th>Severity</th><th>Reason</th><th>Recommendation</th></tr>" + ''.join(audit_rows) + "</table>" if audit_rows else "<p>No suspicious repetitions or unnecessary package-component charges detected.</p>"}
 
-  <h2>Treatment Appropriateness (STG)</h2>
+  <h2>Treatment Appropriateness Check</h2>
   {clinical_evidence_html}
-  {"<p><b>Matched STG conditions:</b> " + escape(', '.join(treatment_audit.get('matched_stg_conditions') or [])) + "</p>" if treatment_audit.get('matched_stg_conditions') else ""}
-  {"<table><tr><th>Item</th><th>Type</th><th>Severity</th><th>Reason</th><th>Recommendation</th><th>STG reference</th></tr>" + ''.join(treatment_rows) + "</table>" if treatment_rows else "<p>No treatment appropriateness flags for the supplied diagnosis.</p>"}
-  <p class='disclaimer'>Guideline-based indication check using CRC Standard Treatment Guidelines, 7th ed. Not a substitute for clinical judgment.</p>
+  {"<p><b>Matched conditions:</b> " + escape(', '.join(treatment_audit.get('matched_stg_conditions') or [])) + "</p>" if treatment_audit.get('matched_stg_conditions') else ""}
+  {"<table><tr><th>Item</th><th>Type</th><th>Severity</th><th>Reason</th><th>Recommendation</th><th>Government guideline basis</th></tr>" + ''.join(treatment_rows) + "</table>" if treatment_rows else "<p>No treatment appropriateness flags for the supplied diagnosis.</p>"}
+  <p class='disclaimer'>Recommendations use ICMR, Clinical Establishments Act, and CRC Standard Treatment Guidelines. Not a substitute for clinical judgment.</p>
 
   {hrs_advisory_html}
 
@@ -875,10 +870,7 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
 
     treatment_rows = []
     for flag in treatment_flags:
-        reference = flag.get("stg_reference") or {}
-        ref_text = reference.get("condition") or ""
-        if reference.get("section"):
-            ref_text = f"{ref_text} · {reference.get('section')}"
+        basis = flag.get("guideline_basis") or ""
         treatment_rows.append(
             "<tr>"
             f"<td>{escape(str(flag.get('item', '')))}</td>"
@@ -886,7 +878,7 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
             f"<td>{escape(str(flag.get('severity', '')))}</td>"
             f"<td>{escape(str(flag.get('reason', '')))}</td>"
             f"<td>{escape(str(flag.get('recommendation', '')))}</td>"
-            f"<td>{escape(ref_text)}</td>"
+            f"<td>{escape(str(basis))}</td>"
             "</tr>"
         )
 
@@ -917,12 +909,12 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
 
   {restricted_medicine_html}
 
-  <h2>Treatment Appropriateness (STG)</h2>
+  <h2>Treatment Appropriateness Check</h2>
   {clinical_evidence_html}
-  {"<p><b>Matched STG conditions:</b> " + escape(', '.join(treatment_audit.get('matched_stg_conditions') or [])) + "</p>" if treatment_audit.get('matched_stg_conditions') else ""}
-  {"<table><tr><th>Item</th><th>Type</th><th>Severity</th><th>Reason</th><th>Recommendation</th><th>STG reference</th></tr>" + ''.join(treatment_rows) + "</table>" if treatment_rows else "<p>No treatment appropriateness flags for the supplied diagnosis.</p>"}
+  {"<p><b>Matched conditions:</b> " + escape(', '.join(treatment_audit.get('matched_stg_conditions') or [])) + "</p>" if treatment_audit.get('matched_stg_conditions') else ""}
+  {"<table><tr><th>Item</th><th>Type</th><th>Severity</th><th>Reason</th><th>Recommendation</th><th>Government guideline basis</th></tr>" + ''.join(treatment_rows) + "</table>" if treatment_rows else "<p>No treatment appropriateness flags for the supplied diagnosis.</p>"}
 
-  <p class='disclaimer'>Guideline-based indication check using CRC Standard Treatment Guidelines, 7th ed. Not a substitute for clinical judgment.</p>
+  <p class='disclaimer'>Recommendations use ICMR, Clinical Establishments Act, and CRC Standard Treatment Guidelines. Not a substitute for clinical judgment.</p>
 </body>
 </html>
 """
