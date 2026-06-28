@@ -133,7 +133,35 @@ async function probeBackend(base) {
  */
 export async function ensureApiBase({ force = false } = {}) {
   if (!Capacitor.isNativePlatform()) {
-    return getApiBase();
+    const env = envApiBase();
+    const stored = storedApiBase();
+    const candidate = env || (import.meta.env.DEV ? "" : stored);
+
+    if (!candidate) {
+      if (import.meta.env.DEV && stored) {
+        clearStoredApiBase();
+      }
+      resolvedApiBase = "";
+      return "";
+    }
+
+    if (!force && resolvedApiBase === candidate) {
+      return candidate;
+    }
+
+    if (await probeBackend(candidate)) {
+      resolvedApiBase = candidate;
+      return candidate;
+    }
+
+    if (import.meta.env.DEV) {
+      clearStoredApiBase();
+      resolvedApiBase = "";
+      return "";
+    }
+
+    resolvedApiBase = candidate;
+    return candidate;
   }
 
   if (resolvedApiBase && !force) {
@@ -171,7 +199,18 @@ export function getApiBase() {
   if (Capacitor.isNativePlatform()) {
     return resolvedApiBase || resolveNativeApiBaseSync();
   }
-  return envApiBase() || storedApiBase() || "";
+
+  const env = envApiBase();
+  if (env) {
+    return env;
+  }
+
+  // Web dev: ignore stale localStorage from native/LAN testing; use Vite proxy.
+  if (import.meta.env.DEV) {
+    return resolvedApiBase || "";
+  }
+
+  return storedApiBase() || "";
 }
 
 export function setApiBase(url) {
@@ -197,6 +236,12 @@ export function clearStoredApiBase() {
 export function backendConnectionHint() {
   const base = getApiBase();
   if (!Capacitor.isNativePlatform()) {
+    if (import.meta.env.DEV) {
+      return (
+        "Start the backend: cd backend && ./run_dev.sh (port 8000), then hard-refresh " +
+        "this page at http://localhost:5173."
+      );
+    }
     return "Start the backend on port 8000 and refresh.";
   }
   if (isAndroidEmulator()) {
