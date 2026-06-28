@@ -10,6 +10,10 @@ if (Capacitor.isNativePlatform()) {
   ensureApiBase().catch((error) => {
     console.warn("Backend discovery failed on startup:", error);
   });
+} else if (import.meta.env.DEV) {
+  ensureApiBase().catch((error) => {
+    console.warn("Backend discovery failed on startup:", error);
+  });
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(

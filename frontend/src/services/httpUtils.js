@@ -1,5 +1,7 @@
-import { backendConnectionHint, ensureApiBase, getApiBase } from "./apiBase";
+import { backendConnectionHint, clearStoredApiBase, ensureApiBase, getApiBase } from "./apiBase";
 import { Capacitor } from "@capacitor/core";
+
+const DEFAULT_FETCH_TIMEOUT_MS = 120000;
 
 export function backendUnreachableMessage() {
   if (Capacitor.isNativePlatform()) {
@@ -8,11 +10,34 @@ export function backendUnreachableMessage() {
   return `Could not reach the backend. ${backendConnectionHint()}`;
 }
 
+async function fetchWithTimeout(url, options, timeoutMs = DEFAULT_FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(
+        `Request timed out after ${Math.round(timeoutMs / 1000)}s. ${backendConnectionHint()}`
+      );
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 async function fetchWithNativeRetry(url, options) {
   try {
-    return await fetch(url, options);
+    return await fetchWithTimeout(url, options);
   } catch (error) {
     if (!Capacitor.isNativePlatform()) {
+      const base = getApiBase();
+      if (import.meta.env.DEV && base) {
+        clearStoredApiBase();
+        const proxiedUrl = url.startsWith(base) ? url.slice(base.length) : url;
+        return fetchWithTimeout(proxiedUrl, options);
+      }
       throw error;
     }
     const previousBase = getApiBase();
@@ -21,7 +46,7 @@ async function fetchWithNativeRetry(url, options) {
       throw error;
     }
     const rewrittenUrl = url.replace(previousBase, nextBase);
-    return fetch(rewrittenUrl, options);
+    return fetchWithTimeout(rewrittenUrl, options);
   }
 }
 
