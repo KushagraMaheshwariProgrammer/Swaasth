@@ -3813,12 +3813,21 @@ body.capacitor-native .landing-hero {
 
 
 
-.report-actions,
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
 
 .report-share-btn {
   margin-top: 0;
   width: auto;
   flex: 1 1 140px;
+}
+
+.report-actions-message {
+  margin: 0.5rem 0 0;
 }
 
 @media (max-width: 640px) {

@@ -12,6 +12,7 @@ from collections.abc import Callable
 from html import escape
 from typing import Any
 
+from app.restricted_medicines import render_restricted_medicine_flags_html
 from app.services.audit_advocacy import ADVOCACY_SCOPE_CHECKED, ADVOCACY_SCOPE_NOT_CHECKED, flag_display_label
 
 RenderHtmlFn = Callable[[dict[str, Any]], str]
@@ -523,4 +524,5 @@ def scheme_filename_prefix(scheme_id: str) -> str:
 
 register_scheme("general", render_bill_comparison_html)
 register_scheme("bill", render_bill_comparison_html)
+register_scheme("combined", render_bill_comparison_html)
 register_scheme("prescription", render_prescription_report_html)
