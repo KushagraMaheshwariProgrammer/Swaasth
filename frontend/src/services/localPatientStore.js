@@ -38,8 +38,6 @@ export function persistLocalPatient(userId, patientData, localId = null) {
 
   const existing = entries.find((entry) => entry.localId === id);
   const patientAge = Number(patientData.age) || 0;
-  const kcrKitAllowed =
-    Boolean(patientData.kcrKitSelected) && patientAge >= 18;
   const record = {
     localId: id,
     patientData: {
@@ -47,138 +45,44 @@ export function persistLocalPatient(userId, patientData, localId = null) {
       age: patientAge,
       gender: patientData.gender || "",
       state: patientData.state?.trim() || "",
-      ayushmanEligible: Boolean(patientData.ayushmanEligible),
-      aarogyaBhadrathaEligible: Boolean(patientData.aarogyaBhadrathaEligible),
-      hospitalisationReliefSchemeSelected: Boolean(
-        patientData.hospitalisationReliefSchemeSelected
-      ),
-      isRegisteredConstructionWorker: Boolean(
-        patientData.hospitalisationReliefSchemeSelected &&
-          patientData.isRegisteredConstructionWorker
-      ),
-      kcrKitSelected: kcrKitAllowed,
-      kcrIsPregnant: Boolean(kcrKitAllowed && patientData.kcrIsPregnant),
-      kcrIsTelanganaResident: Boolean(
-        kcrKitAllowed && patientData.kcrIsTelanganaResident
-      ),
-      kcrAge18OrAbove: kcrKitAllowed,
-      kcrIncomeBelow10000: Boolean(
-        kcrKitAllowed && patientData.kcrIncomeBelow10000
-      ),
-      kcrGovernmentHospitalTreatment: Boolean(
-        kcrKitAllowed && patientData.kcrGovernmentHospitalTreatment
-      ),
-      kcrMoreThanTwoLiveChildren: Boolean(
-        kcrKitAllowed && patientData.kcrMoreThanTwoLiveChildren
-      ),
-      kcrAadhaarTelangana: Boolean(
-        kcrKitAllowed && patientData.kcrAadhaarTelangana
-      ),
-      kcrIdentifiedByAnganwadiWorker: Boolean(
-        kcrKitAllowed && patientData.kcrIdentifiedByAnganwadiWorker
-      ),
-      rajivAarogyasriSelected: Boolean(patientData.rajivAarogyasriSelected),
-      rajivIsTelanganaResident: Boolean(
-        patientData.rajivAarogyasriSelected && patientData.rajivIsTelanganaResident
-      ),
-      rajivHasEligibleCard: Boolean(
-        patientData.rajivAarogyasriSelected && patientData.rajivHasEligibleCard
-      ),
-      rajivHasAadhaar: Boolean(
-        patientData.rajivAarogyasriSelected && patientData.rajivHasAadhaar
-      ),
-      rajivIsCancerRelated: Boolean(
-        patientData.rajivAarogyasriSelected && patientData.rajivIsCancerRelated
-      ),
-      rajivFamilyCoverageUsedAmount:
-        patientData.rajivAarogyasriSelected &&
-        patientData.rajivFamilyCoverageUsedAmount != null &&
-        patientData.rajivFamilyCoverageUsedAmount !== ""
-          ? Number(patientData.rajivFamilyCoverageUsedAmount)
-          : null,
-      ehsSelected: Boolean(patientData.ehsSelected),
-      ehsIsGovernmentEmployee: Boolean(
-        patientData.ehsSelected && patientData.ehsIsGovernmentEmployee
-      ),
-      ehsIsPensioner: Boolean(patientData.ehsSelected && patientData.ehsIsPensioner),
-      ehsIsDependent: Boolean(patientData.ehsSelected && patientData.ehsIsDependent),
-      ehsHasHealthCard: Boolean(
-        patientData.ehsSelected && patientData.ehsHasHealthCard
-      ),
-      ehsCardNumber:
-        patientData.ehsSelected && patientData.ehsCardNumber
-          ? String(patientData.ehsCardNumber).trim() || null
-          : null,
-      jhsSelected: Boolean(patientData.jhsSelected),
-      jhsIsWorkingJournalist: Boolean(
-        patientData.jhsSelected && patientData.jhsIsWorkingJournalist
-      ),
-      jhsIsRetiredJournalist: Boolean(
-        patientData.jhsSelected && patientData.jhsIsRetiredJournalist
-      ),
-      jhsIsDependent: Boolean(patientData.jhsSelected && patientData.jhsIsDependent),
-      jhsHasHealthCard: Boolean(
-        patientData.jhsSelected && patientData.jhsHasHealthCard
-      ),
-      jhsHasAadhaar: Boolean(patientData.jhsSelected && patientData.jhsHasAadhaar),
-      jhsCardNumber:
-        patientData.jhsSelected && patientData.jhsCardNumber
-          ? String(patientData.jhsCardNumber).trim() || null
-          : null,
-      cghsBeneficiaryCategory: patientData.cghsBeneficiaryCategory || null,
-      cghsEligibleCategoryConfirmed:
-        patientData.cghsBeneficiaryCategory &&
-        patientData.cghsBeneficiaryCategory !== "not_sure"
-          ? true
-          : patientData.cghsBeneficiaryCategory === "not_sure"
-          ? false
-          : null,
-      cghsResidesInCoveredCity:
-        patientData.cghsResidesInCoveredCity === true ||
-        patientData.cghsResidesInCoveredCity === false
-          ? patientData.cghsResidesInCoveredCity
-          : null,
-      pmjayHasAyushmanCard:
-        patientData.ayushmanEligible &&
-        (patientData.pmjayHasAyushmanCard === true ||
-          patientData.pmjayHasAyushmanCard === false)
-          ? patientData.pmjayHasAyushmanCard
-          : null,
       savePastBills: Boolean(patientData.savePastBills),
     },
-    synced: existing?.synced ?? false,
-    firestoreId: existing?.firestoreId ?? null,
-    updatedAt: new Date().toISOString(),
+    firestoreId: existing?.firestoreId || null,
+    synced: false,
+    updatedAt: Date.now(),
   };
 
-  if (existing) {
-    Object.assign(existing, record);
+  const index = entries.findIndex((entry) => entry.localId === id);
+  if (index >= 0) {
+    entries[index] = record;
   } else {
     entries.push(record);
   }
+
   writeStore(store);
   return id;
 }
 
-export function getLocalPatients(userId) {
+export function markLocalPatientSynced(userId, localId, firestoreId) {
   const store = readStore();
-  return store.users[userId] || [];
+  const entries = userEntries(store, userId);
+  const entry = entries.find((item) => item.localId === localId);
+  if (entry) {
+    entry.firestoreId = firestoreId;
+    entry.synced = true;
+    writeStore(store);
+  }
+}
+
+export function getLocalPatients(userId) {
+  if (!userId) {
+    return [];
+  }
+  return readStore().users[userId] || [];
 }
 
 export function getUnsyncedLocalPatients(userId) {
   return getLocalPatients(userId).filter((entry) => !entry.synced);
-}
-
-export function markLocalPatientSynced(userId, localId, firestoreId) {
-  const store = readStore();
-  const entries = store.users[userId] || [];
-  const entry = entries.find((item) => item.localId === localId);
-  if (!entry) {
-    return;
-  }
-  entry.synced = true;
-  entry.firestoreId = firestoreId;
-  writeStore(store);
 }
 
 export function localPatientToEntry(entry) {
@@ -188,23 +92,22 @@ export function localPatientToEntry(entry) {
     firestoreId: entry.firestoreId || null,
     localOnly: !entry.firestoreId,
     ...entry.patientData,
-    updatedAt: entry.updatedAt,
   };
 }
 
 export function getLocalPatientById(userId, patientId) {
   const match = getLocalPatients(userId).find(
-    (entry) => entry.localId === patientId || entry.firestoreId === patientId
+    (entry) =>
+      entry.localId === patientId || entry.firestoreId === patientId
   );
   return match ? localPatientToEntry(match) : null;
 }
 
 export function removeLocalPatient(userId, patientId) {
   const store = readStore();
-  const entries = store.users[userId] || [];
+  const entries = userEntries(store, userId);
   store.users[userId] = entries.filter(
-    (entry) =>
-      entry.localId !== patientId && entry.firestoreId !== patientId
+    (entry) => entry.localId !== patientId && entry.firestoreId !== patientId
   );
   writeStore(store);
 }

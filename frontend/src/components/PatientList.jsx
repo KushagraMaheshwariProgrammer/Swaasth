@@ -27,9 +27,6 @@ export default function PatientList({
                 {genderLabel(patient.gender)}
               </p>
             </div>
-            {patient.ayushmanEligible && (
-              <span className="patient-pmjay-badge">PM-JAY eligible</span>
-            )}
           </>
         );
 
