@@ -118,6 +118,7 @@ export async function fetchStgConditions() {
 export async function analyzeTreatment({
   diagnosis,
   diagnosisUserProvided = false,
+  diagnosisConfidence = null,
   medicines = [],
   tests = [],
   procedures = [],
@@ -133,6 +134,7 @@ export async function analyzeTreatment({
     body: JSON.stringify({
       diagnosis,
       diagnosis_user_provided: diagnosisUserProvided,
+      diagnosis_confidence: diagnosisConfidence,
       medicines,
       tests,
       procedures,

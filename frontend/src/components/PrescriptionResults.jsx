@@ -1,9 +1,14 @@
 import TreatmentAuditSection from "./TreatmentAuditSection";
+import PatientQuestionsSection from "./PatientQuestionsSection";
 import RestrictedMedicinesSection from "./RestrictedMedicinesSection";
 import ReportActions from "./ReportActions";
 
 export default function PrescriptionResults({ result, toolbar = null }) {
-  if (!result?.treatment_audit_flags && !result?.restricted_medicine_flags) {
+  if (
+    !result?.treatment_audit_flags &&
+    !result?.restricted_medicine_flags &&
+    !(result?.patient_questions || []).length
+  ) {
     return null;
   }
 
@@ -74,7 +79,12 @@ export default function PrescriptionResults({ result, toolbar = null }) {
         )}
       </section>
 
-      <TreatmentAuditSection treatmentAuditFlags={result.treatment_audit_flags} />
+      <PatientQuestionsSection report={result} />
+
+      <TreatmentAuditSection
+        treatmentAuditFlags={result.treatment_audit_flags}
+        report={result}
+      />
 
       <RestrictedMedicinesSection
         restrictedMedicineFlags={result?.restricted_medicine_flags}

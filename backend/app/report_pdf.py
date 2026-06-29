@@ -12,7 +12,7 @@ from collections.abc import Callable
 from html import escape
 from typing import Any
 
-from app.restricted_medicines import render_restricted_medicine_flags_html
+from app.services.audit_advocacy import ADVOCACY_SCOPE_CHECKED, ADVOCACY_SCOPE_NOT_CHECKED, flag_display_label
 
 RenderHtmlFn = Callable[[dict[str, Any]], str]
 
@@ -33,6 +33,42 @@ _HOSPITAL_TYPE_LABELS: dict[str, str] = {
     "general": "General hospital",
     "speciality": "Speciality hospital",
 }
+
+
+def _render_patient_questions_html(report: dict[str, Any]) -> str:
+    questions = report.get("patient_questions") or []
+    if not questions:
+        treatment_questions = (report.get("treatment_audit_flags") or {}).get("patient_questions") or []
+        audit_questions = (report.get("audit_flags") or {}).get("patient_questions") or []
+        questions = treatment_questions or audit_questions
+    if not questions:
+        return ""
+
+    rows = []
+    for index, item in enumerate(questions, start=1):
+        confidence = escape(str(item.get("confidence") or "LOW"))
+        question = escape(str(item.get("question") or ""))
+        basis = escape(str(item.get("guideline_basis") or ""))
+        rows.append(
+            f"<li><b>{index}. {question}</b> "
+            f"<span>({confidence} confidence)</span>"
+            f"{f'<br/><i>{basis}</i>' if basis else ''}</li>"
+        )
+    return f"<h2>Questions to ask before you pay or discharge</h2><ol>{''.join(rows)}</ol>"
+
+
+def _render_advocacy_scope_html(report: dict[str, Any]) -> str:
+    scope = report.get("advocacy_scope") or {}
+    checked = scope.get("checked") or list(ADVOCACY_SCOPE_CHECKED)
+    not_checked = scope.get("not_checked") or list(ADVOCACY_SCOPE_NOT_CHECKED)
+    checked_html = "".join(f"<li>{escape(str(item))}</li>" for item in checked)
+    not_checked_html = "".join(f"<li>{escape(str(item))}</li>" for item in not_checked)
+    return f"""
+  <h2>What we checked</h2>
+  <p><b>Checked</b></p><ul>{checked_html}</ul>
+  <p><b>Not checked</b></p><ul>{not_checked_html}</ul>
+  <p class='disclaimer'>Swaasth does not make final medical, legal, or regulatory findings against any hospital or doctor.</p>
+"""
 
 
 def _render_clinical_evidence_html(report: dict[str, Any]) -> str:
@@ -249,11 +285,12 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
 
     audit_rows = []
     for flag in audit_flags:
+        label = flag.get("display_label") or flag_display_label(str(flag.get("type") or ""))
         audit_rows.append(
             "<tr>"
             f"<td>{escape(str(flag.get('item', '')))}</td>"
-            f"<td>{escape(str(flag.get('type', '')).replace('_', ' '))}</td>"
-            f"<td>{escape(str(flag.get('severity', '')))}</td>"
+            f"<td>{escape(str(label))}</td>"
+            f"<td>{escape(str(flag.get('confidence', '')))}</td>"
             f"<td>{escape(str(flag.get('reason', '')))}</td>"
             f"<td>{escape(str(flag.get('recommendation', '')))}</td>"
             "</tr>"
@@ -264,17 +301,20 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
     treatment_rows = []
     for flag in treatment_flags:
         basis = flag.get("guideline_basis") or ""
+        label = flag.get("display_label") or flag_display_label(str(flag.get("type") or ""))
         treatment_rows.append(
             "<tr>"
             f"<td>{escape(str(flag.get('item', '')))}</td>"
-            f"<td>{escape(str(flag.get('type', '')).replace('_', ' '))}</td>"
-            f"<td>{escape(str(flag.get('severity', '')))}</td>"
+            f"<td>{escape(str(label))}</td>"
+            f"<td>{escape(str(flag.get('confidence', '')))}</td>"
             f"<td>{escape(str(flag.get('reason', '')))}</td>"
             f"<td>{escape(str(flag.get('recommendation', '')))}</td>"
             f"<td>{escape(str(basis))}</td>"
             "</tr>"
         )
 
+    patient_questions_html = _render_patient_questions_html(report)
+    advocacy_scope_html = _render_advocacy_scope_html(report)
     clinical_evidence_html = _render_clinical_evidence_html(report)
     restricted_medicine_html = render_restricted_medicine_flags_html(report)
 
@@ -326,6 +366,10 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
     <tr><td><b>Items flagged</b></td><td class='num'>{items_flagged}</td></tr>
   </table>
 
+  {patient_questions_html}
+
+  {advocacy_scope_html}
+
   {"<h2>Jan Aushadhi — subsidized medicines</h2><ul>" + ''.join(jan_rows) + "</ul><p>" + escape(str(jan_aushadhi.get('advisory', ''))) + "</p>" if jan_rows else ""}
 
   {restricted_medicine_html}
@@ -340,14 +384,14 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
     {''.join(rows_html)}
   </table>
 
-  <h2>Suspicious / Unnecessary Charges</h2>
-  {"<table><tr><th>Item</th><th>Type</th><th>Severity</th><th>Reason</th><th>Recommendation</th></tr>" + ''.join(audit_rows) + "</table>" if audit_rows else "<p>No suspicious repetitions or unnecessary package-component charges detected.</p>"}
+  <h2>Items worth clarifying (billing)</h2>
+  {"<table><tr><th>Item</th><th>Finding</th><th>Confidence</th><th>Reason</th><th>Suggested question</th></tr>" + ''.join(audit_rows) + "</table>" if audit_rows else "<p>No billing patterns flagged for clarification.</p>"}
 
-  <h2>Treatment Appropriateness Check</h2>
+  <h2>Treatment appropriateness (details)</h2>
   {clinical_evidence_html}
   {"<p><b>Matched conditions:</b> " + escape(', '.join(treatment_audit.get('matched_stg_conditions') or [])) + "</p>" if treatment_audit.get('matched_stg_conditions') else ""}
-  {"<table><tr><th>Item</th><th>Type</th><th>Severity</th><th>Reason</th><th>Recommendation</th><th>Government guideline basis</th></tr>" + ''.join(treatment_rows) + "</table>" if treatment_rows else "<p>No treatment appropriateness flags for the supplied diagnosis.</p>"}
-  <p class='disclaimer'>Recommendations use ICMR, Clinical Establishments Act, and CRC Standard Treatment Guidelines. Not a substitute for clinical judgment.</p>
+  {"<table><tr><th>Item</th><th>Finding</th><th>Confidence</th><th>Reason</th><th>Suggested question</th><th>Government guideline basis</th></tr>" + ''.join(treatment_rows) + "</table>" if treatment_rows else "<p>No treatment items flagged for clarification based on retrieved guidelines.</p>"}
+  <p class='disclaimer'>Recommendations use ICMR and CRC Standard Treatment Guidelines where available. Not a substitute for clinical judgment.</p>
 
   <p class='disclaimer'>{escape(BILL_DISCLAIMER)}</p>
 </body>
@@ -377,17 +421,20 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
     treatment_rows = []
     for flag in treatment_flags:
         basis = flag.get("guideline_basis") or ""
+        label = flag.get("display_label") or flag_display_label(str(flag.get("type") or ""))
         treatment_rows.append(
             "<tr>"
             f"<td>{escape(str(flag.get('item', '')))}</td>"
-            f"<td>{escape(str(flag.get('type', '')).replace('_', ' '))}</td>"
-            f"<td>{escape(str(flag.get('severity', '')))}</td>"
+            f"<td>{escape(str(label))}</td>"
+            f"<td>{escape(str(flag.get('confidence', '')))}</td>"
             f"<td>{escape(str(flag.get('reason', '')))}</td>"
             f"<td>{escape(str(flag.get('recommendation', '')))}</td>"
             f"<td>{escape(str(basis))}</td>"
             "</tr>"
         )
 
+    patient_questions_html = _render_patient_questions_html(report)
+    advocacy_scope_html = _render_advocacy_scope_html(report)
     clinical_evidence_html = _render_clinical_evidence_html(report)
     restricted_medicine_html = render_restricted_medicine_flags_html(report)
 
@@ -413,14 +460,18 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
   {"<h2>Tests</h2><ul>" + ''.join(test_rows) + "</ul>" if test_rows else ""}
   {"<h2>Procedures</h2><ul>" + ''.join(procedure_rows) + "</ul>" if procedure_rows else ""}
 
+  {patient_questions_html}
+
+  {advocacy_scope_html}
+
   {restricted_medicine_html}
 
-  <h2>Treatment Appropriateness Check</h2>
+  <h2>Treatment appropriateness (details)</h2>
   {clinical_evidence_html}
   {"<p><b>Matched conditions:</b> " + escape(', '.join(treatment_audit.get('matched_stg_conditions') or [])) + "</p>" if treatment_audit.get('matched_stg_conditions') else ""}
-  {"<table><tr><th>Item</th><th>Type</th><th>Severity</th><th>Reason</th><th>Recommendation</th><th>Government guideline basis</th></tr>" + ''.join(treatment_rows) + "</table>" if treatment_rows else "<p>No treatment appropriateness flags for the supplied diagnosis.</p>"}
+  {"<table><tr><th>Item</th><th>Finding</th><th>Confidence</th><th>Reason</th><th>Suggested question</th><th>Government guideline basis</th></tr>" + ''.join(treatment_rows) + "</table>" if treatment_rows else "<p>No treatment items flagged for clarification based on retrieved guidelines.</p>"}
 
-  <p class='disclaimer'>Recommendations use ICMR, Clinical Establishments Act, and CRC Standard Treatment Guidelines. Not a substitute for clinical judgment.</p>
+  <p class='disclaimer'>Recommendations use ICMR and CRC Standard Treatment Guidelines where available. Not a substitute for clinical judgment.</p>
 </body>
 </html>
 """

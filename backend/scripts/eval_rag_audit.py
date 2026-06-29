@@ -8,7 +8,7 @@ Usage:
 
 from __future__ import annotations
 
-import argparse
+from typing import Any
 import json
 import sys
 from datetime import date
@@ -32,6 +32,19 @@ from rag_eval_utils import (  # noqa: E402
 from app.services.treatment_audit import analyze_treatment  # noqa: E402
 
 
+def _citation_metrics(result: dict) -> dict[str, Any]:
+    flags = result.get("flags") or []
+    if not flags:
+        return {"citation_verification_rate": "", "high_confidence_rate": ""}
+    verified = sum(1 for flag in flags if flag.get("citation_verified") is True)
+    high = sum(1 for flag in flags if flag.get("confidence") == "HIGH")
+    total = len(flags)
+    return {
+        "citation_verification_rate": round(verified / total, 3),
+        "high_confidence_rate": round(high / total, 3),
+    }
+
+
 def _run_case(case: dict, runs: int) -> dict:
     audit_gold = case.get("audit_gold") or {}
     kwargs = case_input_to_audit_kwargs(case)
@@ -39,7 +52,9 @@ def _run_case(case: dict, runs: int) -> dict:
 
     for _ in range(runs):
         result = analyze_treatment(**kwargs)
-        run_results.append(audit_matches_gold(result, audit_gold))
+        match = audit_matches_gold(result, audit_gold)
+        match["result"] = result
+        run_results.append(match)
 
     pass_at_1 = run_results[0]["passed"] if run_results else False
     pass_at_k = any(item["passed"] for item in run_results)
@@ -57,6 +72,7 @@ def _run_case(case: dict, runs: int) -> dict:
         "expected_misses": ", ".join(run_results[0].get("expected_misses") or []),
         "forbidden_hits": ", ".join(run_results[0].get("forbidden_hits") or []),
         "alignment_match": run_results[0].get("alignment_match"),
+        **_citation_metrics(run_results[0].get("result") or {}),
     }
 
 
@@ -96,6 +112,16 @@ def main() -> None:
         f"pass_at_{args.runs}": sum(1 for row in rows if row[f"pass_at_{args.runs}"]) / total,
         "rule_based_cases": sum(1 for row in rows if row["rule_based_only"]),
     }
+    citation_rates = [
+        row["citation_verification_rate"]
+        for row in rows
+        if row.get("citation_verification_rate") not in ("", None)
+    ]
+    if citation_rates:
+        summary["mean_citation_verification_rate"] = round(
+            sum(float(rate) for rate in citation_rates) / len(citation_rates),
+            3,
+        )
 
     stamp = date.today().isoformat()
     args.output.mkdir(parents=True, exist_ok=True)

@@ -2,17 +2,28 @@ import { useMemo } from "react";
 import {
   computeBillSummary,
   CountUp,
+  displayableBillLineItems,
   formatCurrency,
   getAuditRiskMeta,
   getAuditSeverityMeta,
   getFlagMeta,
   HOSPITAL_TYPE_OPTIONS,
 } from "../billUtils";
+import {
+  flagDisplayLabel,
+  getAuditConfidenceMeta,
+} from "../auditAdvocacyUtils";
+import AdvocacyScopeSection from "./AdvocacyScopeSection";
+import PatientQuestionsSection from "./PatientQuestionsSection";
 import ReportActions from "./ReportActions";
 import TreatmentAuditSection from "./TreatmentAuditSection";
 import RestrictedMedicinesSection from "./RestrictedMedicinesSection";
 
 export default function BillResults({ result, toolbar = null }) {
+  const displayableItems = useMemo(
+    () => displayableBillLineItems(result?.line_items),
+    [result?.line_items]
+  );
   const summary = useMemo(() => computeBillSummary(result), [result]);
 
   const janAushadhiMatches = result?.jan_aushadhi?.matches ?? [];
@@ -103,116 +114,109 @@ export default function BillResults({ result, toolbar = null }) {
 
       {toolbar && <div className="results-toolbar">{toolbar}</div>}
 
-      <article className="summary-banner">
-        <div className="summary-stat">
-          <p>Total Charged</p>
-          <h3>
-            <CountUp value={summary.totalCharged} isCurrency />
-          </h3>
-        </div>
-        <div className="summary-stat summary-focus">
-          <p>Overcharged By</p>
-          <h3>
-            <CountUp value={summary.totalOvercharged} isCurrency />
-          </h3>
-        </div>
-        <div className="summary-stat summary-flagged">
-          <p>Items Flagged</p>
-          <h3>
-            <CountUp value={summary.itemsFlagged} />
-          </h3>
-        </div>
-      </article>
+      {displayableItems.length > 0 && (
+        <>
+          <article className="summary-banner">
+            <div className="summary-stat">
+              <p>Total Charged</p>
+              <h3>
+                <CountUp value={summary.totalCharged} isCurrency />
+              </h3>
+            </div>
+            <div className="summary-stat summary-focus">
+              <p>Overcharged By</p>
+              <h3>
+                <CountUp value={summary.totalOvercharged} isCurrency />
+              </h3>
+            </div>
+            <div className="summary-stat summary-flagged">
+              <p>Items Flagged</p>
+              <h3>
+                <CountUp value={summary.itemsFlagged} />
+              </h3>
+            </div>
+          </article>
 
-      <div className="results-grid">
-        {result.line_items.map((item, index) => {
-          const meta = getFlagMeta(item.flag);
-          const isMedicine =
-            item.comparison_source === "pharma" || item.category === "medicine";
-          const referenceRate = isMedicine ? item.pharma_rate : null;
-          const referenceLabel = isMedicine ? "NPPA Ceiling" : "Reference";
-          const badgeLabel =
-            item.flag === "no_reference" && !isMedicine
-              ? "Manual verification"
-              : meta.badgeLabel;
-          const badgeClass =
-            item.flag === "no_reference" && !isMedicine
-              ? "status-pill status-neutral"
-              : meta.badgeClass;
+          <div className="results-grid">
+            {displayableItems.map((item, index) => {
+              const meta = getFlagMeta(item.flag);
+              const isMedicine =
+                item.comparison_source === "pharma" || item.category === "medicine";
+              const referenceRate = isMedicine ? item.pharma_rate : null;
+              const referenceLabel = isMedicine ? "NPPA Ceiling" : "Reference";
 
-          return (
-            <article
-              key={`${item.item_name || "item"}-${index}`}
-              className={meta.cardClass}
-            >
-              <div className="result-top">
-                <h4>{item.item_name || "--"}</h4>
-                <span className={badgeClass}>{badgeLabel}</span>
-              </div>
-              {item.matched_reference_item && (
-                <p className="matched-reference">
-                  Matched: {item.matched_reference_item}
-                  {item.pharma_product_id ? ` (NPPA #${item.pharma_product_id})` : ""}
-                  {item.pharma_database === "nppa_via_az" && item.resolved_generic_name
-                    ? ` · resolved from brand`
-                    : ""}
-                  {item.approximate_match ? " · approximate" : ""}
-                </p>
-              )}
-              <div className="result-metrics">
-                <div>
-                  <p>Charged</p>
-                  <h5>{formatCurrency(item.total_price)}</h5>
-                </div>
-                {isMedicine && (
-                  <>
+              return (
+                <article
+                  key={`${item.item_name || "item"}-${index}`}
+                  className={meta.cardClass}
+                >
+                  <div className="result-top">
+                    <h4>{item.item_name || "--"}</h4>
+                    <span className={meta.badgeClass}>{meta.badgeLabel}</span>
+                  </div>
+                  {item.matched_reference_item && (
+                    <p className="matched-reference">
+                      Matched: {item.matched_reference_item}
+                      {item.pharma_product_id ? ` (NPPA #${item.pharma_product_id})` : ""}
+                      {item.pharma_database === "nppa_via_az" && item.resolved_generic_name
+                        ? ` · resolved from brand`
+                        : ""}
+                      {item.approximate_match ? " · approximate" : ""}
+                    </p>
+                  )}
+                  <div className="result-metrics">
                     <div>
-                      <p>{referenceLabel}</p>
-                      <h5>{formatCurrency(referenceRate)}</h5>
+                      <p>Charged</p>
+                      <h5>{formatCurrency(item.total_price)}</h5>
                     </div>
-                    <div>
-                      <p>Difference</p>
-                      <h5>{formatCurrency(item.price_difference)}</h5>
-                    </div>
-                  </>
-                )}
-              </div>
-              {item.jan_aushadhi_available && (
-                <p className="jan-aushadhi-item-note">
-                  Available under Jan Aushadhi at subsidized rates
-                  {item.jan_aushadhi_mrp != null
-                    ? ` (MRP ${formatCurrency(item.jan_aushadhi_mrp)}${
-                        item.jan_aushadhi_unit_size
-                          ? ` per ${item.jan_aushadhi_unit_size}`
-                          : ""
-                      })`
-                    : ""}
-                  . Visit a Jan Aushadhi Kendra.
-                </p>
-              )}
-              {isMedicine && (item.resolved_generic_name || item.pharma_price_basis) && (
-                <p className="rate-breakdown">
-                  {item.resolved_generic_name
-                    ? `Generic: ${item.resolved_generic_name}`
-                    : ""}
-                  {item.pharma_price_basis
-                    ? `${item.resolved_generic_name ? " · " : ""}per ${item.pharma_price_basis}`
-                    : ""}
-                </p>
-              )}
-              {!isMedicine && item.flag === "no_reference" && (
-                <p className="manual-review-note">
-                  No automated benchmark for this line item — review manually if needed.
-                </p>
-              )}
-            </article>
-          );
-        })}
-      </div>
+                    {isMedicine && (
+                      <>
+                        <div>
+                          <p>{referenceLabel}</p>
+                          <h5>{formatCurrency(referenceRate)}</h5>
+                        </div>
+                        <div>
+                          <p>Difference</p>
+                          <h5>{formatCurrency(item.price_difference)}</h5>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  {item.jan_aushadhi_available && (
+                    <p className="jan-aushadhi-item-note">
+                      Available under Jan Aushadhi at subsidized rates
+                      {item.jan_aushadhi_mrp != null
+                        ? ` (MRP ${formatCurrency(item.jan_aushadhi_mrp)}${
+                            item.jan_aushadhi_unit_size
+                              ? ` per ${item.jan_aushadhi_unit_size}`
+                              : ""
+                          })`
+                        : ""}
+                      . Visit a Jan Aushadhi Kendra.
+                    </p>
+                  )}
+                  {isMedicine && (item.resolved_generic_name || item.pharma_price_basis) && (
+                    <p className="rate-breakdown">
+                      {item.resolved_generic_name
+                        ? `Generic: ${item.resolved_generic_name}`
+                        : ""}
+                      {item.pharma_price_basis
+                        ? `${item.resolved_generic_name ? " · " : ""}per ${item.pharma_price_basis}`
+                        : ""}
+                    </p>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      <PatientQuestionsSection report={result} />
 
       <section className="audit-section">
         <div className="audit-section-header">
-          <h3>Suspicious / Unnecessary Charges</h3>
+          <h3>Items worth clarifying (billing)</h3>
           {result?.audit_flags && (
             <div className="audit-summary-badges">
               <span
@@ -231,22 +235,24 @@ export default function BillResults({ result, toolbar = null }) {
         {result?.audit_flags?.flags?.length ? (
           <div className="audit-flags-grid">
             {result.audit_flags.flags.map((flag, index) => {
-              const meta = getAuditSeverityMeta(flag.severity);
+              const confidenceMeta = getAuditConfidenceMeta(flag.confidence);
               return (
                 <article
                   key={`${flag.type || "flag"}-${flag.item || "item"}-${index}`}
-                  className={meta.cardClass}
+                  className={getAuditSeverityMeta(flag.severity).cardClass}
                 >
                   <div className="result-top">
                     <h4>{flag.item || "--"}</h4>
-                    <span className={meta.badgeClass}>{meta.badgeLabel}</span>
+                    <span className={confidenceMeta.badgeClass}>
+                      {confidenceMeta.label}
+                    </span>
                   </div>
                   <p className="audit-flag-type">
-                    {flag.type?.replaceAll("_", " ") || "--"}
+                    {flag.display_label || flagDisplayLabel(flag.type)}
                   </p>
                   <p className="audit-flag-reason">{flag.reason}</p>
                   <p className="audit-flag-recommendation">
-                    <strong>Recommendation:</strong> {flag.recommendation}
+                    <strong>Suggested question:</strong> {flag.recommendation}
                   </p>
                 </article>
               );
@@ -254,13 +260,17 @@ export default function BillResults({ result, toolbar = null }) {
           </div>
         ) : (
           <p className="audit-empty-state">
-            No suspicious repetitions or unnecessary package-component charges
-            detected.
+            No billing patterns flagged for clarification.
           </p>
         )}
       </section>
 
-      <TreatmentAuditSection treatmentAuditFlags={result?.treatment_audit_flags} />
+      <TreatmentAuditSection
+        treatmentAuditFlags={result?.treatment_audit_flags}
+        report={result}
+      />
+
+      <AdvocacyScopeSection advocacyScope={result?.advocacy_scope} />
 
       <RestrictedMedicinesSection
         restrictedMedicineFlags={result?.restricted_medicine_flags}
