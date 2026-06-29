@@ -55,7 +55,7 @@ export default function PatientList({
               </Link>
               <button
                 type="button"
-                className="history-delete-btn"
+                className="history-delete-btn patient-delete-btn"
                 disabled={isDeleting}
                 aria-label={`Delete patient ${patient.name || "profile"}`}
                 onClick={() => onDelete(patient)}

@@ -7,6 +7,9 @@ import { ensureApiBase } from "./services/apiBase";
 import "./app.css";
 
 if (Capacitor.isNativePlatform()) {
+  document.body.classList.add("capacitor-native");
+  document.body.classList.add(`capacitor-${Capacitor.getPlatform()}`);
+
   ensureApiBase().catch((error) => {
     console.warn("Backend discovery failed on startup:", error);
   });

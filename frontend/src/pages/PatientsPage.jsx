@@ -14,6 +14,7 @@ import {
 } from "../billUtils";
 import { resolveScheme } from "../data/schemes";
 import { useAuth } from "../context/AuthContext";
+import UserNav from "../components/UserNav";
 import { deleteBill } from "../services/bills";
 import {
   createPatient,
@@ -276,21 +277,14 @@ export default function PatientsPage() {
           >
             ← {patientId ? "All patients" : "Back"}
           </Link>
-          <div className="user-nav">
-            <Link to="/check" className="user-nav-link">
-              Check bill
-            </Link>
-            <Link to="/history" className="user-nav-link">
-              Past bills
-            </Link>
-          </div>
+          <UserNav />
         </div>
 
         {!patientId ? (
           <>
             <header className="check-header">
               <h1>Your patients</h1>
-              <p>Add family members to track bills and Ayushman Bharat eligibility.</p>
+              <p>Add family members to save bills and track charges over time.</p>
             </header>
 
             {!showAddForm && (
@@ -367,9 +361,6 @@ export default function PatientsPage() {
                     <h1>{selectedPatient.name}</h1>
                     <p>
                       {selectedPatient.age} yrs · {genderLabel(selectedPatient.gender)}
-                      {selectedPatient.ayushmanEligible && (
-                        <> · Ayushman Bharat PM-JAY eligible</>
-                      )}
                     </p>
                   </div>
                   <div className="patient-detail-actions">
