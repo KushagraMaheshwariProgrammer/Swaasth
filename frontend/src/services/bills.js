@@ -166,6 +166,43 @@ function mergeBillLists(cloudBills, localEntries) {
   return merged;
 }
 
+export function buildReportSavePayload(reportData, patient) {
+  if (!patient) {
+    return reportData;
+  }
+  return {
+    ...reportData,
+    patientId: patient.id || null,
+    patient: {
+      id: patient.id,
+      name: patient.name,
+      age: patient.age,
+      gender: patient.gender,
+    },
+  };
+}
+
+export async function saveReportToAccount(userId, patient, reportData) {
+  if (!userId || !patient) {
+    return { saved: false };
+  }
+
+  const payload = buildReportSavePayload(reportData, patient);
+  const localId = persistLocalBill(userId, payload);
+
+  try {
+    const firestoreId = await saveBill(userId, payload, {
+      localId,
+      patientId: patient.id || null,
+    });
+    markLocalBillSynced(userId, localId, firestoreId);
+    return { saved: true, localId, firestoreId, localOnly: false };
+  } catch (error) {
+    console.error("Failed to sync report to Firebase:", error);
+    return { saved: true, localId, localOnly: true, error };
+  }
+}
+
 export async function saveBill(userId, billData, options = {}) {
   const payload = sanitizeForFirestore({
     ...billData,

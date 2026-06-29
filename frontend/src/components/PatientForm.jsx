@@ -12,7 +12,6 @@ export const emptyPatientForm = () => ({
   age: "",
   gender: "",
   state: "",
-  savePastBills: false,
 });
 
 export function patientToFormFields(patient) {
@@ -21,7 +20,6 @@ export function patientToFormFields(patient) {
     age: patient?.age != null ? String(patient.age) : "",
     gender: patient?.gender || "",
     state: patient?.state || "",
-    savePastBills: Boolean(patient?.savePastBills),
   };
 }
 
@@ -104,20 +102,6 @@ export default function PatientForm({
             </option>
           ))}
         </select>
-      </label>
-
-      <label className="patient-checkbox">
-        <input
-          type="checkbox"
-          checked={form.savePastBills}
-          onChange={(event) =>
-            setForm((prev) => ({
-              ...prev,
-              savePastBills: event.target.checked,
-            }))
-          }
-        />
-        <span>Do you want to save this patient&apos;s past bills?</span>
       </label>
 
       {info && <p className="auth-info">{info}</p>}
