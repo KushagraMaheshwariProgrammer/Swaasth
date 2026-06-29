@@ -69,21 +69,6 @@ export default function BillResults({ result, toolbar = null }) {
       {result?.hospital?.name_from_bill && (
         <p className="comparison-context">
           Hospital on bill: <strong>{result.hospital.name_from_bill}</strong>
-          {result.hospital.is_accredited != null && (
-            <>
-              {" · "}
-              NABH:{" "}
-              <strong>
-                {result.hospital.is_accredited
-                  ? `Accredited (${result.hospital.accreditation_status})`
-                  : "Not found in NABH registry"}
-              </strong>
-              {result.hospital.matched_registry_name &&
-                result.hospital.approximate_match && (
-                  <> · matched as {result.hospital.matched_registry_name}</>
-                )}
-            </>
-          )}
         </p>
       )}
 

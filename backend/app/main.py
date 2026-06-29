@@ -13,7 +13,6 @@ from pydantic import BaseModel, Field, model_validator
 from app.report_routes import router as report_router
 from app.cghs_rates import resolve_hospital_type, resolve_tier
 from app.locations import get_location_store
-from app.nabh_registry import get_nabh_registry
 from app.jan_aushadhi_rates import get_jan_aushadhi_store
 from app.medicine_comparison import enrich_bill_line_items_with_jan_aushadhi
 from app.pharma_rates import get_pharma_store
@@ -88,12 +87,6 @@ def load_reference_data() -> None:
         )
     except Exception as exc:
         print(f"WARNING: Location directories failed to load: {exc}")
-
-    try:
-        nabh = get_nabh_registry()
-        print(f"Loaded {len(nabh.records)} NABH registry hospitals from {nabh.csv_path}")
-    except Exception as exc:
-        print(f"WARNING: NABH registry failed to load: {exc}")
 
     try:
         from app.pharma_rates import get_pharma_store
@@ -286,26 +279,6 @@ def _extract_json_from_text(raw_text: str) -> dict[str, Any]:
 
 def _analyze_bill_text_with_groq(extracted_text: str) -> dict[str, Any]:
     return extract_bill_with_groq(extracted_text)
-
-
-def _resolve_nabh_lookup(hospital_name: str | None) -> dict[str, Any]:
-    nabh_lookup: dict[str, Any] = {
-        "hospital_name": hospital_name or "",
-        "is_accredited": False,
-        "accreditation_status": None,
-        "matched_registry_name": None,
-        "accreditation_number": None,
-        "approximate_match": False,
-        "match_score": 0.0,
-    }
-
-    if hospital_name and hospital_name.strip():
-        try:
-            nabh_lookup = get_nabh_registry().lookup(hospital_name)
-        except Exception:
-            pass
-
-    return nabh_lookup
 
 
 def _add_price_comparison(line_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -527,7 +500,6 @@ def _build_comparison_response(
         city=city,
     )
     canonical_hospital_type = resolve_hospital_type(hospital_type)
-    nabh_lookup = _resolve_nabh_lookup(hospital_name)
 
     normalized_items = _normalize_line_items(line_items)
     compared_line_items = _add_price_comparison(normalized_items)
@@ -616,7 +588,6 @@ def _build_comparison_response(
         "message": "Comparison completed",
         "hospital": {
             "name_from_bill": hospital_name,
-            **nabh_lookup,
         },
         "comparison_settings": {
             "tier": canonical_tier,
@@ -779,7 +750,6 @@ async def upload_bill(
     if hospital_name is not None:
         hospital_name = str(hospital_name).strip() or None
 
-    nabh_lookup = _resolve_nabh_lookup(hospital_name)
     canonical_hospital_type = resolve_hospital_type(hospital_type)
 
     normalized_items = _normalize_line_items(line_items)
@@ -790,7 +760,6 @@ async def upload_bill(
         "message": "Bill extracted successfully",
         "hospital": {
             "name_from_bill": hospital_name,
-            **nabh_lookup,
         },
         "comparison_settings": {
             "tier": canonical_tier,
