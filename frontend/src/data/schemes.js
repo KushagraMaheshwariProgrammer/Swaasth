@@ -21,6 +21,12 @@ export const SCHEMES = {
     reportTitle: "Prescription Treatment Appropriateness Report",
     filenamePrefix: "prescription",
   },
+  combined: {
+    id: "combined",
+    label: "Bill + Prescription Review",
+    reportTitle: "Bill and Prescription Review Report",
+    filenamePrefix: "bill-prescription",
+  },
 };
 
 const SCHEME_BY_ID = Object.fromEntries(
