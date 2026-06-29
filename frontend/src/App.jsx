@@ -18,6 +18,8 @@ import PatientsPage from "./pages/PatientsPage";
 import AccountSettingsPage from "./pages/AccountSettingsPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import TermsDevPreview from "./pages/TermsDevPreview";
+import AppBackground from "./components/AppBackground";
+import UserNav from "./components/UserNav";
 import PatientForm, { emptyPatientForm } from "./components/PatientForm";
 import PatientList from "./components/PatientList";
 import LocationSearchPicker from "./components/LocationSearchPicker";
@@ -124,45 +126,55 @@ const pageTransition = {
   transition: { duration: 0.35 },
 };
 
-function UserNav({ className = "" }) {
-  const { user, logOut, loading } = useAuth();
+const HOW_IT_WORKS_STEPS = [
+  {
+    id: "upload",
+    step: "Step 1",
+    title: "Upload your bill",
+    desc: "Take a photo or upload a PDF of your hospital bill.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+        <path d="M12 16V4m0 0 4 4m-4-4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "extract",
+    step: "Step 2",
+    title: "OCR reads every line",
+    desc: "BillCheck extracts room charges, medicines, tests, and other billed items.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <path d="M7 9h6M7 13h10M7 17h8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "compare",
+    step: "Step 3",
+    title: "See what's fair",
+    desc: "Each item is reviewed for suspicious charges and medicine price references where available.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+        <path d="M4 19V5M4 19h16M8 15l3-3 3 2 4-5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+];
 
-  if (loading) {
-    return null;
-  }
+const TRUST_BADGES = [
+  { id: "free", label: "Free forever" },
+  { id: "save", label: "Sign in to save bills" },
+  { id: "fast", label: "Results in seconds" },
+];
 
-  if (!user) {
-    return (
-      <div className={`user-nav ${className}`.trim()}>
-        <Link to="/login" className="user-nav-link">
-          Sign in
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`user-nav ${className}`.trim()}>
-      <Link to="/patients" className="user-nav-link">
-        Patients
-      </Link>
-      <Link to="/history" className="user-nav-link">
-        Past bills
-      </Link>
-      <Link to="/account" className="user-nav-link">
-        Account
-      </Link>
-      <span className="user-nav-email">{user.email || "Signed in"}</span>
-      <button
-        type="button"
-        className="user-nav-signout"
-        onClick={() => logOut()}
-      >
-        Sign out
-      </button>
-    </div>
-  );
-}
+const TRUST_STATS = [
+  { value: "Pan-India", label: "Used by patients nationwide" },
+  { value: "Smart OCR", label: "Reads every line item" },
+  { value: "Secure", label: "Account storage for your bills" },
+];
 
 function ProtectedRoute({ children }) {
   const {
@@ -280,55 +292,64 @@ function LandingPage() {
 
   return (
     <motion.div className="landing-page" {...pageTransition}>
-      <div className="landing-bg-blobs" aria-hidden="true">
-        <span className="blob blob-blue" />
-        <span className="blob blob-green" />
-        <span className="blob blob-purple" />
-      </div>
-
       <header className="landing-navbar">
-        <div className="landing-brand">
+        <Link to="/" className="landing-brand">
+          <span className="landing-brand-mark" aria-hidden="true" />
           <span>BillCheck</span>
-          <span className="pulse-dot" aria-hidden="true" />
-        </div>
+        </Link>
         <UserNav className="landing-user-nav" />
       </header>
 
       <main className="landing-wrap">
         <section className="landing-hero">
           <motion.div
-            className="hero-copy"
+            className="hero-panel"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <p className="eyebrow">Trusted by Indian patients</p>
-            <h1>Your hospital bill, finally explained.</h1>
-            <p>
-              BillCheck reads every line of your hospital bill and highlights
-              charges that may need verification — before you pay.
-            </p>
-            <button
-              type="button"
-              className="cta-button"
-              onClick={startChecking}
-            >
-              Check My Bill →
-            </button>
-            <div className="trust-inline">
-              <span>✓ Free forever</span>
-              <span>•</span>
-              <span>✓ Sign in to save bills</span>
-              <span>•</span>
-              <span>✓ Results in seconds</span>
+            <p className="hero-kicker">Trusted by Indian patients</p>
+
+            <div className="hero-content">
+              <h1>Your hospital bill, clearly explained.</h1>
+              <p className="hero-lead">
+                BillCheck reads every line of your hospital bill and highlights
+                charges that may need verification — before you pay.
+              </p>
             </div>
+
+            <div className="hero-actions">
+              <button
+                type="button"
+                className="cta-button cta-button--hero"
+                onClick={startChecking}
+              >
+                Check My Bill
+              </button>
+            </div>
+
+            <ul className="hero-trust-badges">
+              {TRUST_BADGES.map((badge, index) => (
+                <motion.li
+                  key={badge.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, delay: 0.45 + index * 0.1 }}
+                  whileHover={{ y: -3, scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                >
+                  <span className="trust-badge-dot" aria-hidden="true" />
+                  {badge.label}
+                </motion.li>
+              ))}
+            </ul>
           </motion.div>
 
           <motion.div
             className="phone-shell-wrap"
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.55 }}
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.12 }}
           >
             <div className="floating-panel" aria-hidden="true">
               <p>Bill Analysis</p>
@@ -341,10 +362,12 @@ function LandingPage() {
               </div>
             </div>
 
-            <div className="iphone-shell">
-              <div className="iphone-inner">
-                <div className="dynamic-island" />
-                <div className="iphone-screen">
+            <div className="android-shell">
+              <div className="android-inner">
+                <div className="android-status-bar" aria-hidden="true">
+                  <span className="android-punch-hole" />
+                </div>
+                <div className="android-screen">
                   <div className="phone-top">
                     <strong>BillCheck</strong>
                     <span className="phone-dot" />
@@ -385,37 +408,24 @@ function LandingPage() {
         </section>
 
         <section className="how-it-works">
-          <h2>How BillCheck works</h2>
+          <div className="section-heading">
+            <p className="section-eyebrow">Simple process</p>
+            <h2>How BillCheck works</h2>
+            <p className="section-lead">
+              Three steps from upload to a clear, item-by-item fairness report.
+            </p>
+          </div>
           <div className="how-grid">
-            {[
-              {
-                icon: "📄",
-                step: "Step 1",
-                title: "Upload your bill",
-                desc: "Take a photo or upload a PDF of your hospital bill",
-              },
-              {
-                icon: "🤖",
-                step: "Step 2",
-                title: "Optical character recognition",
-                desc: "Our system extracts every line item - medicines, tests, room charges, fees",
-              },
-              {
-                icon: "📊",
-                step: "Step 3",
-                title: "See what's fair",
-                desc: "Each item is reviewed for suspicious charges and medicine price references where available",
-              },
-            ].map((item) => (
+            {HOW_IT_WORKS_STEPS.map((item) => (
               <motion.article
-                key={item.title}
+                key={item.id}
                 className="how-card"
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.35 }}
                 transition={{ duration: 0.4 }}
               >
-                <span className="how-icon">{item.icon}</span>
+                <div className="how-icon-wrap">{item.icon}</div>
                 <p className="how-step-label">{item.step}</p>
                 <h3>{item.title}</h3>
                 <p>{item.desc}</p>
@@ -424,18 +434,25 @@ function LandingPage() {
           </div>
         </section>
 
-        <section className="trust-bar-dark">
-          Bill line-item review · Suspicious charge detection · Secure account storage · Built with ❤️ for India
+        <section className="trust-section" aria-label="Coverage and trust">
+          <ul className="trust-stats">
+            {TRUST_STATS.map((stat) => (
+              <li key={stat.label} className="trust-stat">
+                <strong>{stat.value}</strong>
+                <span>{stat.label}</span>
+              </li>
+            ))}
+          </ul>
         </section>
       </main>
 
       <footer className="site-footer">
         <div className="footer-top">
-          <div>
+          <div className="footer-brand">
             <strong>BillCheck</strong>
-            <p>Know before you pay.</p>
+            <p className="footer-tagline">Know before you pay.</p>
           </div>
-          <p>
+          <p className="footer-disclaimer">
             For informational purposes only. Review results may require manual
             verification. Actual hospital pricing may vary.
           </p>
@@ -2166,9 +2183,14 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <TermsGate>
-          <AppRoutes />
-        </TermsGate>
+        <div className="app-shell">
+          <AppBackground />
+          <div className="app-content">
+            <TermsGate>
+              <AppRoutes />
+            </TermsGate>
+          </div>
+        </div>
       </BrowserRouter>
     </AuthProvider>
   );
