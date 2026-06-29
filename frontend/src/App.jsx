@@ -10,11 +10,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import BillResults from "./components/BillResults";
-import {
-  getBillComparisonScheme,
-  getComparisonSchemeCopy,
-  HOSPITAL_TYPE_OPTIONS,
-} from "./billUtils";
+import { getComparisonSchemeCopy, HOSPITAL_TYPE_OPTIONS } from "./billUtils";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import HistoryPage from "./pages/HistoryPage";
@@ -25,7 +21,6 @@ import TermsDevPreview from "./pages/TermsDevPreview";
 import PatientForm, { emptyPatientForm } from "./components/PatientForm";
 import PatientList from "./components/PatientList";
 import LocationSearchPicker from "./components/LocationSearchPicker";
-import AarogyaFlow from "./components/AarogyaFlow";
 import ClinicalContextForm from "./components/ClinicalContextForm";
 import DiagnosisPrompt from "./components/DiagnosisPrompt";
 import PrescriptionResults from "./components/PrescriptionResults";
@@ -50,10 +45,7 @@ import {
 import {
   getCities,
   getStateOptions,
-  isTelanganaState,
-  mapDistrictToCghsCity,
   resolveCanonicalStateUtName,
-  resolveCghsFallbackLocation,
   resolveCityTier,
 } from "./services/locations";
 import { validateUploadFile } from "./utils/fileUpload";
@@ -110,7 +102,7 @@ const withRecalculatedTotal = (item) => {
 const LOADING_MESSAGES = [
   "Reading your bill...",
   "Extracting line items...",
-  "Comparing with CGHS rates...",
+  "Reviewing line items...",
   "Preparing your report...",
 ];
 const PRESCRIPTION_LOADING_MESSAGES = [
@@ -313,9 +305,8 @@ function LandingPage() {
             <p className="eyebrow">Trusted by Indian patients</p>
             <h1>Your hospital bill, finally explained.</h1>
             <p>
-              BillCheck reads every line of your hospital bill and compares it
-              against official CGHS government rates. Know exactly what&apos;s fair
-              - before you pay.
+              BillCheck reads every line of your hospital bill and highlights
+              charges that may need verification — before you pay.
             </p>
             <button
               type="button"
@@ -369,7 +360,7 @@ function LandingPage() {
                       <strong>Room Rent</strong>
                       <span className="mini-pill red">Overpriced</span>
                     </div>
-                    <small>₹12,500 charged vs ₹2,500 CGHS</small>
+                    <small>₹12,500 charged vs expected</small>
                   </div>
 
                   <div className="phone-card ok">
@@ -377,7 +368,7 @@ function LandingPage() {
                       <strong>CBC Test</strong>
                       <span className="mini-pill green">Acceptable</span>
                     </div>
-                    <small>₹600 charged vs ₹350 CGHS</small>
+                    <small>₹600 charged vs expected</small>
                   </div>
 
                   <div className="phone-card over">
@@ -385,7 +376,7 @@ function LandingPage() {
                       <strong>Blood Transfusion</strong>
                       <span className="mini-pill red">Overpriced</span>
                     </div>
-                    <small>₹7,000 vs ₹1,800 CGHS</small>
+                    <small>₹7,000 vs expected</small>
                   </div>
                 </div>
               </div>
@@ -413,7 +404,7 @@ function LandingPage() {
                 icon: "📊",
                 step: "Step 3",
                 title: "See what's fair",
-                desc: "Each item is compared against official CGHS government benchmark rates",
+                desc: "Each item is reviewed for suspicious charges and medicine price references where available",
               },
             ].map((item) => (
               <motion.article
@@ -434,8 +425,7 @@ function LandingPage() {
         </section>
 
         <section className="trust-bar-dark">
-          Comparing against 5,900+ official CGHS 2025 rates · Used by patients across
-          India · Secure account storage · Built with ❤️ for India
+          Bill line-item review · Suspicious charge detection · Secure account storage · Built with ❤️ for India
         </section>
       </main>
 
@@ -446,8 +436,8 @@ function LandingPage() {
             <p>Know before you pay.</p>
           </div>
           <p>
-            For informational purposes only. CGHS rates are government
-            benchmarks. Actual hospital pricing may vary.
+            For informational purposes only. Review results may require manual
+            verification. Actual hospital pricing may vary.
           </p>
         </div>
         <div className="footer-bottom">© {new Date().getFullYear()} BillCheck</div>
@@ -459,7 +449,7 @@ function LandingPage() {
 function CheckPage() {
   const { user } = useAuth();
   const location = useLocation();
-  const cghsLocationRef = useRef({ state: "", city: "" });
+  const compareLocationRef = useRef({ state: "", city: "" });
   const [selectedFile, setSelectedFile] = useState(null);
   const [states] = useState(() => getStateOptions());
   const [cities, setCities] = useState([]);
@@ -490,7 +480,6 @@ function CheckPage() {
   const [patientForm, setPatientForm] = useState(emptyPatientForm);
   const [patientSaving, setPatientSaving] = useState(false);
   const [patientInfo, setPatientInfo] = useState("");
-  const [cghsFromAarogya, setCghsFromAarogya] = useState(false);
   const [documentMode, setDocumentMode] = useState("bill");
   const [selectedPrescriptionFile, setSelectedPrescriptionFile] = useState(null);
   const [prescriptionMeta, setPrescriptionMeta] = useState(null);
@@ -563,20 +552,14 @@ function CheckPage() {
   }, [user, reloadPatients]);
 
   const selectedPatient = patients.find((p) => p.id === selectedPatientId);
-  const comparisonScheme = getBillComparisonScheme(selectedPatient);
-  const comparisonCopy = getComparisonSchemeCopy(comparisonScheme);
-  const aarogyaMode =
-    isTelanganaState(selectedPatient?.state) &&
-    Boolean(selectedPatient?.aarogyaBhadrathaEligible);
-  const showAarogyaFlow =
-    aarogyaMode && !cghsFromAarogya && documentMode === "bill";
-  const showCghsBillFlow = !aarogyaMode || cghsFromAarogya;
+  const comparisonCopy = getComparisonSchemeCopy();
+  const showBillFlow = true;
   const showPrescriptionFlow =
     documentMode === "prescription" && billStep === "bill";
   const showBillUploadFlow =
     (documentMode === "bill" || documentMode === "combined") &&
     billStep === "bill" &&
-    showCghsBillFlow;
+    showBillFlow;
   const activeLoadingMessages =
     documentMode === "prescription"
       ? PRESCRIPTION_LOADING_MESSAGES
@@ -629,7 +612,6 @@ function CheckPage() {
     setResult(null);
     setScanMeta(null);
     setEditableItems([]);
-    setCghsFromAarogya(false);
     setDocumentMode("bill");
     setSelectedPrescriptionFile(null);
     setPrescriptionMeta(null);
@@ -640,68 +622,11 @@ function CheckPage() {
     setDiagnosisUserProvided(false);
     setClinicalStep(null);
     setClinicalContext(emptyClinicalContext());
-    cghsLocationRef.current = { state: "", city: "" };
-  };
-
-  const handleAarogyaCghsFallback = async ({
-    items,
-    hospitalName,
-    district,
-    ocr: ocrMeta,
-    file: billFile,
-  }) => {
-    const normalizedItems = (items || []).map(normalizeLineItem);
-    if (!normalizedItems.length) {
-      setError("Add at least one bill item before comparing with CGHS.");
-      return;
-    }
-
-    const location = resolveCghsFallbackLocation({
-      patientState: selectedPatient?.state || "Telangana",
-      district,
-    });
-    if (!location.state || !location.city) {
-      setError(
-        "Could not determine the hospital city for CGHS comparison. Select Hyderabad as the district on the bill review step and try again."
-      );
-      return;
-    }
-
-    cghsLocationRef.current = location;
-    setStateUtName(location.state);
-    setCity(location.city);
-    setCities(getCities(location.state));
-    setResolvedTier(resolveCityTier(location.state, location.city));
-    setHospitalType("general");
-    setHospitalNameEdit(hospitalName || "");
-    setEditableItems(normalizedItems);
-    setScanMeta({
-      filename: ocrMeta?.filename || billFile?.name || "bill",
-      file_type: ocrMeta?.file_type || null,
-      hospital: { name_from_bill: hospitalName || null },
-      comparison_settings: {
-        state_name: location.state,
-        city: location.city,
-        aarogya_district: district || "",
-        comparison_scheme: "cghs",
-        cghs_fallback_from_aarogya: true,
-      },
-    });
-    setResult(null);
-    setError("");
-    setSaveMessage("");
-    setCghsFromAarogya(true);
-    setIsComparing(true);
-
-    await runCghsComparison(normalizedItems, location, {
-      hospitalName: hospitalName || "",
-      filename: ocrMeta?.filename || billFile?.name || "bill",
-      file_type: ocrMeta?.file_type || null,
-    });
+    compareLocationRef.current = { state: "", city: "" };
   };
 
   const resolveCompareLocation = () => {
-    const refLocation = cghsLocationRef.current;
+    const refLocation = compareLocationRef.current;
     const compareState =
       resolveCanonicalStateUtName(
         refLocation.state ||
@@ -716,19 +641,12 @@ function CheckPage() {
       scanMeta?.comparison_settings?.city ||
       "";
     if (!compareCity && compareState) {
-      compareCity =
-        mapDistrictToCghsCity(
-          compareState,
-          scanMeta?.comparison_settings?.aarogya_district || ""
-        ) ||
-        getCities(compareState).find((name) => name === "Hyderabad") ||
-        getCities(compareState)[0] ||
-        "";
+      compareCity = getCities(compareState)[0] || "";
     }
     return { state: compareState, city: compareCity };
   };
 
-  const runCghsComparison = async (
+  const runBillComparison = async (
     validItems,
     locationOverride = null,
     metaOverride = {}
@@ -743,7 +661,7 @@ function CheckPage() {
       return;
     }
 
-    cghsLocationRef.current = location;
+    compareLocationRef.current = location;
     setError("");
     setSaveMessage("");
     setCompareFailed(false);
@@ -762,88 +680,8 @@ function CheckPage() {
           hospital_name: (metaOverride.hospitalName ?? hospitalNameEdit).trim() || null,
           filename: metaOverride.filename ?? scanMeta?.filename,
           file_type: metaOverride.file_type ?? scanMeta?.file_type,
-          pmjay_eligible: Boolean(selectedPatient?.ayushmanEligible),
-          hospitalisation_relief_scheme_selected: Boolean(
-            selectedPatient?.hospitalisationReliefSchemeSelected
-          ),
-          is_registered_construction_worker: Boolean(
-            selectedPatient?.isRegisteredConstructionWorker
-          ),
-          kcr_kit_selected: Boolean(
-            selectedPatient?.kcrKitSelected &&
-              Number(selectedPatient?.age) >= 18
-          ),
-          kcr_is_pregnant: Boolean(selectedPatient?.kcrIsPregnant),
-          kcr_is_telangana_resident: Boolean(
-            selectedPatient?.kcrIsTelanganaResident
-          ),
-          kcr_age_18_or_above: Boolean(
-            selectedPatient?.kcrKitSelected &&
-              Number(selectedPatient?.age) >= 18
-          ),
-          kcr_income_below_10000: Boolean(selectedPatient?.kcrIncomeBelow10000),
-          kcr_government_hospital_treatment: Boolean(
-            selectedPatient?.kcrGovernmentHospitalTreatment
-          ),
-          kcr_more_than_two_live_children: Boolean(
-            selectedPatient?.kcrMoreThanTwoLiveChildren
-          ),
-          kcr_aadhaar_telangana: Boolean(selectedPatient?.kcrAadhaarTelangana),
-          kcr_identified_by_anganwadi_worker: Boolean(
-            selectedPatient?.kcrIdentifiedByAnganwadiWorker
-          ),
-          rajiv_aarogyasri_selected: Boolean(
-            selectedPatient?.rajivAarogyasriSelected
-          ),
-          rajiv_is_telangana_resident: Boolean(
-            selectedPatient?.rajivIsTelanganaResident
-          ),
-          rajiv_has_eligible_card: Boolean(selectedPatient?.rajivHasEligibleCard),
-          rajiv_has_aadhaar: Boolean(selectedPatient?.rajivHasAadhaar),
-          rajiv_is_cancer_related: Boolean(selectedPatient?.rajivIsCancerRelated),
-          rajiv_family_coverage_used_amount:
-            selectedPatient?.rajivFamilyCoverageUsedAmount ?? null,
-          ehs_selected: Boolean(selectedPatient?.ehsSelected),
-          ehs_is_government_employee: Boolean(
-            selectedPatient?.ehsIsGovernmentEmployee
-          ),
-          ehs_is_pensioner: Boolean(selectedPatient?.ehsIsPensioner),
-          ehs_is_dependent: Boolean(selectedPatient?.ehsIsDependent),
-          ehs_has_health_card: Boolean(selectedPatient?.ehsHasHealthCard),
-          ehs_card_number: selectedPatient?.ehsCardNumber || null,
-          jhs_selected: Boolean(selectedPatient?.jhsSelected),
-          jhs_is_working_journalist: Boolean(
-            selectedPatient?.jhsIsWorkingJournalist
-          ),
-          jhs_is_retired_journalist: Boolean(
-            selectedPatient?.jhsIsRetiredJournalist
-          ),
-          jhs_is_dependent: Boolean(selectedPatient?.jhsIsDependent),
-          jhs_has_health_card: Boolean(selectedPatient?.jhsHasHealthCard),
-          jhs_has_aadhaar: Boolean(selectedPatient?.jhsHasAadhaar),
-          jhs_card_number: selectedPatient?.jhsCardNumber || null,
-          cghs_fallback_from_aarogya: Boolean(
-            cghsFromAarogya ||
-              scanMeta?.comparison_settings?.cghs_fallback_from_aarogya
-          ),
-          cghs_beneficiary_category:
-            selectedPatient?.cghsBeneficiaryCategory || null,
-          cghs_eligible_category_confirmed:
-            selectedPatient?.cghsEligibleCategoryConfirmed ?? null,
-          cghs_resides_in_covered_city:
-            selectedPatient?.cghsResidesInCoveredCity ?? null,
-          pmjay_has_ayushman_card: selectedPatient?.pmjayHasAyushmanCard ?? null,
-          pmjay_state: selectedPatient?.state || location.stateUtName || null,
-          pmjay_district:
-            scanMeta?.comparison_settings?.aarogya_district ||
-            location.city ||
-            null,
-          pmjay_city: location.city || null,
           bill_date: scanMeta?.bill_date || null,
-          patient_district:
-            scanMeta?.comparison_settings?.aarogya_district ||
-            location.city ||
-            null,
+          patient_district: location.city || null,
           patient_id: selectedPatient?.id || null,
           patient_name: selectedPatient?.name || null,
           patient_age: selectedPatient?.age ?? null,
@@ -900,7 +738,7 @@ function CheckPage() {
       setError("Nothing to retry. Edit bill items and compare again.");
       return;
     }
-    runCghsComparison(last.validItems, last.locationOverride, last.metaOverride);
+    runBillComparison(last.validItems, last.locationOverride, last.metaOverride);
   };
 
   useEffect(() => {
@@ -913,12 +751,10 @@ function CheckPage() {
 
     const nextCities = getCities(stateUtName);
     setCities(nextCities);
-    if (!cghsFromAarogya) {
-      setCity((current) =>
-        current && nextCities.includes(current) ? current : ""
-      );
-    }
-  }, [stateUtName, cghsFromAarogya]);
+    setCity((current) =>
+      current && nextCities.includes(current) ? current : ""
+    );
+  }, [stateUtName]);
 
   useEffect(() => {
     if (!stateUtName || !city) {
@@ -1137,7 +973,6 @@ function CheckPage() {
     setScanMeta(null);
     setEditableItems([]);
     setHospitalNameEdit("");
-    setCghsFromAarogya(false);
     setPrescriptionMeta(null);
     setPrescriptionMedicines([]);
     setPrescriptionTests([]);
@@ -1146,7 +981,7 @@ function CheckPage() {
     setDiagnosisUserProvided(false);
     setClinicalStep(null);
     setClinicalContext(emptyClinicalContext());
-    cghsLocationRef.current = { state: "", city: "" };
+    compareLocationRef.current = { state: "", city: "" };
     setError("");
   };
 
@@ -1222,7 +1057,7 @@ function CheckPage() {
       return;
     }
 
-    await runCghsComparison(validItems);
+    await runBillComparison(validItems);
   };
 
   const runPrescriptionAnalysis = async (
@@ -1504,7 +1339,6 @@ function CheckPage() {
                   <p>
                     <strong>{selectedPatient.name}</strong> · {selectedPatient.age}{" "}
                     yrs · {selectedPatient.gender}
-                    {selectedPatient.ayushmanEligible && " · PM-JAY eligible"}
                   </p>
                   <button
                     type="button"
@@ -1583,23 +1417,6 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {billStep === "bill" && showAarogyaFlow && (
-            <motion.section
-              key="aarogya-flow"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.25 }}
-            >
-              <AarogyaFlow
-                patient={selectedPatient}
-                user={user}
-                onChangePatient={handleChangePatient}
-                onCompareWithCghs={handleAarogyaCghsFallback}
-              />
-            </motion.section>
-          )}
-
           {uiState === "upload" && billStep === "bill" && showBillUploadFlow && (
             <motion.section
               key="upload"
@@ -1614,7 +1431,6 @@ function CheckPage() {
                   <p>
                     Patient: <strong>{selectedPatient.name}</strong> ·{" "}
                     {selectedPatient.age} yrs
-                    {selectedPatient.ayushmanEligible && " · PM-JAY eligible"}
                   </p>
                   <button
                     type="button"
@@ -1697,13 +1513,6 @@ function CheckPage() {
                 </>
               )}
 
-              {selectedPatient?.ayushmanEligible && (
-                <p className="comparison-settings-hint pmjay-hint">
-                  Procedures and tests will be compared against Ayushman Bharat HBP
-                  2022 rates (medicines use NPPA ceiling prices).
-                </p>
-              )}
-
               <div className="comparison-settings">
                 <p className="comparison-settings-title">Hospital location</p>
                 <div className="comparison-settings-grid">
@@ -1751,22 +1560,11 @@ function CheckPage() {
                   </select>
                 </label>
                 <p className="comparison-settings-hint nabh-hint">
-                  For general hospitals, NABH vs non-NABH rates are chosen
-                  automatically by matching the hospital name from your bill
-                  against the official NABH registry.
+                  Hospital name from your bill is matched against the NABH registry
+                  when available.
                 </p>
-                {resolvedTier && (
-                  <p className="tier-detected">
-                    CGHS tier for this city:{" "}
-                    <strong>{resolvedTier.tier_label}</strong>
-                    {resolvedTier.tier_source === "default_tier_3"
-                      ? " (not in CGHS city list — Tier III applied)"
-                      : ""}
-                  </p>
-                )}
                 <p className="comparison-settings-hint">
-                  City tier is detected automatically from official CGHS city
-                  classification. Unlisted cities use Tier III rates.
+                  Hospital location helps contextualize audit checks on your bill.
                 </p>
                 {locationError && (
                   <p className="error-text">{locationError}</p>
@@ -1921,7 +1719,7 @@ function CheckPage() {
           )}
 
           {(uiState === "loading" || uiState === "comparing") &&
-            (showCghsBillFlow || showPrescriptionFlow) && (
+            (showBillFlow || showPrescriptionFlow) && (
             <motion.section
               key={uiState === "comparing" ? "comparing" : "loading"}
               className="loading-card"
@@ -1944,7 +1742,7 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {uiState === "edit" && showCghsBillFlow && editableItems.length > 0 && (
+          {uiState === "edit" && showBillFlow && editableItems.length > 0 && (
             <motion.section
               key="edit"
               className="bill-editor-shell"
@@ -1953,54 +1751,6 @@ function CheckPage() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.25 }}
             >
-              {cghsFromAarogya && (
-                <p className="abh-cghs-fallback-note">
-                  Comparing against CGHS rates because{" "}
-                  <strong>{hospitalNameEdit || "this hospital"}</strong> is not
-                  empanelled under Aarogya Bhadratha.
-                  {city && stateUtName
-                    ? ` Location: ${city}, ${stateUtName}.`
-                    : " Using Hyderabad, Telangana for CGHS tier."}
-                </p>
-              )}
-
-              {cghsFromAarogya && (
-                <div className="comparison-settings-grid abh-cghs-location-grid">
-                  <LocationSearchPicker
-                    label="State/UT"
-                    items={states}
-                    value={stateUtName}
-                    onSelect={(value) => {
-                      const canonical = resolveCanonicalStateUtName(value);
-                      cghsLocationRef.current = {
-                        state: canonical,
-                        city: "",
-                      };
-                      setStateUtName(canonical);
-                      setCity("");
-                    }}
-                    placeholder="Select state/UT"
-                  />
-                  <LocationSearchPicker
-                    label="City (CGHS tier)"
-                    items={cities}
-                    value={city}
-                    onSelect={(value) => {
-                      cghsLocationRef.current = {
-                        state: stateUtName,
-                        city: value,
-                      };
-                      setCity(value);
-                    }}
-                    disabled={!stateUtName}
-                    placeholder="Select city"
-                    emptyLabel={
-                      stateUtName ? "No cities available" : "Select state/UT first"
-                    }
-                  />
-                </div>
-              )}
-
               <header className="bill-editor-header">
                 <div>
                   <h2>Review scanned items</h2>
@@ -2281,7 +2031,7 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {uiState === "results" && showCghsBillFlow && result?.line_items?.length && (
+          {uiState === "results" && showBillFlow && result?.line_items?.length && (
             <motion.section
               key="results"
               className="results-shell"

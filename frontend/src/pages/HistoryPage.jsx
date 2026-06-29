@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import BillResults from "../components/BillResults";
 import PrescriptionResults from "../components/PrescriptionResults";
-import AarogyaResults from "../components/AarogyaResults";
 import {
   buildPatientNameMap,
   computeBillSummary,
@@ -274,9 +273,7 @@ export default function HistoryPage() {
               </button>
             </div>
             <section className="results-shell">
-              {selectedBill.report_kind === "aarogya_bhadratha" ? (
-                <AarogyaResults report={selectedBill} />
-              ) : selectedBill.report_kind === "prescription" ? (
+              {selectedBill.report_kind === "prescription" ? (
                 <PrescriptionResults result={selectedBill} />
               ) : (
                 <BillResults result={selectedBill} />
