@@ -61,6 +61,7 @@ class BillItemInput(BaseModel):
 class AnalyzeTreatmentRequest(BaseModel):
     diagnosis: str
     diagnosis_user_provided: bool = False
+    diagnosis_confidence: str | None = None
     medicines: list[PrescriptionItemInput] = Field(default_factory=list)
     tests: list[PrescriptionItemInput] = Field(default_factory=list)
     procedures: list[PrescriptionItemInput] = Field(default_factory=list)
@@ -303,6 +304,7 @@ def analyze_treatment_endpoint(body: AnalyzeTreatmentRequest) -> dict[str, Any]:
         bill_items=bill_items,
         clinical_context=clinical_context,
         diagnosis_user_provided=body.diagnosis_user_provided,
+        diagnosis_confidence=body.diagnosis_confidence,
     )
 
     restricted_medicine_flags = build_restricted_medicine_flags(
@@ -325,5 +327,7 @@ def analyze_treatment_endpoint(body: AnalyzeTreatmentRequest) -> dict[str, Any]:
         "clinical_context": clinical_context,
         "treatment_audit_flags": treatment_audit_flags,
         "restricted_medicine_flags": restricted_medicine_flags,
+        "patient_questions": treatment_audit_flags.get("patient_questions") or [],
+        "advocacy_scope": treatment_audit_flags.get("advocacy_scope"),
         "report_kind": "prescription",
     }

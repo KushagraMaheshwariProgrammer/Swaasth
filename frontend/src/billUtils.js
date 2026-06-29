@@ -107,8 +107,25 @@ export function CountUp({ value, isCurrency = false, duration = 1200 }) {
   return isCurrency ? formatCurrency(displayValue) : Math.round(displayValue);
 }
 
+export function isDisplayableBillLineItem(item) {
+  if (!item) {
+    return false;
+  }
+  if (item.flag === "overpriced" || item.flag === "acceptable") {
+    return true;
+  }
+  if (item.jan_aushadhi_available) {
+    return true;
+  }
+  return false;
+}
+
+export function displayableBillLineItems(lineItems = []) {
+  return lineItems.filter(isDisplayableBillLineItem);
+}
+
 export function computeBillSummary(result) {
-  const lineItems = result?.line_items ?? [];
+  const lineItems = displayableBillLineItems(result?.line_items ?? []);
   return lineItems.reduce(
     (acc, item) => {
       const charged = Number(item.total_price ?? 0) || 0;

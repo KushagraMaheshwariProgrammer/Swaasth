@@ -79,6 +79,15 @@ def main() -> None:
         )
 
     summary = aggregate_retrieval_results(results)
+    if rows:
+        summary["diagnosis_match_rate"] = round(
+            sum(1 for row in rows if row.get("document_hit_at_5")) / len(rows),
+            3,
+        )
+        summary["fallback_rate"] = round(
+            sum(1 for row in rows if row.get("used_fallback")) / len(rows),
+            3,
+        )
     stamp = date.today().isoformat()
     args.output.mkdir(parents=True, exist_ok=True)
     json_path = args.output / f"retrieval_{stamp}.json"

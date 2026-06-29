@@ -1,10 +1,16 @@
-"""Rule-based audit for suspicious or unnecessary hospital bill charges."""
+"""Rule-based audit for billing patterns worth clarifying."""
 
 from __future__ import annotations
 
 import re
 from difflib import SequenceMatcher
 from typing import Any
+
+from app.services.audit_advocacy import (
+    ADVOCACY_SCOPE_CHECKED,
+    ADVOCACY_SCOPE_NOT_CHECKED,
+    build_advocacy_payload,
+)
 
 FILLER_WORDS = {
     "a",
@@ -136,7 +142,16 @@ def analyze_claim_items(
     del city  # Reserved for future city-specific audit rules.
 
     if not items:
-        return {"flags_count": 0, "risk_level": "LOW", "flags": []}
+        return {
+            "flags_count": 0,
+            "risk_level": "LOW",
+            "flags": [],
+            "patient_questions": [],
+            "advocacy_scope": {
+                "checked": list(ADVOCACY_SCOPE_CHECKED),
+                "not_checked": list(ADVOCACY_SCOPE_NOT_CHECKED),
+            },
+        }
 
     entries: list[dict[str, Any]] = []
     for item in items:
@@ -173,6 +188,7 @@ def analyze_claim_items(
                 "type": "DUPLICATE_ITEM",
                 "severity": severity,
                 "item": display_name,
+                "category": "billing",
                 "reason": (
                     f'This item appears {len(group)} times on the bill '
                     f"(total quantity: {total_qty:g})."
@@ -200,6 +216,7 @@ def analyze_claim_items(
                     "type": "NEAR_DUPLICATE_ITEM",
                     "severity": "MEDIUM",
                     "item": left["name"],
+                    "category": "billing",
                     "reason": (
                         f'Similar to "{right["name"]}" '
                         f"(possible duplicate spelling, {score:.0%} match)."
@@ -234,6 +251,7 @@ def analyze_claim_items(
                 "type": "UNREALISTIC_REPETITION",
                 "severity": severity,
                 "item": entry["name"],
+                "category": "billing",
                 "reason": (
                     f"This surgery/procedure appears {occurrence_count} time(s) "
                     f"with total quantity {total_qty:g}, which is unusually high."
@@ -265,6 +283,7 @@ def analyze_claim_items(
                 "type": "LAB_REPETITION",
                 "severity": severity,
                 "item": group[0]["name"],
+                "category": "billing",
                 "reason": (
                     f"Lab/sample/test item appears {occurrence_count} time(s) "
                     f"with total quantity {total_qty:g}, which may be excessive."
@@ -291,6 +310,7 @@ def analyze_claim_items(
                 "type": "PACKAGE_COMPONENT_CHARGED_SEPARATELY",
                 "severity": "HIGH",
                 "item": package_names,
+                "category": "billing",
                 "reason": (
                     "A package/surgery/procedure charge appears alongside separate "
                     f"component charges such as {component_names}."
@@ -315,6 +335,7 @@ def analyze_claim_items(
                 "type": "MEDICINE_PRICE_DISCREPANCY",
                 "severity": "HIGH",
                 "item": entry["name"],
+                "category": "billing",
                 "reason": (
                     f"Charged {charged} vs NPPA ceiling {pharma_rate} for "
                     f'"{reference}" (difference: {diff}).'
@@ -326,8 +347,11 @@ def analyze_claim_items(
             }
         )
 
+    advocacy = build_advocacy_payload(flags)
     return {
-        "flags_count": len(flags),
-        "risk_level": _compute_risk_level(flags),
-        "flags": flags,
+        "flags_count": advocacy["flags_count"],
+        "risk_level": _compute_risk_level(advocacy["flags"]),
+        "flags": advocacy["flags"],
+        "patient_questions": advocacy["patient_questions"],
+        "advocacy_scope": advocacy["advocacy_scope"],
     }

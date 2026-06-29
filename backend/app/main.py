@@ -25,6 +25,7 @@ from app.services.document_extraction import (
     normalize_clinical_context,
 )
 from app.restricted_medicines import build_restricted_medicine_flags, get_restricted_medicines_store
+from app.services.audit_advocacy import ADVOCACY_SCOPE_CHECKED, ADVOCACY_SCOPE_NOT_CHECKED, merge_patient_questions
 from app.services.treatment_audit import analyze_treatment
 
 
@@ -523,6 +524,7 @@ def _build_comparison_response(
             bill_items=compared_line_items,
             clinical_context=clinical_context,
             diagnosis_user_provided=diagnosis_user_provided,
+            diagnosis_confidence=clinical_context.get("diagnosis_confidence"),
         )
         if prescription_items or clinical_context:
             prescription_payload = {
@@ -582,6 +584,19 @@ def _build_comparison_response(
         prescription_items=prescription_items or [],
     )
 
+    patient_questions = merge_patient_questions(
+        audit_flags.get("patient_questions"),
+        treatment_audit_flags.get("patient_questions") if treatment_audit_flags else None,
+    )
+    advocacy_scope = (
+        treatment_audit_flags.get("advocacy_scope")
+        if treatment_audit_flags
+        else audit_flags.get("advocacy_scope")
+    ) or {
+        "checked": list(ADVOCACY_SCOPE_CHECKED),
+        "not_checked": list(ADVOCACY_SCOPE_NOT_CHECKED),
+    }
+
     return {
         "filename": filename,
         "file_type": file_type,
@@ -611,6 +626,8 @@ def _build_comparison_response(
         "clinical_context": clinical_context if clinical_context else None,
         "report_kind": report_kind,
         "restricted_medicine_flags": restricted_medicine_flags,
+        "patient_questions": patient_questions,
+        "advocacy_scope": advocacy_scope,
     }
 
 

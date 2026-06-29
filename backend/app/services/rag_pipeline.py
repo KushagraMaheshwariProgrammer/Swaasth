@@ -382,11 +382,16 @@ def validate_stg_citations(
                     matched_chunk = chunk
                     break
 
-            if not matched_chunk:
+            if matched_chunk:
+                item["citation_verified"] = True
+            else:
                 item["stg_reference"] = None
+                item["citation_verified"] = False
                 item["reason"] = _strip_citation_verification_suffix(
                     str(item.get("reason") or "")
                 )
+        else:
+            item["citation_verified"] = False
 
         existing_basis = sanitize_display_text(str(item.get("guideline_basis") or ""))
         if existing_basis:

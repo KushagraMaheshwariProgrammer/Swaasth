@@ -375,23 +375,27 @@ def build_primary_guideline_corpus(
                 )
             )
 
-    cea_chunks = build_chunks_from_directory(
-        CEA_DIR,
-        corpus="clinical_establishments",
-        use_ocr_fallback=use_ocr_fallback,
-    )
-    chunks.extend(cea_chunks)
-    for file_path in sorted(CEA_DIR.iterdir()):
-        if file_path.suffix.lower() not in SUPPORTED_SUFFIXES:
-            continue
-        documents.append(
-            GuidelineDocument(
-                condition=_title_from_filename(file_path.name),
-                corpus="clinical_establishments",
-                source_file=file_path.name,
-                chapter="Clinical Establishments Act STG",
-            )
+    cea_chunks: list[GuidelineChunk] = []
+    if CEA_DIR.exists() and any(
+        path.suffix.lower() in SUPPORTED_SUFFIXES for path in CEA_DIR.iterdir() if path.is_file()
+    ):
+        cea_chunks = build_chunks_from_directory(
+            CEA_DIR,
+            corpus="clinical_establishments",
+            use_ocr_fallback=use_ocr_fallback,
         )
+        chunks.extend(cea_chunks)
+        for file_path in sorted(CEA_DIR.iterdir()):
+            if file_path.suffix.lower() not in SUPPORTED_SUFFIXES:
+                continue
+            documents.append(
+                GuidelineDocument(
+                    condition=_title_from_filename(file_path.name),
+                    corpus="clinical_establishments",
+                    source_file=file_path.name,
+                    chapter="Clinical Establishments Act STG",
+                )
+            )
 
     deduped_docs: list[GuidelineDocument] = []
     seen_docs: set[tuple[str, str]] = set()

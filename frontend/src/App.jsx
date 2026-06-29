@@ -1096,6 +1096,7 @@ function CheckPage() {
       const payload = await analyzeTreatment({
         diagnosis: resolvedDiagnosis,
         diagnosisUserProvided: userProvided,
+        diagnosisConfidence: meta?.diagnosisConfidence || meta?.diagnosis_confidence || null,
         ...items,
         symptoms: clinicalPayload.symptoms,
         testResults: clinicalPayload.test_results,

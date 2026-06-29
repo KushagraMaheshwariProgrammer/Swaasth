@@ -9,7 +9,10 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from app.services.audit_advocacy import build_advocacy_payload, finalize_audit_flags
 from app.services.groq_client import groq_json_chat
+from app.services.investigation_audit import analyze_investigations
+from app.services.prescription_rationality import analyze_prescription_rationality
 from app.services.rag_pipeline import (
     _find_supporting_chunk,
     format_guideline_basis,
@@ -223,7 +226,10 @@ def _rule_based_clinical_flags(
             _contains_marker(str(result.get("test_name") or ""), DENGUE_TEST_MARKERS)
             and str(result.get("result") or "").lower() in {"positive", "low", "high"}
             for result in results
-        ) or any(marker in _normalize_name(name) for name in _symptom_names(clinical_context))
+        ) or any(
+            _contains_marker(name, DENGUE_MARKERS)
+            for name in _symptom_names(clinical_context)
+        )
         if dengue_evidence:
             for rx_name in rx_names:
                 rx_norm = _normalize_name(rx_name)
@@ -369,6 +375,10 @@ Rules:
 - Recommendations must be concrete actions for the patient, for example:
   "Ask your doctor whether antibiotics are needed for a viral URTI" or
   "Request a malaria RDT before starting antimalarial treatment".
+- Use neutral, guideline-based phrasing in reasons. Examples:
+  "For uncomplicated dengue, the following tests are not routinely recommended under the guideline."
+  "Guideline support for MRI in this clinical scenario was not identified."
+- Do not write that the doctor ordered unnecessary tests or that the prescription is wrong.
 - Every flag MUST include guideline_basis: one short plain-language sentence
   explaining what the government guidelines say about this issue. Write at an
   8th-grade reading level. No section numbers, no symbols, no jargon, no quotes
@@ -436,6 +446,7 @@ def analyze_treatment(
     bill_items: list[dict[str, Any]] | None = None,
     clinical_context: dict[str, Any] | None = None,
     diagnosis_user_provided: bool = False,
+    diagnosis_confidence: str | None = None,
 ) -> dict[str, Any]:
     diagnosis = str(diagnosis or "").strip()
     if not diagnosis:
@@ -468,6 +479,35 @@ def analyze_treatment(
             diagnosis,
             clinical_context,
             prescription_items=prescription_items,
+        )
+    )
+
+    flags.extend(
+        analyze_prescription_rationality(
+            diagnosis=diagnosis,
+            prescription_items=prescription_items,
+        )
+    )
+
+    investigation_items = [
+        str(item.get("name") or item.get("item_name") or "").strip()
+        for item in prescription_items + bill_items
+        if isinstance(item, dict)
+        and str(item.get("category") or "").lower() in {"test", "procedure", "investigation"}
+        and str(item.get("name") or item.get("item_name") or "").strip()
+    ]
+    investigation_items = list(dict.fromkeys(investigation_items))
+    flagged_norms = {
+        _normalize_name(str(flag.get("item") or ""))
+        for flag in flags
+        if flag.get("item")
+    }
+    flags.extend(
+        analyze_investigations(
+            diagnosis=diagnosis,
+            investigation_items=investigation_items,
+            retrieval_chunks=retrieval_chunks,
+            flagged_item_norms=flagged_norms,
         )
     )
 
@@ -541,14 +581,24 @@ def analyze_treatment(
             }
         )
 
-    flags = _polish_flags_for_users(flags, retrieval_chunks)
+    flags = finalize_audit_flags(flags, chunks=retrieval_chunks)
+
+    if str(diagnosis_confidence or "").lower() in {"low", "missing"}:
+        for flag in flags:
+            if flag.get("confidence") == "HIGH":
+                flag["confidence"] = "MEDIUM"
+
+    advocacy = build_advocacy_payload(flags, chunks=retrieval_chunks)
 
     return {
-        "flags_count": len(flags),
-        "risk_level": _compute_risk_level(flags),
+        "flags_count": advocacy["flags_count"],
+        "risk_level": _compute_risk_level(advocacy["flags"]),
         "matched_stg_conditions": matched_conditions,
         "clinical_alignment": clinical_alignment,
         "guideline_sources": retrieval.get("guideline_sources") or [],
         "used_fallback": bool(retrieval.get("used_fallback")),
-        "flags": flags,
+        "flags": advocacy["flags"],
+        "patient_questions": advocacy["patient_questions"],
+        "advocacy_scope": advocacy["advocacy_scope"],
+        "diagnosis_confidence": diagnosis_confidence,
     }
