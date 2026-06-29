@@ -50,13 +50,10 @@ python scripts/build_stg_index.py
 | Route | Purpose |
 |-------|---------|
 | `POST /upload-bill` | OCR + Groq bill extraction |
-| `POST /compare-bill` | CGHS / PM-JAY / scheme rate comparison |
+| `POST /compare-bill` | General bill review (NPPA, Jan Aushadhi, audit flags) |
 | `POST /upload-prescription` | Prescription OCR + extraction |
 | `POST /upload-clinical-document` | Lab/discharge summary upload |
 | `POST /analyze-treatment` | STG treatment appropriateness audit |
-| `/api/schemes/pmjay/*` | PM-JAY hospital search & verify |
-| `/api/schemes/cghs/*` | CGHS covered cities |
-| `/api/aarogya-bhadratha/*` | Aarogya Bhadratha hospitals, rates, reports |
 | `POST /api/reports/render-pdf` | Unified PDF report generation |
 
 ---
@@ -100,9 +97,7 @@ Smoke tests:
 curl http://localhost:8000/health
 # Expected: Backend is running
 
-curl http://localhost:8000/api/schemes/pmjay/status
-curl http://localhost:8000/api/aarogya-bhadratha/status
-curl http://localhost:8000/cghs/options
+curl http://localhost:8000/api/locations/states
 ```
 
 Stop with `Ctrl+C`.
@@ -263,10 +258,9 @@ Install the new APK/AAB on devices. The app probes `/health` to confirm connecti
 
 | Path | In Git? | Notes |
 |------|---------|-------|
-| `backend/data/schemes/`, CGHS CSVs, NPPA | Yes | Loaded at startup |
+| `backend/data/` reference CSVs (NPPA, locations, NABH, Jan Aushadhi) | Yes | Loaded at startup |
 | `backend/data/stg_index/` | Yes | Pre-built Chroma index |
 | `backend/data/primary_guidelines_index/` | Yes | Pre-built Chroma index |
-| `backend/data/aarogya_bhadratha_cache/reports/` | No | Ephemeral per deploy |
 | FastEmbed ONNX models | No | Prefetched during Docker build |
 | `backend/.env`, `firebase-service-account.json` | No | Use Railway variables |
 

@@ -4,7 +4,6 @@ __pycache__/
 *.pyc
 .env
 firebase-service-account.json
-data/aarogya_bhadratha_cache/reports/
 tests/
 scripts/eval_*
 .git/

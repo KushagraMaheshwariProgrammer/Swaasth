@@ -15,7 +15,7 @@ from app.cghs_rates import resolve_hospital_type, resolve_tier
 from app.locations import get_location_store
 from app.nabh_registry import get_nabh_registry
 from app.jan_aushadhi_rates import get_jan_aushadhi_store
-from app.medicine_comparison import enrich_scheme_line_items_with_jan_aushadhi
+from app.medicine_comparison import enrich_bill_line_items_with_jan_aushadhi
 from app.pharma_rates import get_pharma_store
 from app.prescription_routes import router as prescription_router
 from app.services.claim_audit import analyze_claim_items
@@ -531,7 +531,7 @@ def _build_comparison_response(
 
     normalized_items = _normalize_line_items(line_items)
     compared_line_items = _add_price_comparison(normalized_items)
-    compared_line_items, jan_aushadhi = enrich_scheme_line_items_with_jan_aushadhi(
+    compared_line_items, jan_aushadhi = enrich_bill_line_items_with_jan_aushadhi(
         compared_line_items
     )
 

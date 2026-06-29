@@ -48,7 +48,6 @@ import {
   getCities,
   getStateOptions,
   resolveCanonicalStateUtName,
-  resolveCityTier,
 } from "./services/locations";
 import { validateUploadFile } from "./utils/fileUpload";
 
@@ -472,7 +471,6 @@ function CheckPage() {
   const [cities, setCities] = useState([]);
   const [stateUtName, setStateUtName] = useState("");
   const [city, setCity] = useState("");
-  const [resolvedTier, setResolvedTier] = useState(null);
   const [hospitalType, setHospitalType] = useState("general");
   const [isLoading, setIsLoading] = useState(false);
   const locationError = states.length
@@ -762,7 +760,6 @@ function CheckPage() {
     if (!stateUtName) {
       setCities([]);
       setCity("");
-      setResolvedTier(null);
       return;
     }
 
@@ -772,15 +769,6 @@ function CheckPage() {
       current && nextCities.includes(current) ? current : ""
     );
   }, [stateUtName]);
-
-  useEffect(() => {
-    if (!stateUtName || !city) {
-      setResolvedTier(null);
-      return;
-    }
-
-    setResolvedTier(resolveCityTier(stateUtName, city));
-  }, [stateUtName, city]);
 
   useEffect(() => {
     if (!isLoading && !isComparing) {

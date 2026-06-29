@@ -216,7 +216,7 @@ export default function BillResults({ result, toolbar = null }) {
                 </p>
               )}
               {!isMedicine && item.flag === "no_reference" && (
-                <p className="rajiv-fallback-note">
+                <p className="manual-review-note">
                   No automated benchmark for this line item — review manually if needed.
                 </p>
               )}

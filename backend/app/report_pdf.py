@@ -170,7 +170,7 @@ def _scheme_title(scheme_id: str) -> str:
 
 def render_bill_comparison_html(report: dict[str, Any]) -> str:
     settings = report.get("comparison_settings") or {}
-    scheme_id = settings.get("comparison_scheme") or "cghs"
+    scheme_id = settings.get("comparison_scheme") or "general"
     title = _scheme_title(scheme_id)
     scheme_label = _SCHEME_LABELS.get(scheme_id, scheme_id)
 
