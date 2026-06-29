@@ -275,15 +275,6 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
             "</tr>"
         )
 
-    nabh_line = ""
-    if hospital.get("is_accredited") is not None:
-        if hospital.get("is_accredited"):
-            nabh_line = (
-                f"NABH: Accredited ({escape(str(hospital.get('accreditation_status', '')))})"
-            )
-        else:
-            nabh_line = "NABH: Not found in NABH registry"
-
     clinical_evidence_html = _render_clinical_evidence_html(report)
     restricted_medicine_html = render_restricted_medicine_flags_html(report)
 
@@ -321,7 +312,6 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
       {f" · {escape(str(patient.get('gender')))}" if patient.get('gender') else ''}
     </p>
     <p><b>Hospital (from bill):</b> {escape(str(hospital.get('name_from_bill', '—')))}
-      {f" · {nabh_line}" if nabh_line else ''}
     </p>
     <p><b>Location:</b> {escape(', '.join(location_bits) if location_bits else '—')}</p>
     <p><b>Hospital type:</b> {escape(str(hospital_type))}</p>

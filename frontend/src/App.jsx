@@ -1564,10 +1564,6 @@ function CheckPage() {
                     ))}
                   </select>
                 </label>
-                <p className="comparison-settings-hint nabh-hint">
-                  Hospital name from your bill is matched against the NABH registry
-                  when available.
-                </p>
                 <p className="comparison-settings-hint">
                   Hospital location helps contextualize audit checks on your bill.
                 </p>

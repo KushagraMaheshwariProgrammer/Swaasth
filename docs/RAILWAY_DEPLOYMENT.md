@@ -258,7 +258,7 @@ Install the new APK/AAB on devices. The app probes `/health` to confirm connecti
 
 | Path | In Git? | Notes |
 |------|---------|-------|
-| `backend/data/` reference CSVs (NPPA, locations, NABH, Jan Aushadhi) | Yes | Loaded at startup |
+| `backend/data/` reference CSVs (NPPA, locations, Jan Aushadhi) | Yes | Loaded at startup |
 | `backend/data/stg_index/` | Yes | Pre-built Chroma index |
 | `backend/data/primary_guidelines_index/` | Yes | Pre-built Chroma index |
 | FastEmbed ONNX models | No | Prefetched during Docker build |
