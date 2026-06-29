@@ -45,6 +45,9 @@ def test_compare_bill_without_scheme_fields() -> None:
     assert "hospitalisation_relief_advisory" not in payload
     assert payload.get("line_items")
     assert payload.get("audit_flags") is not None
+    assert payload.get("jan_aushadhi") is not None
+    assert payload["jan_aushadhi"].get("matches")
+    assert payload["line_items"][0].get("jan_aushadhi_available") is True
 
 
 def test_compare_bill_includes_restricted_medicine_flags_shape() -> None:
