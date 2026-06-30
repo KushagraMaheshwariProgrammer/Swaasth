@@ -209,7 +209,6 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
     settings = report.get("comparison_settings") or {}
     scheme_id = settings.get("comparison_scheme") or "general"
     title = _scheme_title(scheme_id)
-    scheme_label = _SCHEME_LABELS.get(scheme_id, scheme_id)
 
     patient = report.get("patient") or {}
     hospital = report.get("hospital") or {}
@@ -235,10 +234,6 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
         flag = item.get("flag")
         matched = item.get("matched_reference_item") or "—"
         code_bits: list[str] = []
-        if item.get("hbp_procedure_code"):
-            code_bits.append(str(item["hbp_procedure_code"]))
-        elif item.get("cghs_code"):
-            code_bits.append(str(item["cghs_code"]))
         if item.get("pharma_product_id"):
             code_bits.append(f"NPPA #{item['pharma_product_id']}")
         if code_bits:
@@ -260,11 +255,9 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
     location_bits: list[str] = []
     if settings.get("city") and settings.get("state_name"):
         location_bits.append(f"{settings['city']}, {settings['state_name']}")
-    tier_label = settings.get("tier_label") or settings.get("tier") or "—"
     hospital_type = _HOSPITAL_TYPE_LABELS.get(
         settings.get("hospital_type", ""), settings.get("hospital_type", "—")
     )
-    rate_type_label = settings.get("rate_type_label") or settings.get("rate_type") or "—"
 
     jan_rows = []
     for match in jan_matches:
@@ -334,14 +327,6 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
   .disclaimer {{ margin-top: 14px; font-size: 8.5px; color: #7f8c8d; font-style: italic; }}
   ul {{ margin: 4px 0; padding-left: 16px; }}
   ol {{ margin: 4px 0; padding-left: 16px; }}
-  .hrs-pdf-card {{ background: #f4f7fb; border-left: 3px solid #5d8aa8; border-radius: 6px; padding: 8px 10px; margin: 8px 0; }}
-  .hrs-pdf-card h3 {{ margin: 0 0 4px; font-size: 10px; color: #1a5276; }}
-  .hrs-pdf-note {{ margin-top: 8px; font-size: 8.5px; color: #566573; font-style: italic; }}
-  .cghs-pdf-card {{ background: #f4f7fb; border-left: 3px solid #5d8aa8; border-radius: 6px; padding: 8px 10px; margin: 8px 0; }}
-  .cghs-pdf-card h3 {{ margin: 0 0 4px; font-size: 10px; color: #1a5276; }}
-  .cghs-pdf-fallback {{ margin: 6px 0; font-size: 9px; color: #566573; }}
-  .cghs-pdf-preview {{ margin: 6px 0; padding-left: 16px; }}
-  .cghs-pdf-details {{ margin: 8px 0; font-size: 9px; }}
 </style></head>
 <body>
   <h1>{escape(title)}</h1>

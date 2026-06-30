@@ -32,7 +32,6 @@ def _catalog_ingredient_keys(name: str) -> list[str]:
 
 def _default_csv_path() -> Path:
     backend_root = Path(__file__).resolve().parent.parent
-    repo_root = backend_root.parent
     env_path = os.getenv("JAN_AUSHADHI_DATASET_PATH", "").strip()
     if env_path:
         path = Path(env_path)
@@ -42,7 +41,6 @@ def _default_csv_path() -> Path:
 
     candidates = [
         backend_root / "data" / "Jan_Aushadhi_Product_List.csv",
-        repo_root / "Jan_Aushadhi_Product List_8_6_2026 @ 16_1_8.csv",
     ]
     for path in candidates:
         if path.exists():

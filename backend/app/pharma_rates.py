@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from app.cghs_rates import normalize_item_name
+from app.item_normalization import normalize_item_name
 
 PRICE_TOLERANCE = float(os.getenv("PHARMA_PRICE_TOLERANCE", "0.0"))
 MIN_INGREDIENT_KEY_LEN = 3

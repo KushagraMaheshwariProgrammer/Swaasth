@@ -1,11 +1,5 @@
 import bundle from "../data/locations.bundle.json";
 
-const DEFAULT_TIER = {
-  tier_id: "tier_3",
-  tier_label: "Tier III (Z City)",
-  tier_source: "default_tier_3",
-};
-
 /**
  * Canonical list of Indian States & Union Territories.
  * Used as a baseline so the patient form always offers every State/UT (the
@@ -115,19 +109,4 @@ export function getCities(stateUtName) {
   const canonical = resolveCanonicalStateUtName(stateUtName);
   const cities = bundle.citiesByState?.[canonical];
   return Array.isArray(cities) ? cities : [];
-}
-
-/** City tier for a state + city using bundled classification data. */
-export function resolveCityTier(stateUtName, cityName) {
-  if (!stateUtName || !cityName) {
-    return null;
-  }
-
-  const canonical = resolveCanonicalStateUtName(stateUtName);
-  const tier = bundle.tierByStateCity?.[canonical]?.[cityName];
-  return {
-    state_ut_name: canonical,
-    city_name: cityName,
-    ...(tier || DEFAULT_TIER),
-  };
 }

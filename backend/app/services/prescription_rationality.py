@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from app.jan_aushadhi_rates import enrich_line_items_with_jan_aushadhi
-from app.pharma_rates import get_pharma_store, normalize_item_name
+from app.item_normalization import normalize_item_name
+from app.pharma_rates import get_pharma_store
 
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
 DRUG_RATIONALITY_PATH = _BACKEND_ROOT / "data" / "medicines" / "drug_rationality.json"

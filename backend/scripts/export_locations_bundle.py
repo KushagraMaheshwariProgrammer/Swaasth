@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export states/cities/tiers JSON for the mobile and web frontend bundle."""
+"""Export states/cities JSON for the mobile and web frontend bundle."""
 
 from __future__ import annotations
 
@@ -20,23 +20,13 @@ from app.locations import get_location_store  # noqa: E402
 def main() -> None:
     store = get_location_store()
     cities_by_state: dict[str, list[str]] = {}
-    tier_by_state_city: dict[str, dict[str, dict[str, str]]] = {}
 
     for state_ut_name in store.state_ut_names:
-        city_names = store.get_city_names(state_ut_name)
-        cities_by_state[state_ut_name] = city_names
-        tier_by_state_city[state_ut_name] = {}
-        for city in store.cities_by_state_ut.get(state_ut_name, []):
-            tier_by_state_city[state_ut_name][city.name] = {
-                "tier_id": city.tier_id,
-                "tier_label": city.tier_label,
-                "tier_source": city.tier_source,
-            }
+        cities_by_state[state_ut_name] = store.get_city_names(state_ut_name)
 
     bundle = {
         "states": store.get_state_ut_names(),
         "citiesByState": cities_by_state,
-        "tierByStateCity": tier_by_state_city,
     }
 
     FRONTEND_BUNDLE.parent.mkdir(parents=True, exist_ok=True)

@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, model_validator
 
 from app.report_routes import router as report_router
-from app.cghs_rates import resolve_hospital_type, resolve_tier
+from app.item_normalization import resolve_hospital_type
 from app.locations import get_location_store
 from app.jan_aushadhi_rates import get_jan_aushadhi_store
 from app.medicine_comparison import enrich_bill_line_items_with_jan_aushadhi
@@ -190,7 +190,7 @@ def list_cities(
 def list_cities_legacy(
     state_code: str = Query(..., description="State code from /locations/states"),
 ) -> dict[str, list[dict[str, str]]]:
-    """Legacy shape for older frontends: { cities: [{ name, tier_id, ... }] }."""
+    """Legacy shape for older frontends: { cities: [{ name }] }."""
     try:
         store = get_location_store()
         state_ut_name = store.get_state_ut_name_by_code(state_code)
@@ -216,54 +216,22 @@ def list_cities_legacy(
     return {"cities": cities}
 
 
-@app.get("/api/locations/tier")
-def resolve_city_tier(
-    state: str = Query(..., description="State/UT name from /api/locations/states"),
-    city: str = Query(..., description="City name from /api/locations/cities"),
-) -> dict[str, str]:
+def _resolve_location_meta(
+    *,
+    state_ut_name: str,
+    city: str,
+) -> dict[str, Any]:
     try:
-        return get_location_store().resolve_tier(state, city)
+        resolved = get_location_store().resolve_city(state_ut_name, city)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Location data is unavailable: {exc}",
-        ) from exc
 
-
-def _resolve_comparison_tier(
-    *,
-    tier: str | None,
-    state_ut_name: str | None,
-    city: str | None,
-) -> tuple[str, dict[str, Any]]:
-    location_meta: dict[str, Any] = {}
-
-    if state_ut_name and city:
-        try:
-            resolved = get_location_store().resolve_tier(state_ut_name, city)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-        location_meta = {
-            "state_code": resolved["state_code"],
-            "state_ut_name": resolved["state_ut_name"],
-            "state_name": resolved["state_name"],
-            "city": resolved["city_name"],
-            "tier_id": resolved["tier_id"],
-            "tier_label": resolved["tier_label"],
-            "tier_source": resolved["tier_source"],
-        }
-        return resolve_tier(resolved["tier_id"]), location_meta
-
-    if tier:
-        return resolve_tier(tier), location_meta
-
-    raise HTTPException(
-        status_code=400,
-        detail="Provide state_ut_name and city, or an explicit tier.",
-    )
+    return {
+        "state_code": resolved["state_code"],
+        "state_ut_name": resolved["state_ut_name"],
+        "state_name": resolved["state_name"],
+        "city": resolved["city_name"],
+    }
 
 
 def _extract_text_from_pdf(file_bytes: bytes) -> str:
@@ -371,7 +339,6 @@ class CompareBillRequest(BaseModel):
     city: str
     hospital_type: str = "general"
     hospital_name: str | None = None
-    tier: str | None = None
     filename: str | None = None
     file_type: str | None = None
     bill_date: str | None = None
@@ -476,7 +443,6 @@ def _build_comparison_response(
     city: str,
     hospital_type: str,
     hospital_name: str | None,
-    tier: str | None = None,
     filename: str = "edited-bill",
     file_type: str = "manual",
     bill_date: str | None = None,
@@ -495,11 +461,7 @@ def _build_comparison_response(
     if not line_items:
         raise HTTPException(status_code=400, detail="Add at least one line item.")
 
-    canonical_tier, location_meta = _resolve_comparison_tier(
-        tier=tier,
-        state_ut_name=state_ut_name,
-        city=city,
-    )
+    location_meta = _resolve_location_meta(state_ut_name=state_ut_name, city=city)
     canonical_hospital_type = resolve_hospital_type(hospital_type)
 
     normalized_items = _normalize_line_items(line_items)
@@ -605,10 +567,6 @@ def _build_comparison_response(
             "name_from_bill": hospital_name,
         },
         "comparison_settings": {
-            "tier": canonical_tier,
-            "tier_id": location_meta.get("tier_id", tier),
-            "tier_label": location_meta.get("tier_label"),
-            "tier_source": location_meta.get("tier_source"),
             "state_code": location_meta.get("state_code"),
             "state_ut_name": location_meta.get("state_ut_name", state_ut_name),
             "state_name": location_meta.get("state_name", state_ut_name),
@@ -664,7 +622,6 @@ def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
         city=body.city,
         hospital_type=body.hospital_type,
         hospital_name=body.hospital_name,
-        tier=body.tier,
         filename=body.filename or "edited-bill",
         file_type=body.file_type or "manual",
         bill_date=body.bill_date,
@@ -701,10 +658,6 @@ async def upload_bill(
         ...,
         description="Hospital type: general or speciality",
     ),
-    tier: str | None = Query(
-        default=None,
-        description="Optional manual tier override (tier_1, tier_2, tier_3)",
-    ),
 ) -> dict[str, Any]:
     allowed_types = {
         "application/pdf": "pdf",
@@ -723,8 +676,7 @@ async def upload_bill(
             state_ut_name=state_ut_name,
             state_code=state_code,
         )
-        canonical_tier, location_meta = _resolve_comparison_tier(
-            tier=tier,
+        location_meta = _resolve_location_meta(
             state_ut_name=resolved_state_ut_name,
             city=city,
         )
@@ -779,10 +731,6 @@ async def upload_bill(
             "name_from_bill": hospital_name,
         },
         "comparison_settings": {
-            "tier": canonical_tier,
-            "tier_id": location_meta.get("tier_id", tier),
-            "tier_label": location_meta.get("tier_label"),
-            "tier_source": location_meta.get("tier_source"),
             "state_code": location_meta.get("state_code"),
             "state_ut_name": location_meta.get("state_ut_name", resolved_state_ut_name),
             "state_name": location_meta.get("state_name", resolved_state_ut_name),
