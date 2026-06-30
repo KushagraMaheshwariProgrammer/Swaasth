@@ -9,6 +9,7 @@ import {
   formatCurrency,
   getBillPatientName,
 } from "../billUtils";
+import { reportKindLabel } from "../data/reportExport";
 import { useAuth } from "../context/AuthContext";
 import {
   deleteBill,
@@ -44,7 +45,8 @@ function formatBillDate(bill) {
 
 export default function HistoryPage() {
   const { billId } = useParams();
-  const { user } = useAuth();
+  const { user, medicalHistoryConsentAccepted, medicalHistoryConsentLoading } =
+    useAuth();
   const navigate = useNavigate();
   const [bills, setBills] = useState([]);
   const [patientNameById, setPatientNameById] = useState({});
@@ -53,6 +55,18 @@ export default function HistoryPage() {
   const [syncMessage, setSyncMessage] = useState("");
   const [error, setError] = useState("");
   const [deletingBillId, setDeletingBillId] = useState(null);
+
+  const historyAllowed = Boolean(medicalHistoryConsentAccepted);
+
+  const filterConsentedBills = (entries, patientMap) =>
+    entries.filter((bill) => {
+      const patientId = bill.patientId || bill.patient?.id;
+      if (!patientId) {
+        return false;
+      }
+      const patient = patientMap[patientId];
+      return patient?.savePastBills === true;
+    });
 
   const handleDeleteBill = async (bill) => {
     if (!user?.uid || !bill?.id) {
@@ -89,30 +103,48 @@ export default function HistoryPage() {
       if (!user) {
         return;
       }
+      if (!historyAllowed) {
+        setLoading(false);
+        setBills([]);
+        setSelectedBill(null);
+        return;
+      }
       setError("");
       setSyncMessage("");
       try {
         if (billId) {
           setLoading(true);
-          const bill = await getBill(user.uid, billId);
+          const [bill, patients] = await Promise.all([
+            getBill(user.uid, billId),
+            getPatients(user.uid),
+          ]);
+          const patientMap = Object.fromEntries(
+            patients.map((patient) => [patient.id, patient])
+          );
           if (cancelled) {
             return;
           }
           if (!bill) {
             setError("Bill not found.");
             setSelectedBill(null);
+          } else if (!filterConsentedBills([bill], patientMap).length) {
+            setError("This report is not available without medical history consent.");
+            setSelectedBill(null);
           } else {
             setSelectedBill(bill);
           }
         } else {
           const localSnapshot = getUserBillsLocalSnapshot(user.uid);
+          const localPatients = getPatientsLocalSnapshot(user.uid);
+          const localPatientMap = Object.fromEntries(
+            localPatients.map((patient) => [patient.id, patient])
+          );
           if (localSnapshot.length) {
-            setBills(localSnapshot);
+            setBills(filterConsentedBills(localSnapshot, localPatientMap));
             setLoading(false);
           } else {
             setLoading(true);
           }
-          const localPatients = getPatientsLocalSnapshot(user.uid);
           if (localPatients.length) {
             setPatientNameById(buildPatientNameMap(localPatients));
           }
@@ -123,13 +155,17 @@ export default function HistoryPage() {
           if (cancelled) {
             return;
           }
+          const patientMap = Object.fromEntries(
+            patients.map((patient) => [patient.id, patient])
+          );
           setPatientNameById(buildPatientNameMap(patients));
-          const pendingLocal = entries.filter((bill) => bill.localOnly).length;
+          const visibleBills = filterConsentedBills(entries, patientMap);
+          const pendingLocal = visibleBills.filter((bill) => bill.localOnly).length;
           const syncMessage = getPendingBillSyncMessage(pendingLocal);
           if (syncMessage) {
             setSyncMessage(syncMessage);
           }
-          setBills(entries);
+          setBills(visibleBills);
           setSelectedBill(null);
         }
       } catch (err) {
@@ -147,7 +183,7 @@ export default function HistoryPage() {
     return () => {
       cancelled = true;
     };
-  }, [user, billId]);
+  }, [user, billId, historyAllowed]);
 
   return (
     <motion.div className="check-page" {...pageTransition}>
@@ -168,15 +204,38 @@ export default function HistoryPage() {
           <p>
             {billId
               ? "Review a saved analysis from your account."
-              : "Every compared bill is saved to your account automatically."}
+              : "Saved analysis reports from document checks you've opted to store."}
           </p>
         </header>
 
-        {loading && <p className="history-status">Loading your bills...</p>}
-        {syncMessage && !loading && <p className="auth-info">{syncMessage}</p>}
-        {error && <p className="error-text">{error}</p>}
+        {medicalHistoryConsentLoading && (
+          <p className="history-status">Loading consent status...</p>
+        )}
 
-        {!loading && !billId && !bills.length && !error && (
+        {!medicalHistoryConsentLoading && !historyAllowed && (
+          <section className="history-empty">
+            <p>
+              Medical history is disabled for your account. Enable consent to view
+              and save past reports.
+            </p>
+            <Link
+              to="/consent/medical-history"
+              className="analyze-btn history-empty-cta"
+            >
+              Manage medical history consent →
+            </Link>
+          </section>
+        )}
+
+        {historyAllowed && loading && (
+          <p className="history-status">Loading your bills...</p>
+        )}
+        {historyAllowed && syncMessage && !loading && (
+          <p className="auth-info">{syncMessage}</p>
+        )}
+        {historyAllowed && error && <p className="error-text">{error}</p>}
+
+        {historyAllowed && !loading && !billId && !bills.length && !error && (
           <section className="history-empty">
             <p>No saved bills yet.</p>
             <Link to="/check" className="analyze-btn history-empty-cta">
@@ -185,7 +244,7 @@ export default function HistoryPage() {
           </section>
         )}
 
-        {!loading && !billId && bills.length > 0 && (
+        {historyAllowed && !loading && !billId && bills.length > 0 && (
           <ul className="history-list">
             {bills.map((bill) => {
               const summary = computeBillSummary(bill);
@@ -215,11 +274,7 @@ export default function HistoryPage() {
                         ? `${bill.comparison_settings.city}, ${bill.comparison_settings.state_name}`
                         : "Location not recorded"}
                       {" · "}
-                      {bill.report_kind === "prescription"
-                        ? "Prescription review"
-                        : bill.report_kind === "combined"
-                        ? "Bill + prescription review"
-                        : `${bill.line_items?.length || 0} items`}
+                      {reportKindLabel(bill)}
                       {(bill.clinical_context?.symptoms?.length ||
                         bill.clinical_context?.test_results?.length) > 0 && (
                         <span className="history-clinical-badge">Clinical review</span>
@@ -258,7 +313,7 @@ export default function HistoryPage() {
           </ul>
         )}
 
-        {!loading && billId && selectedBill && (
+        {historyAllowed && !loading && billId && selectedBill && (
           <>
             <div className="history-detail-actions">
               <button
@@ -273,7 +328,8 @@ export default function HistoryPage() {
               </button>
             </div>
             <section className="results-shell">
-              {selectedBill.report_kind === "prescription" ? (
+              {selectedBill.report_kind === "prescription" &&
+              !selectedBill.line_items?.length ? (
                 <PrescriptionResults result={selectedBill} />
               ) : (
                 <BillResults result={selectedBill} />

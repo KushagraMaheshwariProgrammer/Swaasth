@@ -996,6 +996,46 @@ body.capacitor-native .landing-hero {
   display: none;
 }
 
+.document-bundle-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.document-bundle-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.document-bundle-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.document-type-select {
+  max-width: 220px;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  font: inherit;
+}
+
+.patient-consent-label {
+  margin-top: 0.75rem;
+}
+
 .upload-zone:disabled {
   cursor: not-allowed;
   opacity: 0.65;
@@ -2857,36 +2897,7 @@ body.capacitor-native .landing-hero {
 
 
 
-.kcr-kit-questions-modal {
-  max-width: 520px;
-}
-
-.kcr-kit-questions-body {
-  display: grid;
-  gap: 0.85rem;
-}
-
-.kcr-kit-questions-intro {
-  margin: 0;
-  font-size: 0.88rem;
-  line-height: 1.5;
-  color: var(--text-secondary);
-}
-
-.kcr-kit-questions-list {
-  display: grid;
-  gap: 0.65rem;
-}
-
-.kcr-kit-questions-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.65rem;
-}
-
-
-
-
+.report-actions {
 
 
 
@@ -3702,111 +3713,6 @@ body.capacitor-native .landing-hero {
   color: #171717;
   font-size: 0.92rem;
 }
-
-/* ----------------------------------------------------------------------- */
-/* Aarogya Bhadratha Scheme                                                */
-/* ----------------------------------------------------------------------- */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* Directory + search */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* Report */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* Payment Info Section */
-
-
-
-/* Per-Case Ceiling Section */
-
-
-
-
-
-
-
-
-
-
-
-/* Consumables Summary */
-
-
-
-
-/* Consumable item card variant */
-
-.status-pill.status-blue {
-  background: var(--accent);
-  color: #fff;
-}
-
-/* Annual Advisory Section */
-
-
-
-
-
-
-/* Consumables Selection in Flow */
-
-
-
-
-
-
-
-
-
-
 
 .report-actions {
   display: flex;

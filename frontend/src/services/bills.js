@@ -20,6 +20,8 @@ import {
   removeLocalBill,
   removeLocalBillsForPatientIds,
 } from "./localBillStore";
+import { getLocalMedicalHistoryConsent } from "./localMedicalHistoryConsentStore";
+import { canSaveMedicalHistory } from "../utils/medicalHistoryConsent";
 
 function billsCollection(userId) {
   return collection(db, "users", userId, "bills");
@@ -182,9 +184,15 @@ export function buildReportSavePayload(reportData, patient) {
   };
 }
 
-export async function saveReportToAccount(userId, patient, reportData) {
+export async function saveReportToAccount(userId, patient, reportData, options = {}) {
   if (!userId || !patient) {
     return { saved: false };
+  }
+
+  const accountConsent =
+    options.accountConsent ?? getLocalMedicalHistoryConsent(userId);
+  if (!canSaveMedicalHistory(accountConsent, patient)) {
+    return { saved: false, reason: "consent_required" };
   }
 
   const payload = buildReportSavePayload(reportData, patient);

@@ -70,7 +70,7 @@ export const getAuditRiskMeta = (riskLevel) => {
   return { label: "Low Risk", className: "audit-risk audit-risk-low" };
 };
 
-export function getComparisonSchemeCopy() {
+export function getBillComparisonCopy() {
   return {
     compareButton: "Generate bill report →",
     loading: "Reviewing bill line items...",

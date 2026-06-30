@@ -1,4 +1,4 @@
-"""Tests for scheme-free bill comparison flow."""
+"""Tests for bill comparison flow without legacy government scheme modules."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ def test_startup_health() -> None:
     assert res.text == "Backend is running"
 
 
-def test_compare_bill_without_scheme_fields() -> None:
+def test_compare_bill_returns_core_payload() -> None:
     res = client.post(
         "/compare-bill",
         json={
@@ -36,7 +36,7 @@ def test_compare_bill_without_scheme_fields() -> None:
     )
     assert res.status_code == 200, res.text
     payload = res.json()
-    assert payload["comparison_settings"]["comparison_scheme"] == "general"
+    assert "comparison_scheme" not in payload["comparison_settings"]
     assert "cghs_costs_report" not in payload
     assert "pmjay_hospital_verification" not in payload
     assert "rajiv_aarogyasri_report" not in payload

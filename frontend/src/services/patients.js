@@ -77,7 +77,7 @@ export function validatePatientInput(patientData) {
     gender,
     age,
     state,
-    savePastBills: patientData?.savePastBills !== false,
+    savePastBills: patientData?.savePastBills === true,
   };
 }
 

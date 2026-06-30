@@ -35,6 +35,10 @@ import { syncPendingPatients } from "../services/patients";
 import {
   acceptTerms as persistTermsAcceptance,
   getTermsAcceptance,
+  acceptMedicalHistoryConsent as persistMedicalHistoryConsent,
+  declineMedicalHistoryConsent as persistMedicalHistoryConsentDecline,
+  revokeMedicalHistoryConsent as persistMedicalHistoryConsentRevoke,
+  getMedicalHistoryConsent,
 } from "../services/userProfile";
 
 const AuthContext = createContext(null);
@@ -65,6 +69,12 @@ export function AuthProvider({ children }) {
   );
   const [termsAccepted, setTermsAccepted] = useState(null);
   const [termsLoading, setTermsLoading] = useState(false);
+  const [medicalHistoryConsentAccepted, setMedicalHistoryConsentAccepted] =
+    useState(null);
+  const [medicalHistoryConsentResolved, setMedicalHistoryConsentResolved] =
+    useState(null);
+  const [medicalHistoryConsentLoading, setMedicalHistoryConsentLoading] =
+    useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,6 +151,42 @@ export function AuthProvider({ children }) {
       cancelled = true;
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!user || needsEmailVerification(user) || !termsAccepted) {
+      setMedicalHistoryConsentAccepted(null);
+      setMedicalHistoryConsentResolved(null);
+      setMedicalHistoryConsentLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setMedicalHistoryConsentLoading(true);
+
+    getMedicalHistoryConsent(user.uid)
+      .then(({ accepted, declined }) => {
+        if (!cancelled) {
+          setMedicalHistoryConsentAccepted(accepted);
+          setMedicalHistoryConsentResolved(accepted || declined);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load medical history consent:", error);
+        if (!cancelled) {
+          setMedicalHistoryConsentAccepted(false);
+          setMedicalHistoryConsentResolved(false);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setMedicalHistoryConsentLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, termsAccepted]);
 
   useEffect(() => {
     const linkParams = getEmailVerificationLinkParams();
@@ -244,6 +290,33 @@ export function AuthProvider({ children }) {
     setTermsAccepted(true);
   }, []);
 
+  const acceptMedicalHistoryConsent = useCallback(async () => {
+    if (!auth.currentUser) {
+      throw new Error("You must be signed in to update medical history consent.");
+    }
+    await persistMedicalHistoryConsent(auth.currentUser.uid);
+    setMedicalHistoryConsentAccepted(true);
+    setMedicalHistoryConsentResolved(true);
+  }, []);
+
+  const declineMedicalHistoryConsent = useCallback(async () => {
+    if (!auth.currentUser) {
+      throw new Error("You must be signed in to update medical history consent.");
+    }
+    await persistMedicalHistoryConsentDecline(auth.currentUser.uid);
+    setMedicalHistoryConsentAccepted(false);
+    setMedicalHistoryConsentResolved(true);
+  }, []);
+
+  const revokeMedicalHistoryConsent = useCallback(async () => {
+    if (!auth.currentUser) {
+      throw new Error("You must be signed in to update medical history consent.");
+    }
+    await persistMedicalHistoryConsentRevoke(auth.currentUser.uid);
+    setMedicalHistoryConsentAccepted(false);
+    setMedicalHistoryConsentResolved(false);
+  }, []);
+
   const logOut = useCallback(async () => {
     return signOut(auth);
   }, []);
@@ -256,6 +329,12 @@ export function AuthProvider({ children }) {
       termsAccepted,
       termsLoading,
       acceptTerms,
+      medicalHistoryConsentAccepted,
+      medicalHistoryConsentResolved,
+      medicalHistoryConsentLoading,
+      acceptMedicalHistoryConsent,
+      declineMedicalHistoryConsent,
+      revokeMedicalHistoryConsent,
       usesPasswordProvider: usesPasswordProvider(user),
       signUpWithEmail,
       signInWithEmail,
@@ -275,6 +354,12 @@ export function AuthProvider({ children }) {
       termsAccepted,
       termsLoading,
       acceptTerms,
+      medicalHistoryConsentAccepted,
+      medicalHistoryConsentResolved,
+      medicalHistoryConsentLoading,
+      acceptMedicalHistoryConsent,
+      declineMedicalHistoryConsent,
+      revokeMedicalHistoryConsent,
       signUpWithEmail,
       signInWithEmail,
       signInWithGoogle,

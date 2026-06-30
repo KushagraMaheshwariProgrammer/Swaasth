@@ -505,7 +505,7 @@ def _build_comparison_response(
                 ],
             }
 
-    rates_source: dict[str, Any] = {"comparison_scheme": "general"}
+    rates_source: dict[str, Any] = {}
     try:
         from app.pharma_rates import get_pharma_store
 
@@ -572,7 +572,6 @@ def _build_comparison_response(
             "state_name": location_meta.get("state_name", state_ut_name),
             "city": location_meta.get("city", city),
             "hospital_type": canonical_hospital_type,
-            "comparison_scheme": "general",
         },
         "patient": patient_payload,
         "rates_source": rates_source,

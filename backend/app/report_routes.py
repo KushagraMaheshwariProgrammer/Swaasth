@@ -9,8 +9,8 @@ from fastapi.responses import Response
 
 from app.report_pdf import (
     render_report_pdf,
-    resolve_scheme_id,
-    scheme_filename_prefix,
+    report_filename_prefix,
+    resolve_report_kind,
     validate_report,
 )
 
@@ -21,8 +21,8 @@ router = APIRouter(prefix="/api/reports", tags=["reports"])
 def render_pdf(report: dict[str, Any] = Body(...)) -> Response:
     """Render a PDF from a report object supplied by the client."""
     try:
-        scheme_id = resolve_scheme_id(report)
-        validate_report(report, scheme_id)
+        report_kind = resolve_report_kind(report)
+        validate_report(report, report_kind)
         pdf_bytes = render_report_pdf(report)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -34,7 +34,7 @@ def render_pdf(report: dict[str, Any] = Body(...)) -> Response:
 
     patient_name = str((report.get("patient") or {}).get("name") or "report")
     safe_name = patient_name.replace(" ", "-")[:40]
-    prefix = scheme_filename_prefix(scheme_id)
+    prefix = report_filename_prefix(report_kind)
     filename = f"{prefix}-{safe_name}.pdf"
     return Response(
         content=pdf_bytes,

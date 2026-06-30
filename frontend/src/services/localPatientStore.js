@@ -45,7 +45,7 @@ export function persistLocalPatient(userId, patientData, localId = null) {
       age: patientAge,
       gender: patientData.gender || "",
       state: patientData.state?.trim() || "",
-      savePastBills: patientData?.savePastBills !== false,
+      savePastBills: patientData?.savePastBills === true,
     },
     firestoreId: existing?.firestoreId || null,
     synced: false,

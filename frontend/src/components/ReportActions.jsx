@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { canExportReport, buildReportFilename } from "../data/schemes";
+import { canExportReport, buildReportFilename } from "../data/reportExport";
 import { collectPatientQuestions } from "../auditAdvocacyUtils";
 import {
   downloadReportPdf,

@@ -13,7 +13,6 @@ def _sample_bill_report() -> dict:
     return {
         "filename": "test-bill.pdf",
         "comparison_settings": {
-            "comparison_scheme": "general",
             "city": "Mumbai",
             "state_name": "Maharashtra",
             "hospital_type": "general",

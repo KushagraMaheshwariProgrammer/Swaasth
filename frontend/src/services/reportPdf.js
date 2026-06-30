@@ -1,5 +1,5 @@
 import { getApiBase } from "./apiBase";
-import { buildReportFilename, resolveScheme } from "../data/schemes";
+import { buildReportFilename, resolveReportMeta } from "../data/reportExport";
 import { backendUnreachableMessage, fetchBackend } from "./httpUtils";
 
 function isFirestoreTimestamp(value) {
@@ -123,7 +123,7 @@ export async function downloadReportPdf(report, filename) {
 }
 
 export async function shareReportPdf(report) {
-  const scheme = resolveScheme(report);
+  const reportMeta = resolveReportMeta(report);
   const filename = buildReportFilename(report);
   const blob = await fetchReportPdfBlob(report);
   const file =
@@ -134,8 +134,8 @@ export async function shareReportPdf(report) {
   if (file && navigator.canShare?.({ files: [file] }) && navigator.share) {
     try {
       await navigator.share({
-        title: scheme.reportTitle,
-        text: scheme.reportTitle,
+        title: reportMeta.reportTitle,
+        text: reportMeta.reportTitle,
         files: [file],
       });
       return true;

@@ -1,7 +1,7 @@
-"""Unified report PDF rendering for all comparison schemes.
+"""Unified report PDF rendering.
 
-New schemes register an HTML renderer via ``register_scheme``; the client sends
-the full report object (from live results or bill history) to
+Report kinds register an HTML renderer via ``register_report_renderer``; the
+client sends the full report object (from live results or bill history) to
 ``/api/reports/render-pdf``.
 """
 
@@ -17,7 +17,7 @@ from app.services.audit_advocacy import ADVOCACY_SCOPE_CHECKED, ADVOCACY_SCOPE_N
 
 RenderHtmlFn = Callable[[dict[str, Any]], str]
 
-_SCHEME_RENDERERS: dict[str, RenderHtmlFn] = {}
+_REPORT_RENDERERS: dict[str, RenderHtmlFn] = {}
 
 BILL_DISCLAIMER = (
     "This report is based on extracted bill information and reference rates "
@@ -25,9 +25,11 @@ BILL_DISCLAIMER = (
     "and uncertain item matches may require manual verification."
 )
 
-_SCHEME_LABELS: dict[str, str] = {
-    "general": "General Bill Review",
-    "bill": "General Bill Review",
+_REPORT_TITLES: dict[str, str] = {
+    "general": "Bill Review Report",
+    "bill": "Bill Review Report",
+    "combined": "Bill and Prescription Review Report",
+    "prescription": "Prescription Treatment Appropriateness Report",
 }
 
 _HOSPITAL_TYPE_LABELS: dict[str, str] = {
@@ -141,13 +143,13 @@ def _render_clinical_evidence_html(report: dict[str, Any]) -> str:
 """
 
 
-def register_scheme(scheme_id: str, render_html: RenderHtmlFn) -> None:
-    _SCHEME_RENDERERS[scheme_id] = render_html
+def register_report_renderer(report_kind: str, render_html: RenderHtmlFn) -> None:
+    _REPORT_RENDERERS[report_kind] = render_html
 
 
-def resolve_scheme_id(report: dict[str, Any]) -> str:
+def resolve_report_kind(report: dict[str, Any]) -> str:
     report_kind = report.get("report_kind")
-    if isinstance(report_kind, str) and report_kind in _SCHEME_RENDERERS:
+    if isinstance(report_kind, str) and report_kind in _REPORT_RENDERERS:
         return report_kind
 
     if report.get("line_items"):
@@ -156,11 +158,11 @@ def resolve_scheme_id(report: dict[str, Any]) -> str:
     if report.get("treatment_audit_flags"):
         return "prescription"
 
-    raise ValueError("Could not determine report scheme.")
+    raise ValueError("Could not determine report kind.")
 
 
-def validate_report(report: dict[str, Any], scheme_id: str) -> None:
-    if scheme_id == "prescription":
+def validate_report(report: dict[str, Any], report_kind: str) -> None:
+    if report_kind == "prescription":
         if not report.get("treatment_audit_flags"):
             raise ValueError("Invalid prescription report payload.")
         return
@@ -200,15 +202,14 @@ def _reference_rate(item: dict[str, Any]) -> tuple[Any, str]:
     return None, "No reference"
 
 
-def _scheme_title(scheme_id: str) -> str:
-    label = _SCHEME_LABELS.get(scheme_id, "General Bill Review")
-    return f"{label} Report"
+def _report_title(report_kind: str) -> str:
+    return _REPORT_TITLES.get(report_kind, "Bill Review Report")
 
 
 def render_bill_comparison_html(report: dict[str, Any]) -> str:
     settings = report.get("comparison_settings") or {}
-    scheme_id = settings.get("comparison_scheme") or "general"
-    title = _scheme_title(scheme_id)
+    report_kind = report.get("report_kind") or "general"
+    title = _report_title(report_kind)
 
     patient = report.get("patient") or {}
     hospital = report.get("hospital") or {}
@@ -494,20 +495,22 @@ def html_to_pdf(html: str) -> bytes:
 
 
 def render_report_pdf(report: dict[str, Any]) -> bytes:
-    scheme_id = resolve_scheme_id(report)
-    validate_report(report, scheme_id)
-    render_html = _SCHEME_RENDERERS[scheme_id]
+    report_kind = resolve_report_kind(report)
+    validate_report(report, report_kind)
+    render_html = _REPORT_RENDERERS[report_kind]
     return html_to_pdf(render_html(report))
 
 
-def scheme_filename_prefix(scheme_id: str) -> str:
+def report_filename_prefix(report_kind: str) -> str:
     return {
         "general": "bill",
         "bill": "bill",
-    }.get(scheme_id, scheme_id.replace("_", "-"))
+        "combined": "bill-prescription",
+        "prescription": "prescription",
+    }.get(report_kind, report_kind.replace("_", "-"))
 
 
-register_scheme("general", render_bill_comparison_html)
-register_scheme("bill", render_bill_comparison_html)
-register_scheme("combined", render_bill_comparison_html)
-register_scheme("prescription", render_prescription_report_html)
+register_report_renderer("general", render_bill_comparison_html)
+register_report_renderer("bill", render_bill_comparison_html)
+register_report_renderer("combined", render_bill_comparison_html)
+register_report_renderer("prescription", render_prescription_report_html)

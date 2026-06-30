@@ -10,7 +10,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import BillResults from "./components/BillResults";
-import { getComparisonSchemeCopy, HOSPITAL_TYPE_OPTIONS } from "./billUtils";
+import { getBillComparisonCopy, HOSPITAL_TYPE_OPTIONS } from "./billUtils";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import HistoryPage from "./pages/HistoryPage";
@@ -27,7 +27,9 @@ import ClinicalContextForm from "./components/ClinicalContextForm";
 import DiagnosisPrompt from "./components/DiagnosisPrompt";
 import PrescriptionResults from "./components/PrescriptionResults";
 import TermsAndConditionsModal from "./components/TermsAndConditionsModal";
-import DragAndDropUpload from "./components/DragAndDropUpload";
+import MedicalHistoryConsentModal from "./components/MedicalHistoryConsentModal";
+import MultiDocumentUpload from "./components/MultiDocumentUpload";
+import MedicalHistoryConsentPage from "./pages/MedicalHistoryConsentPage";
 import { getApiBase } from "./services/apiBase";
 import {
   backendUnreachableMessage,
@@ -40,16 +42,17 @@ import {
   analyzeTreatment,
   clinicalContextToApiPayload,
   emptyClinicalContext,
-  mergeClinicalContext,
-  normalizePrescriptionPayload,
-  uploadPrescription,
 } from "./services/prescriptions";
 import {
   getCities,
   getStateOptions,
   resolveCanonicalStateUtName,
 } from "./services/locations";
-import { validateUploadFile } from "./utils/fileUpload";
+import {
+  bundleHasBills,
+  createBundleSession,
+  processDocumentBundle,
+} from "./utils/documentBundle";
 
 function formatFetchError(err, fallback) {
   if (err?.message === "Failed to fetch") {
@@ -111,10 +114,6 @@ const PRESCRIPTION_LOADING_MESSAGES = [
   "Extracting medicines and tests...",
   "Checking against treatment guidelines...",
   "Preparing your report...",
-];
-const DOCUMENT_MODES = [
-  { id: "combined", label: "Bill + prescription" },
-  { id: "prescription", label: "Prescription only" },
 ];
 
 const pageTransition = {
@@ -272,6 +271,72 @@ function TermsGate({ children }) {
           onDecline={handleDecline}
           isSubmitting={isAccepting}
           error={acceptError}
+        />
+      )}
+    </>
+  );
+}
+
+function MedicalHistoryConsentGate({ children }) {
+  const {
+    user,
+    loading,
+    needsEmailVerification: pendingVerification,
+    termsAccepted,
+    termsLoading,
+    medicalHistoryConsentResolved,
+    medicalHistoryConsentLoading,
+    acceptMedicalHistoryConsent,
+    declineMedicalHistoryConsent,
+  } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const showConsent =
+    user &&
+    !pendingVerification &&
+    !loading &&
+    !termsLoading &&
+    termsAccepted &&
+    !medicalHistoryConsentLoading &&
+    medicalHistoryConsentResolved === false;
+
+  const handleAccept = async () => {
+    setSubmitError("");
+    setIsSubmitting(true);
+    try {
+      await acceptMedicalHistoryConsent();
+    } catch (err) {
+      setSubmitError(
+        err?.message ||
+          "Could not save your consent. Check your connection and try again."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDecline = async () => {
+    setSubmitError("");
+    setIsSubmitting(true);
+    try {
+      await declineMedicalHistoryConsent();
+    } catch (err) {
+      setSubmitError(err?.message || "Could not save your preference.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      {children}
+      {showConsent && (
+        <MedicalHistoryConsentModal
+          onAccept={handleAccept}
+          onDecline={handleDecline}
+          isSubmitting={isSubmitting}
+          error={submitError}
         />
       )}
     </>
@@ -462,10 +527,12 @@ function LandingPage() {
 }
 
 function CheckPage() {
-  const { user } = useAuth();
+  const { user, medicalHistoryConsentAccepted } = useAuth();
   const location = useLocation();
   const compareLocationRef = useRef({ state: "", city: "" });
-  const [selectedFile, setSelectedFile] = useState(null);
+  const bundleSessionRef = useRef(createBundleSession());
+  const bundleSourceDocumentsRef = useRef([]);
+  const [bundleDocuments, setBundleDocuments] = useState([]);
   const [states] = useState(() => getStateOptions());
   const [cities, setCities] = useState([]);
   const [stateUtName, setStateUtName] = useState("");
@@ -494,8 +561,6 @@ function CheckPage() {
   const [patientForm, setPatientForm] = useState(emptyPatientForm);
   const [patientSaving, setPatientSaving] = useState(false);
   const [patientInfo, setPatientInfo] = useState("");
-  const [documentMode, setDocumentMode] = useState("combined");
-  const [selectedPrescriptionFile, setSelectedPrescriptionFile] = useState(null);
   const [prescriptionMeta, setPrescriptionMeta] = useState(null);
   const [prescriptionMedicines, setPrescriptionMedicines] = useState([]);
   const [prescriptionTests, setPrescriptionTests] = useState([]);
@@ -566,16 +631,30 @@ function CheckPage() {
   }, [user, reloadPatients]);
 
   const selectedPatient = patients.find((p) => p.id === selectedPatientId);
-  const comparisonCopy = getComparisonSchemeCopy();
-  const showBillFlow = true;
-  const showPrescriptionFlow =
-    documentMode === "prescription" && billStep === "bill";
-  const showBillUploadFlow =
-    documentMode === "combined" && billStep === "bill" && showBillFlow;
-  const activeLoadingMessages =
-    documentMode === "prescription"
-      ? PRESCRIPTION_LOADING_MESSAGES
-      : LOADING_MESSAGES;
+  const comparisonCopy = getBillComparisonCopy();
+  const hasBillItems = editableItems.length > 0;
+  const hasPrescriptionItems =
+    prescriptionMedicines.length > 0 ||
+    prescriptionTests.length > 0 ||
+    prescriptionProcedures.length > 0;
+  const showBillFlow = hasBillItems;
+  const showPrescriptionFlow = !hasBillItems && hasPrescriptionItems;
+  const activeLoadingMessages = hasPrescriptionItems && !hasBillItems
+    ? PRESCRIPTION_LOADING_MESSAGES
+    : LOADING_MESSAGES;
+
+  const buildBundleReportMeta = (reportKind) => ({
+    report_kind: reportKind,
+    session_id: bundleSessionRef.current.sessionId,
+    source_documents: bundleSourceDocumentsRef.current,
+  });
+
+  const getConsentSaveMessage = (outcome) => {
+    if (outcome?.reason === "consent_required") {
+      return "Analysis complete. Report not saved — enable medical history in your account and for this patient to save reports.";
+    }
+    return null;
+  };
 
   const handleSaveNewPatient = async (event) => {
     event.preventDefault();
@@ -619,13 +698,13 @@ function CheckPage() {
 
   const handleChangePatient = () => {
     setBillStep("patient");
-    setSelectedFile(null);
+    setBundleDocuments([]);
+    bundleSessionRef.current = createBundleSession();
+    bundleSourceDocumentsRef.current = [];
     setError("");
     setResult(null);
     setScanMeta(null);
     setEditableItems([]);
-    setDocumentMode("combined");
-    setSelectedPrescriptionFile(null);
     setPrescriptionMeta(null);
     setPrescriptionMedicines([]);
     setPrescriptionTests([]);
@@ -717,8 +796,27 @@ function CheckPage() {
       setResult(payload);
 
       if (user && selectedPatient) {
-        const outcome = await saveReportToAccount(user.uid, selectedPatient, payload);
-        if (outcome.saved) {
+        const reportKind =
+          bundleSourceDocumentsRef.current.length > 1
+            ? "bundle"
+            : bundleSourceDocumentsRef.current[0]?.type === "prescription"
+            ? "prescription"
+            : "bill";
+        const outcome = await saveReportToAccount(
+          user.uid,
+          selectedPatient,
+          {
+            ...payload,
+            ...buildBundleReportMeta(reportKind),
+          },
+          {
+            accountConsent: { accepted: medicalHistoryConsentAccepted },
+          }
+        );
+        const consentMessage = getConsentSaveMessage(outcome);
+        if (consentMessage) {
+          setSaveMessage(consentMessage);
+        } else if (outcome.saved) {
           if (outcome.localOnly) {
             const offline = typeof navigator !== "undefined" && !navigator.onLine;
             setSaveMessage(
@@ -805,126 +903,35 @@ function CheckPage() {
     ? "edit"
     : "upload";
 
-  const handleFileSelection = (file) => {
-    if (!file) {
-      return;
-    }
-    const validation = validateUploadFile(file);
-    if (!validation.ok) {
-      setError(validation.error);
-      setSelectedFile(null);
-      return;
-    }
-    setError("");
-    if (documentMode !== "combined") {
-      setResult(null);
-      setScanMeta(null);
-      setEditableItems([]);
-      setHospitalNameEdit("");
-    }
-    setSelectedFile(file);
-  };
+  const applyBundleExtraction = (merged) => {
+    bundleSourceDocumentsRef.current = merged.sourceDocuments || [];
 
-  const handlePrescriptionFileSelection = (file) => {
-    if (!file) {
-      setSelectedPrescriptionFile(null);
-      return;
-    }
-    const validation = validateUploadFile(file);
-    if (!validation.ok) {
-      setError(validation.error);
-      setSelectedPrescriptionFile(null);
-      return;
-    }
-    setError("");
-    if (documentMode !== "combined") {
-      setResult(null);
-      setPrescriptionMeta(null);
-      setPrescriptionMedicines([]);
-      setPrescriptionTests([]);
-      setPrescriptionProcedures([]);
-      setDiagnosis("");
-      setDiagnosisUserProvided(false);
-      setClinicalStep(null);
-      setClinicalContext(emptyClinicalContext());
-    }
-    setSelectedPrescriptionFile(file);
-    if (documentMode === "prescription" && selectedPatient) {
-      void handleAnalyzePrescription(file);
-    } else if (documentMode === "prescription" && !selectedPatient) {
-      setError("Select or add a patient first, then upload your prescription.");
-      setBillStep("patient");
-    }
-  };
+    setClinicalContext(merged.clinicalContext || emptyClinicalContext());
 
-  const applyPrescriptionPayload = (payload, userProvidedDiagnosis = false) => {
-    const normalized = normalizePrescriptionPayload(payload);
-    setPrescriptionMeta({
-      filename: payload.filename,
-      file_type: payload.file_type,
-      prescriber: normalized.prescriber,
-      prescriptionDate: normalized.prescriptionDate,
-      ocr_text: payload.ocr_text || "",
-    });
-    setPrescriptionMedicines(normalized.medicines.filter((item) => item.name));
-    setPrescriptionTests(normalized.tests.filter((item) => item.name));
-    setPrescriptionProcedures(normalized.procedures.filter((item) => item.name));
-    setClinicalContext((current) =>
-      mergeClinicalContext(current, normalized.clinicalContext)
-    );
-    if (normalized.diagnosis) {
-      setDiagnosis(normalized.diagnosis);
-      setDiagnosisUserProvided(userProvidedDiagnosis);
-    } else {
-      setDiagnosis("");
-      setDiagnosisUserProvided(false);
-    }
-  };
-
-  const routeAfterPrescriptionUpload = async (payload) => {
-    const normalized = normalizePrescriptionPayload(payload);
-    const medicines = normalized.medicines.filter((item) => item.name);
-    const tests = normalized.tests.filter((item) => item.name);
-    const procedures = normalized.procedures.filter((item) => item.name);
-    const hasItems = medicines.length || tests.length || procedures.length;
-
-    if (!hasItems) {
-      setClinicalStep(null);
-      setError(
-        "No medicines, tests, or procedures were detected. Add them manually on the next screen, then run the treatment appropriateness check."
+    if (
+      merged.medicines?.length ||
+      merged.tests?.length ||
+      merged.procedures?.length
+    ) {
+      setPrescriptionMeta(merged.prescriptionMeta);
+      setPrescriptionMedicines(
+        (merged.medicines || []).filter((item) => item.name)
       );
-      return;
+      setPrescriptionTests((merged.tests || []).filter((item) => item.name));
+      setPrescriptionProcedures(
+        (merged.procedures || []).filter((item) => item.name)
+      );
+      if (merged.diagnosis) {
+        setDiagnosis(merged.diagnosis);
+        setDiagnosisUserProvided(false);
+      }
     }
 
-    setPatientInfo(
-      `Extracted ${medicines.length} medicine(s), ${tests.length} test(s), and ${procedures.length} procedure(s) from your prescription.`
-    );
-
-    const resolvedDiagnosis = normalized.diagnosis.trim();
-    if (documentMode === "combined") {
-      setClinicalStep("clinical");
-      return;
+    if (merged.lineItems?.length) {
+      setScanMeta(merged.scanMeta);
+      setHospitalNameEdit(merged.scanMeta?.hospital?.name_from_bill ?? "");
+      setEditableItems(merged.lineItems.map(normalizeLineItem));
     }
-
-    if (resolvedDiagnosis) {
-      setClinicalStep(null);
-      await runPrescriptionAnalysis(resolvedDiagnosis, false, {
-        medicines,
-        tests,
-        procedures,
-        meta: {
-          filename: payload.filename,
-          file_type: payload.file_type,
-          prescriber: normalized.prescriber,
-          prescriptionDate: normalized.prescriptionDate,
-          ocr_text: payload.ocr_text || "",
-        },
-        clinicalContext: normalized.clinicalContext,
-      });
-      return;
-    }
-
-    setClinicalStep("diagnosis");
   };
 
   const buildPrescriptionRequestItems = () => ({
@@ -937,10 +944,26 @@ function CheckPage() {
     if (!user || !selectedPatient) {
       return;
     }
-    const outcome = await saveReportToAccount(user.uid, selectedPatient, {
-      ...payload,
-      report_kind: payload.report_kind || "prescription",
-    });
+    const reportKind =
+      bundleSourceDocumentsRef.current.length > 1
+        ? "bundle"
+        : payload.report_kind || "prescription";
+    const outcome = await saveReportToAccount(
+      user.uid,
+      selectedPatient,
+      {
+        ...payload,
+        ...buildBundleReportMeta(reportKind),
+      },
+      {
+        accountConsent: { accepted: medicalHistoryConsentAccepted },
+      }
+    );
+    const consentMessage = getConsentSaveMessage(outcome);
+    if (consentMessage) {
+      setSaveMessage(consentMessage);
+      return;
+    }
     if (!outcome.saved) {
       return;
     }
@@ -959,6 +982,9 @@ function CheckPage() {
     setScanMeta(null);
     setEditableItems([]);
     setHospitalNameEdit("");
+    setBundleDocuments([]);
+    bundleSessionRef.current = createBundleSession();
+    bundleSourceDocumentsRef.current = [];
     setPrescriptionMeta(null);
     setPrescriptionMedicines([]);
     setPrescriptionTests([]);
@@ -973,12 +999,18 @@ function CheckPage() {
 
   const handleClinicalContinue = () => {
     setError("");
-    if (!diagnosis.trim()) {
+    const rxItems = buildPrescriptionRequestItems();
+    const hasRx =
+      rxItems.medicines.length ||
+      rxItems.tests.length ||
+      rxItems.procedures.length;
+
+    if (hasRx && !diagnosis.trim()) {
       setClinicalStep("diagnosis");
       return;
     }
     setClinicalStep(null);
-    if (documentMode === "prescription") {
+    if (!editableItems.length && hasRx) {
       void runPrescriptionAnalysis(diagnosis.trim(), diagnosisUserProvided);
     }
   };
@@ -994,6 +1026,7 @@ function CheckPage() {
     setScanMeta(null);
     setDiagnosis("");
     setDiagnosisUserProvided(false);
+    setResult(null);
     setError("");
   };
 
@@ -1115,50 +1148,20 @@ function CheckPage() {
     void runPrescriptionAnalysis(value.trim(), true);
   };
 
-  const handleAnalyzePrescription = async (fileOverride = null) => {
-    const file =
-      fileOverride instanceof File ? fileOverride : selectedPrescriptionFile;
-    if (!selectedPatient) {
-      setError("Save a patient profile before uploading a prescription.");
-      setBillStep("patient");
-      return;
-    }
-    if (!file) {
-      setError("Please select your prescription first.");
-      return;
-    }
-    setError("");
-    setPatientInfo("");
-    setIsLoading(true);
-    setResult(null);
-    try {
-      const payload = await uploadPrescription(file);
-      setLoadingProgress(100);
-      applyPrescriptionPayload(payload);
-      await routeAfterPrescriptionUpload(payload);
-    } catch (err) {
-      setError(formatFetchError(err, "Something went wrong during analysis."));
-    } finally {
-      setTimeout(() => setIsLoading(false), 250);
-    }
-  };
-
-  const handleAnalyzeCombined = async () => {
+  const handleAnalyzeBundle = async () => {
     if (!selectedPatient) {
       setError("Save a patient profile before uploading documents.");
       setBillStep("patient");
       return;
     }
-    if (!selectedFile) {
-      setError("Please select your hospital bill first.");
+    if (!bundleDocuments.length) {
+      setError("Please add at least one document.");
       return;
     }
-    if (!selectedPrescriptionFile) {
-      setError("Please select your prescription as well.");
-      return;
-    }
-    if (!stateUtName || !city) {
-      setError("Please select the state/UT and city where the hospital is located.");
+    if (bundleHasBills(bundleDocuments) && (!stateUtName || !city)) {
+      setError(
+        "Please select the state/UT and city where the hospital is located."
+      );
       return;
     }
     setError("");
@@ -1166,36 +1169,40 @@ function CheckPage() {
     setResult(null);
     setScanMeta(null);
     setEditableItems([]);
+    setPrescriptionMeta(null);
+    setPrescriptionMedicines([]);
+    setPrescriptionTests([]);
+    setPrescriptionProcedures([]);
+    setDiagnosis("");
+    setDiagnosisUserProvided(false);
+    setClinicalContext(emptyClinicalContext());
     try {
-      const billFormData = new FormData();
-      billFormData.append("file", selectedFile);
-      const params = new URLSearchParams({
-        state_ut_name: stateUtName,
+      const merged = await processDocumentBundle(bundleDocuments, {
+        state: stateUtName,
         city,
-        hospital_type: hospitalType,
+        hospitalType,
       });
-      const [billResponse, prescriptionPayload] = await Promise.all([
-        fetchBackend(`${getApiBase()}/upload-bill?${params}`, {
-          method: "POST",
-          body: billFormData,
-        }).then((response) => parseJsonResponse(response)),
-        uploadPrescription(selectedPrescriptionFile),
-      ]);
       setLoadingProgress(100);
-      const items = (billResponse.line_items ?? []).map(normalizeLineItem);
-      if (!items.length) {
-        throw new Error("No line items were found on this bill.");
+      applyBundleExtraction(merged);
+
+      const hasExtractedContent =
+        merged.lineItems?.length ||
+        merged.medicines?.length ||
+        merged.tests?.length ||
+        merged.procedures?.length ||
+        merged.clinicalContext?.symptoms?.length ||
+        merged.clinicalContext?.test_results?.length;
+
+      if (!hasExtractedContent) {
+        throw new Error(
+          "No bill items, prescription details, or clinical data were found in these documents."
+        );
       }
-      setScanMeta({
-        filename: billResponse.filename,
-        file_type: billResponse.file_type,
-        hospital: billResponse.hospital,
-        comparison_settings: billResponse.comparison_settings,
-        ocr_text: billResponse.ocr_text || "",
-      });
-      setHospitalNameEdit(billResponse.hospital?.name_from_bill ?? "");
-      setEditableItems(items);
-      applyPrescriptionPayload(prescriptionPayload);
+
+      const docCount = bundleDocuments.length;
+      setPatientInfo(
+        `Processed ${docCount} document${docCount === 1 ? "" : "s"}. Review clinical details on the next step.`
+      );
       setClinicalStep("clinical");
     } catch (err) {
       setError(formatFetchError(err, "Something went wrong during analysis."));
@@ -1218,17 +1225,13 @@ function CheckPage() {
           <h1>
             {billStep === "patient"
               ? "Set up patient"
-              : documentMode === "prescription"
-              ? "Upload your prescription"
-              : "Upload bill and prescription"}
+              : "Upload your documents"}
           </h1>
           <p>
             {billStep === "patient"
               ? "Add or select a patient before uploading documents."
               : selectedPatient
-              ? documentMode === "prescription"
-                ? `Checking prescription for ${selectedPatient.name}.`
-                : `Checking documents for ${selectedPatient.name}.`
+              ? `Checking documents for ${selectedPatient.name}. Add bills, prescriptions, lab reports, and more in one session.`
               : "We'll analyze it in seconds."}
           </p>
         </header>
@@ -1272,7 +1275,7 @@ function CheckPage() {
                     className="analyze-btn"
                     onClick={handleContinueWithPatient}
                   >
-                    Continue to upload {documentMode === "prescription" ? "prescription" : "documents"} →
+                    Continue to upload documents →
                   </button>
                 </div>
               )}
@@ -1344,7 +1347,7 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {uiState === "upload" && billStep === "bill" && showBillUploadFlow && (
+          {uiState === "upload" && billStep === "bill" && (
             <motion.section
               key="upload"
               className="upload-card"
@@ -1369,187 +1372,15 @@ function CheckPage() {
                 </div>
               )}
 
-              <div className="document-mode-toggle">
-                {DOCUMENT_MODES.map((mode) => (
-                  <button
-                    key={mode.id}
-                    type="button"
-                    className={`document-mode-btn ${
-                      documentMode === mode.id ? "document-mode-btn-active" : ""
-                    }`}
-                    onClick={() => {
-                      setDocumentMode(mode.id);
-                      setError("");
-                      setResult(null);
-                      setScanMeta(null);
-                      setEditableItems([]);
-                      setSelectedFile(null);
-                      setSelectedPrescriptionFile(null);
-                      setPrescriptionMeta(null);
-                      setPrescriptionMedicines([]);
-                      setPrescriptionTests([]);
-                      setPrescriptionProcedures([]);
-                      setDiagnosis("");
-                      setClinicalStep(null);
-                      setClinicalContext(emptyClinicalContext());
-                    }}
-                  >
-                    {mode.label}
-                  </button>
-                ))}
-              </div>
-
               <p className="comparison-settings-title">Step 2 — Upload documents</p>
+              <p className="comparison-settings-hint">
+                Add all documents for this visit in one session — bills, prescriptions,
+                lab reports, discharge summaries, and more.
+              </p>
 
-              <DragAndDropUpload
-                icon="↑"
-                title="Drop your bill here or click to browse"
-                dragTitle="Drop your bill here"
-                subtitle="Supports PDF, JPG, PNG"
-                file={selectedFile}
-                onFileSelect={handleFileSelection}
-                onValidationError={(message) => {
-                  if (message) {
-                    setError(message);
-                  } else {
-                    setError("");
-                  }
-                }}
-              />
-
-              <p className="comparison-settings-title">Prescription</p>
-              <DragAndDropUpload
-                icon="Rx"
-                title="Drop your prescription here or click to browse"
-                dragTitle="Drop your prescription here"
-                subtitle="Supports PDF, JPG, PNG"
-                file={selectedPrescriptionFile}
-                onFileSelect={handlePrescriptionFileSelection}
-                onValidationError={(message) => {
-                  if (message) {
-                    setError(message);
-                  } else {
-                    setError("");
-                  }
-                }}
-              />
-
-              <div className="comparison-settings">
-                <p className="comparison-settings-title">Hospital location</p>
-                <div className="comparison-settings-grid">
-                  <LocationSearchPicker
-                    label="State/UT"
-                    items={states}
-                    value={stateUtName}
-                    onSelect={setStateUtName}
-                    disabled={!states.length && !locationError}
-                    isLoading={!states.length && !locationError}
-                    loadingLabel="Loading states..."
-                    placeholder="Select state/UT"
-                    emptyLabel={
-                      locationError
-                        ? "Could not load states"
-                        : "No states available"
-                    }
-                  />
-                  <LocationSearchPicker
-                    label="City"
-                    items={cities}
-                    value={city}
-                    onSelect={setCity}
-                    disabled={!stateUtName}
-                    loadingLabel="Loading cities..."
-                    placeholder="Select city"
-                    emptyLabel={
-                      stateUtName
-                        ? "No cities available"
-                        : "Select state/UT first"
-                    }
-                  />
-                </div>
-                <label className="setting-field setting-field-full">
-                  <span>Hospital type</span>
-                  <select
-                    value={hospitalType}
-                    onChange={(event) => setHospitalType(event.target.value)}
-                  >
-                    {HOSPITAL_TYPE_OPTIONS.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <p className="comparison-settings-hint">
-                  Hospital location helps contextualize audit checks on your bill.
-                </p>
-                {locationError && (
-                  <p className="error-text">{locationError}</p>
-                )}
-              </div>
-
-              <button
-                type="button"
-                className="analyze-btn"
-                onClick={handleAnalyzeCombined}
-              >
-                Analyze documents
-              </button>
-              {error && <p className="error-text">{error}</p>}
-            </motion.section>
-          )}
-
-          {uiState === "upload" && showPrescriptionFlow && (
-            <motion.section
-              key="prescription-upload"
-              className="upload-card"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.25 }}
-            >
-              {selectedPatient && (
-                <div className="patient-selected-banner patient-selected-banner-compact">
-                  <p>
-                    Patient: <strong>{selectedPatient.name}</strong> ·{" "}
-                    {selectedPatient.age} yrs
-                  </p>
-                  <button
-                    type="button"
-                    className="bill-editor-secondary patient-change-btn"
-                    onClick={handleChangePatient}
-                  >
-                    Change patient
-                  </button>
-                </div>
-              )}
-
-              <div className="document-mode-toggle">
-                {DOCUMENT_MODES.map((mode) => (
-                  <button
-                    key={mode.id}
-                    type="button"
-                    className={`document-mode-btn ${
-                      documentMode === mode.id ? "document-mode-btn-active" : ""
-                    }`}
-                    onClick={() => {
-                      setDocumentMode(mode.id);
-                      setError("");
-                    }}
-                  >
-                    {mode.label}
-                  </button>
-                ))}
-              </div>
-
-              <p className="comparison-settings-title">Step 2 — Upload prescription</p>
-              <DragAndDropUpload
-                icon="Rx"
-                title="Drop your prescription here or click to browse"
-                dragTitle="Drop your prescription here"
-                subtitle="Upload starts automatically after you choose a file"
-                file={selectedPrescriptionFile}
-                onFileSelect={handlePrescriptionFileSelection}
+              <MultiDocumentUpload
+                documents={bundleDocuments}
+                onChange={setBundleDocuments}
                 disabled={isLoading || isComparing}
                 onValidationError={(message) => {
                   if (message) {
@@ -1560,21 +1391,71 @@ function CheckPage() {
                 }}
               />
 
-              {patientInfo && (
-                <p className="auth-info">{patientInfo}</p>
+              {bundleHasBills(bundleDocuments) && (
+                <div className="comparison-settings">
+                  <p className="comparison-settings-title">Hospital location</p>
+                  <div className="comparison-settings-grid">
+                    <LocationSearchPicker
+                      label="State/UT"
+                      items={states}
+                      value={stateUtName}
+                      onSelect={setStateUtName}
+                      disabled={!states.length && !locationError}
+                      isLoading={!states.length && !locationError}
+                      loadingLabel="Loading states..."
+                      placeholder="Select state/UT"
+                      emptyLabel={
+                        locationError
+                          ? "Could not load states"
+                          : "No states available"
+                      }
+                    />
+                    <LocationSearchPicker
+                      label="City"
+                      items={cities}
+                      value={city}
+                      onSelect={setCity}
+                      disabled={!stateUtName}
+                      loadingLabel="Loading cities..."
+                      placeholder="Select city"
+                      emptyLabel={
+                        stateUtName
+                          ? "No cities available"
+                          : "Select state/UT first"
+                      }
+                    />
+                  </div>
+                  <label className="setting-field setting-field-full">
+                    <span>Hospital type</span>
+                    <select
+                      value={hospitalType}
+                      onChange={(event) => setHospitalType(event.target.value)}
+                    >
+                      {HOSPITAL_TYPE_OPTIONS.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <p className="comparison-settings-hint">
+                    Hospital location helps contextualize audit checks on your bill.
+                  </p>
+                  {locationError && (
+                    <p className="error-text">{locationError}</p>
+                  )}
+                </div>
               )}
+
+              {patientInfo && <p className="auth-info">{patientInfo}</p>}
 
               <button
                 type="button"
                 className="analyze-btn"
-                onClick={() => handleAnalyzePrescription()}
-                disabled={isLoading || isComparing || !selectedPrescriptionFile}
+                onClick={handleAnalyzeBundle}
+                disabled={isLoading || isComparing || !bundleDocuments.length}
               >
-                {isLoading
-                  ? "Reading prescription..."
-                  : isComparing
-                  ? "Checking guidelines..."
-                  : "Analyze Prescription"}
+                {isLoading ? "Processing documents..." : "Analyze documents"}
               </button>
               {error && <p className="error-text">{error}</p>}
             </motion.section>
@@ -1593,7 +1474,7 @@ function CheckPage() {
                 onChange={setClinicalContext}
                 onContinue={handleClinicalContinue}
                 continueLabel={
-                  documentMode === "prescription"
+                  !editableItems.length && hasPrescriptionItems
                     ? "Check treatment appropriateness"
                     : "Continue"
                 }
@@ -1603,11 +1484,7 @@ function CheckPage() {
                     setDiagnosisUserProvided(false);
                   }
                 }}
-                onBack={
-                  documentMode === "combined" || editableItems.length
-                    ? handleClinicalBack
-                    : null
-                }
+                onBack={handleClinicalBack}
                 error={error}
               />
             </motion.section>
@@ -1633,8 +1510,7 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {(uiState === "loading" || uiState === "comparing") &&
-            (showBillFlow || showPrescriptionFlow) && (
+          {(uiState === "loading" || uiState === "comparing") && (
             <motion.section
               key={uiState === "comparing" ? "comparing" : "loading"}
               className="loading-card"
@@ -1646,7 +1522,7 @@ function CheckPage() {
               <div className="spinner-conic" aria-hidden="true" />
               <p className="loading-message">
                 {uiState === "comparing"
-                  ? documentMode === "prescription"
+                  ? showPrescriptionFlow
                     ? "Checking against treatment guidelines..."
                     : comparisonCopy.loading
                   : activeLoadingMessages[loadingMessageIndex]}
@@ -2056,6 +1932,14 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/consent/medical-history"
+          element={
+            <ProtectedRoute>
+              <MedicalHistoryConsentPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/history"
           element={
             <ProtectedRoute>
@@ -2085,7 +1969,9 @@ export default function App() {
           <AppBackground />
           <div className="app-content">
             <TermsGate>
-              <AppRoutes />
+              <MedicalHistoryConsentGate>
+                <AppRoutes />
+              </MedicalHistoryConsentGate>
             </TermsGate>
           </div>
         </div>

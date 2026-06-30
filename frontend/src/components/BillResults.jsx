@@ -50,7 +50,7 @@ export default function BillResults({ result, toolbar = null }) {
               {result.jan_aushadhi?.scheme_name ||
                 "Pradhan Mantri Bhartiya Janaushadhi Pariyojana (PMBJP)"}
             </strong>{" "}
-            (Jan Aushadhi scheme).
+            (Jan Aushadhi).
           </p>
           <ul className="jan-aushadhi-match-list">
             {janAushadhiMatches.map((match, index) => (

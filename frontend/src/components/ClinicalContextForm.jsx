@@ -1,5 +1,4 @@
 import { useRef, useState } from "react";
-import { uploadClinicalDocument } from "../services/prescriptions";
 
 const SYMPTOM_SUGGESTIONS = [
   "fever",
@@ -45,11 +44,6 @@ export default function ClinicalContextForm({
   error = "",
   continueLabel = "Continue",
 }) {
-  const labInputRef = useRef(null);
-  const dischargeInputRef = useRef(null);
-  const [uploadError, setUploadError] = useState("");
-  const [uploadingType, setUploadingType] = useState("");
-
   const symptoms = clinicalContext?.symptoms || [];
   const testResults = clinicalContext?.test_results || [];
 
@@ -72,80 +66,15 @@ export default function ClinicalContextForm({
     updateSymptoms([...symptoms, { name: normalized, duration: "", severity: "" }]);
   };
 
-  const handleClinicalUpload = async (file, documentType) => {
-    if (!file) {
-      return;
-    }
-    setUploadError("");
-    setUploadingType(documentType);
-    try {
-      const payload = await uploadClinicalDocument(file, documentType);
-      const extracted = payload?.clinical_context || {};
-      const mergedSymptoms = [...symptoms];
-      for (const item of extracted.symptoms || []) {
-        const name = String(item?.name || "").trim();
-        if (!name) {
-          continue;
-        }
-        if (!mergedSymptoms.some((s) => s.name?.toLowerCase() === name.toLowerCase())) {
-          mergedSymptoms.push({
-            name,
-            duration: item.duration || "",
-            severity: item.severity || "",
-          });
-        }
-      }
-      const mergedTests = [...testResults];
-      for (const item of extracted.test_results || []) {
-        const testName = String(item?.test_name || "").trim();
-        if (!testName) {
-          continue;
-        }
-        const existingIndex = mergedTests.findIndex(
-          (entry) => entry.test_name?.toLowerCase() === testName.toLowerCase()
-        );
-        const normalized = {
-          test_name: testName,
-          value: item.value || "",
-          unit: item.unit || "",
-          result: item.result || "",
-          reference_range: item.reference_range || "",
-        };
-        if (existingIndex >= 0) {
-          mergedTests[existingIndex] = normalized;
-        } else {
-          mergedTests.push(normalized);
-        }
-      }
-      onChange({
-        ...clinicalContext,
-        symptoms: mergedSymptoms,
-        test_results: mergedTests,
-        symptoms_source: extracted.symptoms?.length
-          ? extracted.symptoms_source || clinicalContext?.symptoms_source
-          : clinicalContext?.symptoms_source,
-        test_results_source: extracted.test_results?.length
-          ? extracted.test_results_source || clinicalContext?.test_results_source
-          : clinicalContext?.test_results_source,
-      });
-      if (payload?.diagnosis && onDiagnosisExtracted) {
-        onDiagnosisExtracted(String(payload.diagnosis).trim());
-      }
-    } catch (err) {
-      setUploadError(err.message || "Could not extract clinical document.");
-    } finally {
-      setUploadingType("");
-    }
-  };
-
   return (
     <section className="bill-editor-shell clinical-context-shell">
       <header className="bill-editor-header">
         <div>
           <h2>Clinical context</h2>
           <p>
-            Add symptoms and test results to check whether the diagnosis and
-            treatment match Standard Treatment Guidelines.
+            Review symptoms and test results extracted from your documents, or add
+            them manually to check whether diagnosis and treatment match Standard
+            Treatment Guidelines.
           </p>
         </div>
       </header>
@@ -322,55 +251,6 @@ export default function ClinicalContextForm({
         >
           + Add test result
         </button>
-      </div>
-
-      <div className="clinical-section">
-        <h3>Optional documents</h3>
-        <p className="comparison-settings-hint">
-          Upload a lab report or discharge summary to pre-fill test results and
-          symptoms. You can edit everything before analysis.
-        </p>
-        <div className="clinical-upload-row">
-          <button
-            type="button"
-            className="bill-editor-secondary"
-            disabled={Boolean(uploadingType)}
-            onClick={() => labInputRef.current?.click()}
-          >
-            {uploadingType === "lab_report" ? "Uploading lab report…" : "Upload lab report"}
-          </button>
-          <button
-            type="button"
-            className="bill-editor-secondary"
-            disabled={Boolean(uploadingType)}
-            onClick={() => dischargeInputRef.current?.click()}
-          >
-            {uploadingType === "discharge_summary"
-              ? "Uploading discharge summary…"
-              : "Upload discharge summary"}
-          </button>
-        </div>
-        <input
-          ref={labInputRef}
-          className="hidden-input"
-          type="file"
-          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-          onChange={(event) => {
-            handleClinicalUpload(event.target.files?.[0], "lab_report");
-            event.target.value = "";
-          }}
-        />
-        <input
-          ref={dischargeInputRef}
-          className="hidden-input"
-          type="file"
-          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-          onChange={(event) => {
-            handleClinicalUpload(event.target.files?.[0], "discharge_summary");
-            event.target.value = "";
-          }}
-        />
-        {uploadError && <p className="error-text">{uploadError}</p>}
       </div>
 
       <div className="bill-editor-actions">
