@@ -1,4 +1,4 @@
-"""Unified report PDF endpoints for all comparison schemes."""
+"""Unified report PDF endpoints."""
 
 from __future__ import annotations
 
@@ -19,11 +19,7 @@ router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 @router.post("/render-pdf")
 def render_pdf(report: dict[str, Any] = Body(...)) -> Response:
-    """Render a PDF from a report object supplied by the client.
-
-    Works for any registered comparison scheme (CGHS, PM-JAY HBP, Aarogya
-    Bhadratha, and future schemes) using the full report stored in bill history.
-    """
+    """Render a PDF from a report object supplied by the client."""
     try:
         scheme_id = resolve_scheme_id(report)
         validate_report(report, scheme_id)

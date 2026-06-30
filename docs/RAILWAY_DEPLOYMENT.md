@@ -258,7 +258,7 @@ Install the new APK/AAB on devices. The app probes `/health` to confirm connecti
 
 | Path | In Git? | Notes |
 |------|---------|-------|
-| `backend/data/` reference CSVs (NPPA, locations, Jan Aushadhi) | Yes | Loaded at startup |
+| `backend/data/` reference CSVs (NPPA, locations, Jan Aushadhi, AZ brands) | Yes | Loaded at startup |
 | `backend/data/stg_index/` | Yes | Pre-built Chroma index |
 | `backend/data/primary_guidelines_index/` | Yes | Pre-built Chroma index |
 | FastEmbed ONNX models | No | Prefetched during Docker build |
@@ -275,7 +275,6 @@ Install the new APK/AAB on devices. The app probes `/health` to confirm connecti
 | `/analyze-treatment` 503 | Indexes missing from image | Ensure indexes are committed and copied in Docker build |
 | CORS error from browser | Origin not allowed | Add origin to `CORS_ORIGINS` on Railway |
 | 502 on startup | CSV/index load slow | Health check timeout is 120s in `railway.json`; check deploy logs |
-| Aarogya report 404 after restart | Report cache ephemeral | Re-run analysis or add Railway Volume later |
 
 View logs: Railway dashboard → service → **Deployments** → **View Logs**.
 

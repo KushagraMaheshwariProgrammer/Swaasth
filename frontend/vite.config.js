@@ -20,7 +20,6 @@ export default defineConfig({
       "/upload-prescription": proxyCommon,
       "/upload-clinical-document": proxyCommon,
       "/analyze-treatment": proxyCommon,
-      "/cghs": proxyCommon,
       "/health": proxyCommon,
     },
   },

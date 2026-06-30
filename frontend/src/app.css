@@ -1047,11 +1047,6 @@ body.capacitor-native .landing-hero {
   margin-bottom: 0.35rem;
 }
 
-.tier-detected {
-  margin: 0.65rem 0 0;
-  font-size: 0.86rem;
-  color: var(--primary-dark);
-}
 
 .patient-card-shell {
   padding: 1.25rem 1.35rem;
