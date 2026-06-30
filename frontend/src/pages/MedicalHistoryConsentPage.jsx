@@ -105,9 +105,9 @@ export default function MedicalHistoryConsentPage() {
         </header>
 
         {medicalHistoryConsentLoading ? (
-          <p className="auth-info">Loading your consent status...</p>
+          <p className="auth-info consent-status-banner">Loading your consent status...</p>
         ) : (
-          <p className="auth-info">
+          <p className="auth-info consent-status-banner">
             Status:{" "}
             <strong>
               {medicalHistoryConsentAccepted
@@ -164,10 +164,9 @@ export default function MedicalHistoryConsentPage() {
           {medicalHistoryConsentAccepted && (
             <button
               type="button"
-              className="bill-editor-secondary"
+              className="bill-editor-secondary consent-revoke-btn"
               onClick={handleRevoke}
               disabled={submitting}
-              style={{ marginTop: "1rem" }}
             >
               Reset consent choice
             </button>

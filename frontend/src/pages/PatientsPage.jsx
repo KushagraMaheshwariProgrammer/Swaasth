@@ -363,7 +363,7 @@ export default function PatientsPage() {
             {selectedPatient && (
               <>
                 <header className="check-header patient-detail-header">
-                  <div>
+                  <div className="patient-detail-identity">
                     <h1>{selectedPatient.name}</h1>
                     <p>
                       {selectedPatient.age} yrs · {genderLabel(selectedPatient.gender)}

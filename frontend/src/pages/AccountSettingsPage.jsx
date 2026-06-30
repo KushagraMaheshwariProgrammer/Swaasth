@@ -202,7 +202,7 @@ export default function AccountSettingsPage() {
             Control whether analysis reports are saved to your account and view the consent
             details.
           </p>
-          <Link to="/consent/medical-history" className="analyze-btn auth-submit-btn">
+          <Link to="/consent/medical-history" className="analyze-btn account-section-action">
             Medical history consent
           </Link>
         </section>
