@@ -52,6 +52,19 @@ ANTIBIOTIC_MARKERS = (
 )
 TYPHOID_MARKERS = ("typhoid", "enteric fever", "salmonella typhi")
 TYPHOID_TEST_MARKERS = ("widal", "typhidot", "blood culture", "salmonella")
+UTI_MARKERS = ("uti", "urinary tract infection", "cystitis")
+ADVANCED_IMAGING_MARKERS = ("ct", "mri", "computed tomography", "magnetic resonance")
+DIABETES_MARKERS = ("diabetes", "diabetic", "type 2 diabetes", "type ii diabetes")
+INFECTION_MARKERS = (
+    "infection",
+    "sepsis",
+    "cellulitis",
+    "pneumonia",
+    "abscess",
+    "urinary tract infection",
+    "uti",
+)
+GLUCOSE_TEST_MARKERS = ("glucose", "sugar", "hba1c", "ketone")
 
 
 def _normalize_name(text: str) -> str:
@@ -259,7 +272,61 @@ def _rule_based_clinical_flags(
                 )
                 break
 
+    if any(marker in diagnosis_norm for marker in UTI_MARKERS):
+        for item_name in rx_names:
+            item_norm = _normalize_name(item_name)
+            if not any(marker in item_norm for marker in ADVANCED_IMAGING_MARKERS):
+                continue
+            flags.append(
+                {
+                    "type": "EXCESSIVE_WORKUP",
+                    "severity": "MEDIUM",
+                    "item": item_name,
+                    "category": "investigation",
+                    "reason": (
+                        f"'{item_name}' is listed for '{diagnosis}', but advanced imaging "
+                        "is usually a clarification point unless complicated UTI features "
+                        "are documented."
+                    ),
+                    "recommendation": (
+                        "Ask whether complicated UTI features, obstruction, stone, recurrent "
+                        "infection, or another reason makes this imaging necessary."
+                    ),
+                    "stg_reference": None,
+                }
+            )
+            break
+
     if filtered_history and rx_names:
+        allergies = [
+            str(item.get("name") or "").strip()
+            for item in (filtered_history.get("profile") or {}).get("allergies") or []
+            if str(item.get("name") or "").strip()
+        ]
+        for allergy in allergies:
+            allergy_norm = _normalize_name(allergy)
+            for rx_name in rx_names:
+                rx_norm = _normalize_name(rx_name)
+                if allergy_norm and (allergy_norm in rx_norm or _similarity(allergy_norm, rx_norm) >= 0.76):
+                    flags.append(
+                        {
+                            "type": "PRESCRIPTION_CLINICAL_MISMATCH",
+                            "severity": "HIGH",
+                            "item": rx_name,
+                            "category": "prescription",
+                            "reason": (
+                                f"The patient history lists allergy to '{allergy}', while "
+                                f"'{rx_name}' appears in the current medicines."
+                            ),
+                            "recommendation": (
+                                "Ask the clinician or pharmacist to verify the allergy history "
+                                "before using this medicine."
+                            ),
+                            "stg_reference": None,
+                        }
+                    )
+                    break
+
         prior_medicines: list[str] = []
         for report in filtered_history.get("prior_reports") or []:
             if isinstance(report, dict):
@@ -295,6 +362,49 @@ def _rule_based_clinical_flags(
                         }
                     )
                     break
+
+        history_conditions = [
+            str(item.get("name") or "").strip()
+            for item in (filtered_history.get("profile") or {}).get("conditions") or []
+            if str(item.get("name") or "").strip()
+        ]
+        has_diabetes_history = any(
+            any(marker in _normalize_name(condition) for marker in DIABETES_MARKERS)
+            for condition in history_conditions
+        )
+        has_infection_context = any(marker in diagnosis_norm for marker in INFECTION_MARKERS)
+        if has_diabetes_history and has_infection_context:
+            current_test_names = [
+                _normalize_name(str(result.get("test_name") or "")) for result in results
+            ]
+            rx_test_names = [
+                _normalize_name(name)
+                for name in rx_names
+                if any(token in _normalize_name(name) for token in {"test", "glucose", "sugar", "hba1c"})
+            ]
+            has_glucose_review = any(
+                any(marker in name for marker in GLUCOSE_TEST_MARKERS)
+                for name in [*current_test_names, *rx_test_names]
+            )
+            if not has_glucose_review:
+                flags.append(
+                    {
+                        "type": "MISSING_REQUIRED_INVESTIGATION",
+                        "severity": "MEDIUM",
+                        "item": "Blood glucose review",
+                        "category": "investigation",
+                        "reason": (
+                            "The relevant patient history includes diabetes, and the current "
+                            f"diagnosis is '{diagnosis}', but no glucose or HbA1c review is "
+                            "visible in the uploaded data."
+                        ),
+                        "recommendation": (
+                            "Ask whether blood glucose monitoring is needed during this infection "
+                            "or acute illness episode."
+                        ),
+                        "stg_reference": None,
+                    }
+                )
 
     return flags
 

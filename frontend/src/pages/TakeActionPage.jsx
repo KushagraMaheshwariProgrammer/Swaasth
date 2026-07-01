@@ -4,7 +4,9 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import ActionConsentModal from "../components/ActionConsentModal";
 import ActionItemsList from "../components/ActionItemsList";
 import ComplaintTemplates from "../components/ComplaintTemplates";
+import CombinedNarrative from "../components/CombinedNarrative";
 import DischargeGuidance from "../components/DischargeGuidance";
+import DisputeTimelineReminders from "../components/DisputeTimelineReminders";
 import EscalationLadder from "../components/EscalationLadder";
 import RecoverableSummary from "../components/RecoverableSummary";
 import { resolveActionPlan } from "../actionPlanUtils";
@@ -197,6 +199,7 @@ export default function TakeActionPage() {
               </p>
             )}
 
+            <CombinedNarrative narrative={actionPlan.combined_narrative} />
             <DischargeGuidance
               dischargeGuidance={actionPlan.discharge_guidance}
             />
@@ -205,6 +208,7 @@ export default function TakeActionPage() {
             />
             <ActionItemsList actionItems={actionPlan.action_items} />
             <EscalationLadder escalationLadder={actionPlan.escalation_ladder} />
+            <DisputeTimelineReminders />
             <ComplaintTemplates
               complaintTemplates={actionPlan.complaint_templates}
             />

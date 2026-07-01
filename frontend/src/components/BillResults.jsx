@@ -15,6 +15,7 @@ import {
 } from "../auditAdvocacyUtils";
 import AdvocacyScopeSection from "./AdvocacyScopeSection";
 import ClinicalHistoryUsedPanel from "./ClinicalHistoryUsedPanel";
+import CombinedNarrative from "./CombinedNarrative";
 import PatientQuestionsSection from "./PatientQuestionsSection";
 import ReportActions from "./ReportActions";
 import TreatmentAuditSection from "./TreatmentAuditSection";
@@ -214,6 +215,7 @@ export default function BillResults({ result, toolbar = null }) {
       )}
 
       <PatientQuestionsSection report={result} />
+      <CombinedNarrative narrative={result?.action_plan?.combined_narrative} />
 
       <section className="audit-section">
         <div className="audit-section-header">

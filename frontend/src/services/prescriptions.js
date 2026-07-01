@@ -110,6 +110,15 @@ export async function uploadClinicalDocument(file, documentType) {
   });
 }
 
+export async function uploadPreauthDocument(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  return fetchJson(`${getApiBase()}/upload-preauth`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
 export async function fetchStgConditions() {
   const payload = await fetchJson(`${getApiBase()}/api/stg/conditions`);
   return payload?.conditions || [];

@@ -111,6 +111,19 @@ def extract_discharge_summary_with_groq(extracted_text: str) -> dict[str, Any]:
     return _groq_chat(system, user)
 
 
+def extract_preauth_with_groq(extracted_text: str) -> dict[str, Any]:
+    system = (
+        "You are helping extract insurance or government-scheme pre-authorization "
+        "details for Indian patients. Return ONLY valid JSON with keys: "
+        "is_preauth, error, authorization_id, insurer_or_scheme, hospital_name, "
+        "patient_name, approved_amount, package_name, approved_items. "
+        "approved_items is an array of {name, approved_amount, notes}. "
+        "Keep approved_amount numeric when visible; otherwise null."
+    )
+    user = f"Pre-authorization or claim approval text:\n{extracted_text}"
+    return _groq_chat(system, user)
+
+
 VALID_TEST_RESULTS = {
     "positive",
     "negative",

@@ -44,6 +44,51 @@ def test_rule_based_clinical_flags_malaria_negative_rdt() -> None:
     assert flags[0]["category"] == "diagnosis"
 
 
+def test_rule_based_clinical_flags_uti_advanced_imaging_prompt() -> None:
+    flags = _rule_based_clinical_flags(
+        "Urinary tract infection",
+        {"test_results": []},
+        prescription_items=[{"name": "CT KUB", "category": "test"}],
+    )
+    assert any(flag["type"] == "EXCESSIVE_WORKUP" for flag in flags)
+
+
+def test_rule_based_clinical_flags_allergy_medicine_history() -> None:
+    flags = _rule_based_clinical_flags(
+        "Fever",
+        {"test_results": []},
+        prescription_items=[{"name": "Penicillin", "category": "medicine"}],
+        filtered_history={
+            "profile": {
+                "conditions": [],
+                "surgeries": [],
+                "allergies": [{"name": "Penicillin"}],
+            },
+            "prior_reports": [],
+            "legacy_documents": [],
+        },
+    )
+    assert any(flag["type"] == "PRESCRIPTION_CLINICAL_MISMATCH" for flag in flags)
+
+
+def test_rule_based_clinical_flags_diabetes_infection_glucose_prompt() -> None:
+    flags = _rule_based_clinical_flags(
+        "Cellulitis infection",
+        {"test_results": [{"test_name": "CBC", "result": "high"}]},
+        prescription_items=[{"name": "Amoxicillin", "category": "medicine"}],
+        filtered_history={
+            "profile": {
+                "conditions": [{"name": "Type 2 diabetes"}],
+                "surgeries": [],
+                "allergies": [],
+            },
+            "prior_reports": [],
+            "legacy_documents": [],
+        },
+    )
+    assert any(flag["item"] == "Blood glucose review" for flag in flags)
+
+
 def test_polish_user_facing_text_rewrites_generic_stg_recommendation() -> None:
     polished = _polish_user_facing_text(
         "Review and revise prescription according to STG guidelines"

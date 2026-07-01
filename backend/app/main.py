@@ -23,11 +23,13 @@ from app.services.document_extraction import (
     extract_bill_with_groq,
     extract_document_text,
     extract_json_from_text,
+    extract_preauth_with_groq,
     normalize_clinical_context,
 )
 from app.restricted_medicines import build_restricted_medicine_flags, get_restricted_medicines_store
 from app.services.action_plan import build_action_plan
 from app.services.audit_advocacy import ADVOCACY_SCOPE_CHECKED, ADVOCACY_SCOPE_NOT_CHECKED, merge_patient_questions
+from app.services.preauth_audit import analyze_preauth_mismatches
 from app.services.treatment_audit import analyze_treatment
 
 
@@ -356,6 +358,7 @@ class CompareBillRequest(BaseModel):
     prescription_procedures: list[PrescriptionItemInput] = Field(default_factory=list)
     symptoms: list[SymptomInput] = Field(default_factory=list)
     test_results: list[TestResultInput] = Field(default_factory=list)
+    preauth_documents: list[dict[str, Any]] = Field(default_factory=list)
     ocr_text: str | None = None
     clinical_history: dict[str, Any] | None = None
 
@@ -458,6 +461,7 @@ def _build_comparison_response(
     diagnosis_user_provided: bool = False,
     prescription_items: list[dict[str, Any]] | None = None,
     clinical_context: dict[str, Any] | None = None,
+    preauth_documents: list[dict[str, Any]] | None = None,
     report_kind: str = "bill",
     ocr_text: str | None = None,
     clinical_history: dict[str, Any] | None = None,
@@ -478,6 +482,21 @@ def _build_comparison_response(
         compared_line_items,
         city=location_meta.get("city", city),
     )
+    preauth_audit = analyze_preauth_mismatches(
+        line_items=compared_line_items,
+        preauth_documents=preauth_documents or [],
+    )
+    if preauth_audit.get("flags"):
+        audit_flags["flags"] = list(audit_flags.get("flags") or []) + list(
+            preauth_audit.get("flags") or []
+        )
+        audit_flags["flags_count"] = len(audit_flags["flags"])
+        if audit_flags.get("risk_level") == "LOW":
+            audit_flags["risk_level"] = "MEDIUM"
+    if preauth_audit.get("patient_questions"):
+        audit_flags["patient_questions"] = list(
+            audit_flags.get("patient_questions") or []
+        ) + list(preauth_audit.get("patient_questions") or [])
 
     treatment_audit_flags: dict[str, Any] | None = None
     prescription_payload: dict[str, Any] | None = None
@@ -598,6 +617,7 @@ def _build_comparison_response(
         "treatment_audit_flags": treatment_audit_flags,
         "prescription": prescription_payload,
         "clinical_context": clinical_context if clinical_context else None,
+        "preauth_documents": preauth_documents or [],
         "report_kind": report_kind,
         "restricted_medicine_flags": restricted_medicine_flags,
         "patient_questions": patient_questions,
@@ -656,6 +676,7 @@ def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
         diagnosis_user_provided=body.diagnosis_user_provided,
         prescription_items=prescription_items,
         clinical_context=clinical_context,
+        preauth_documents=body.preauth_documents,
         report_kind=report_kind,
         ocr_text=body.ocr_text,
         clinical_history=body.clinical_history,
@@ -761,6 +782,77 @@ async def upload_bill(
             "hospital_type": canonical_hospital_type,
         },
         "line_items": normalized_items,
+        "ocr_text": extracted_text,
+    }
+
+
+@app.post("/upload-preauth")
+async def upload_preauth(file: UploadFile = File(...)) -> dict[str, Any]:
+    allowed_types = {
+        "application/pdf": "pdf",
+        "image/jpeg": "jpeg",
+        "image/png": "png",
+    }
+
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file type. Allowed types: pdf, jpg, jpeg, png.",
+        )
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    file_type = allowed_types[file.content_type]
+    extracted_text = (
+        _extract_text_from_pdf(file_bytes)
+        if file_type == "pdf"
+        else _extract_text_from_image(file_bytes)
+    )
+    if not extracted_text:
+        raise HTTPException(
+            status_code=400,
+            detail="No readable text found in the uploaded file.",
+        )
+
+    payload = extract_preauth_with_groq(extracted_text)
+    if not payload.get("is_preauth"):
+        raise HTTPException(
+            status_code=400,
+            detail=payload.get(
+                "error",
+                "Uploaded document does not appear to be a pre-authorization or claim approval letter.",
+            ),
+        )
+
+    approved_items = []
+    for item in payload.get("approved_items") or []:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        approved_items.append(
+            {
+                "name": name,
+                "approved_amount": item.get("approved_amount"),
+                "notes": str(item.get("notes") or "").strip() or None,
+            }
+        )
+
+    return {
+        "filename": file.filename or "preauth",
+        "file_type": file_type,
+        "document_type": "preauth_letter",
+        "message": "Pre-authorization extracted successfully",
+        "authorization_id": payload.get("authorization_id"),
+        "insurer_or_scheme": payload.get("insurer_or_scheme"),
+        "hospital_name": payload.get("hospital_name"),
+        "patient_name": payload.get("patient_name"),
+        "approved_amount": payload.get("approved_amount"),
+        "package_name": payload.get("package_name"),
+        "approved_items": approved_items,
         "ocr_text": extracted_text,
     }
 

@@ -12,6 +12,8 @@ const TIER_B_TYPES = new Set([
   "UNREALISTIC_REPETITION",
   "LAB_REPETITION",
   "INSUFFICIENT_CLINICAL_DATA",
+  "PREAUTH_AMOUNT_ABOVE_APPROVED",
+  "PREAUTH_ITEM_OUTSIDE_AUTHORIZATION",
 ]);
 
 const LOW_TYPES = new Set([
@@ -19,6 +21,8 @@ const LOW_TYPES = new Set([
   "INSUFFICIENT_CLINICAL_DATA",
   "GUIDELINE_SUPPORT_NOT_IDENTIFIED",
 ]);
+
+const CLINICAL_CATEGORIES = new Set(["diagnosis", "investigation", "prescription"]);
 
 export function getActionTierMeta(tier) {
   if (tier === "A") {
@@ -73,6 +77,13 @@ function fallbackTier(flag, lineItems) {
   });
   if (matched?.flag === "overpriced" && Number(matched.price_difference) > 0) {
     return "A";
+  }
+  if (
+    CLINICAL_CATEGORIES.has(flag.category || "") &&
+    confidence === "HIGH" &&
+    flag.citation_verified !== true
+  ) {
+    return "B";
   }
   if (confidence === "HIGH") {
     return "A";
@@ -156,6 +167,33 @@ function dischargeFromItems(actionItems) {
   };
 }
 
+function buildFallbackNarrative(report, actionItems, recoverable) {
+  const patientName = report?.patient?.name || "the patient";
+  const hospitalName = report?.hospital?.name_from_bill || "the hospital";
+  const topItems = actionItems
+    .filter((item) => item.tier === "A" || item.tier === "B")
+    .slice(0, 3)
+    .map((item) => item.display_label || item.item || item.type);
+  const concernText = topItems.length
+    ? topItems.join(", ")
+    : "the listed clarification points";
+  const amountText =
+    recoverable.total > 0
+      ? ` The reference-rate math suggests about INR ${Math.round(
+          recoverable.total
+        ).toLocaleString("en-IN")} may be worth verifying.`
+      : "";
+  return {
+    summary:
+      `For ${patientName}, Swaasth found ${
+        actionItems.length || "no"
+      } clarification point${actionItems.length === 1 ? "" : "s"} in the documents from ${hospitalName}. ` +
+      `The main points to verify are ${concernText}.${amountText} Use this as a factual summary for discussion; it is not a medical or legal conclusion.`,
+    disclaimer:
+      "This narrative is informational only. Verify facts and consult qualified professionals before acting.",
+  };
+}
+
 export function buildFallbackActionPlan(report) {
   if (report?.action_plan) {
     return report.action_plan;
@@ -199,6 +237,7 @@ export function buildFallbackActionPlan(report) {
           .filter((q) => q.flag_type === item.type || q.item === item.item)
           .map((q) => q.question),
       })),
+    combined_narrative: buildFallbackNarrative(report, actionItems, recoverable),
     disclaimer:
       "Swaasth provides procedural assistance only. Not medical or legal advice.",
     guardrails: { banned_terms_filtered: true },

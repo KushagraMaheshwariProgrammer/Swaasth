@@ -97,6 +97,8 @@ def _is_billing_strength_flag(flag: dict[str, Any]) -> bool:
 
 def _attachments_for(flag: dict[str, Any]) -> list[str]:
     flag_type = str(flag.get("type") or "")
+    if flag_type.startswith("PREAUTH_"):
+        return ["Itemized bill", "Pre-authorization approval", "Claim or policy documents"]
     if flag_type == "MEDICINE_PRICE_DISCREPANCY":
         return list(_MEDICINE_PRICE_ATTACHMENTS)
     if is_billing_flag(flag):
@@ -489,6 +491,75 @@ def _build_evidence_pack_items(
     return items
 
 
+def _build_combined_narrative(
+    *,
+    flags: list[dict[str, Any]],
+    action_items: list[dict[str, Any]],
+    recoverable_estimate: dict[str, Any],
+    patient: dict[str, Any] | None,
+    hospital: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """One-paragraph factual summary for a family member or advocate."""
+    patient_name = str((patient or {}).get("name") or "the patient").strip()
+    hospital_name = str(
+        (hospital or {}).get("name_from_bill") or (hospital or {}).get("name") or "the hospital"
+    ).strip()
+    actionable = [
+        item
+        for item in action_items
+        if item.get("tier") in {"A", "B"} and (item.get("display_label") or item.get("item"))
+    ]
+    top_items = [
+        sanitize_text(
+            str(item.get("display_label") or "Item worth clarifying")
+            + (f" ({item.get('item')})" if item.get("item") else "")
+        )
+        for item in actionable[:3]
+    ]
+    recoverable_total = _to_float(recoverable_estimate.get("total"))
+    clinical_count = sum(
+        1 for flag in flags if str(flag.get("category") or "").lower() != "billing"
+    )
+    billing_count = sum(
+        1 for flag in flags if str(flag.get("category") or "").lower() == "billing"
+    )
+
+    if top_items:
+        concern_text = ", ".join(top_items)
+    elif flags:
+        concern_text = "the listed clarification points"
+    else:
+        concern_text = "the uploaded documents"
+
+    amount_text = (
+        f" The reference-rate math suggests about INR {recoverable_total:,.0f} may be worth verifying."
+        if recoverable_total > 0
+        else ""
+    )
+    context_bits = []
+    if billing_count:
+        context_bits.append(f"{billing_count} billing point{'s' if billing_count != 1 else ''}")
+    if clinical_count:
+        context_bits.append(
+            f"{clinical_count} clinical/STG point{'s' if clinical_count != 1 else ''}"
+        )
+    context_text = ", ".join(context_bits) if context_bits else "no high-priority finding"
+
+    summary = (
+        f"For {patient_name}, Swaasth found {context_text} for review in the documents "
+        f"from {hospital_name}. The main points to verify are {concern_text}.{amount_text} "
+        "Use this as a factual summary for discussion with the hospital, insurer, or an "
+        "appropriate professional; it is not a medical or legal conclusion."
+    )
+    return {
+        "summary": sanitize_text(summary),
+        "disclaimer": (
+            "This narrative is a plain-language summary of app findings only. "
+            "Verify facts and consult qualified professionals before acting."
+        ),
+    }
+
+
 def build_action_plan(
     *,
     flags: list[dict[str, Any]] | None,
@@ -499,7 +570,7 @@ def build_action_plan(
     clinical: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble the full ``action_plan`` block from finalized flags + bill data."""
-    del patient, hospital, clinical  # Reserved for future personalization.
+    del clinical  # Reserved for future personalization.
 
     flag_list = [flag for flag in (flags or []) if isinstance(flag, dict)]
     item_list = list(line_items or [])
@@ -532,6 +603,13 @@ def build_action_plan(
 
     complaint_templates = _build_complaint_templates(flag_list, tiers)
     evidence_pack_items = _build_evidence_pack_items(flag_list, tiers, item_list)
+    combined_narrative = _build_combined_narrative(
+        flags=flag_list,
+        action_items=action_items,
+        recoverable_estimate=recoverable_estimate,
+        patient=patient,
+        hospital=hospital,
+    )
 
     return {
         "action_items": action_items,
@@ -541,6 +619,7 @@ def build_action_plan(
         "escalation_ladder": escalation_ladder,
         "complaint_templates": complaint_templates,
         "evidence_pack_items": evidence_pack_items,
+        "combined_narrative": combined_narrative,
         "disclaimer": _ACTION_PLAN_DISCLAIMER,
         "guardrails": {"banned_terms_filtered": True},
     }

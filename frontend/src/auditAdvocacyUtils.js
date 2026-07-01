@@ -10,6 +10,8 @@ export const FLAG_DISPLAY_LABELS = {
   DUPLICATE_ITEM: "Repeated bill item",
   NEAR_DUPLICATE_ITEM: "Possibly duplicate bill item",
   PACKAGE_COMPONENT_CHARGED_SEPARATELY: "Package and component both billed",
+  PREAUTH_AMOUNT_ABOVE_APPROVED: "Bill above pre-authorization amount",
+  PREAUTH_ITEM_OUTSIDE_AUTHORIZATION: "Item not clearly listed in pre-authorization",
   DUPLICATE_THERAPEUTIC_CLASS: "Duplicate therapeutic class",
   BROADER_SPECTRUM_ANTIBIOTIC: "Broader-spectrum antibiotic than typical",
   DRUG_INTERACTION: "Possible drug interaction",

@@ -1,5 +1,6 @@
 import TreatmentAuditSection from "./TreatmentAuditSection";
 import ClinicalHistoryUsedPanel from "./ClinicalHistoryUsedPanel";
+import CombinedNarrative from "./CombinedNarrative";
 import PatientQuestionsSection from "./PatientQuestionsSection";
 import RestrictedMedicinesSection from "./RestrictedMedicinesSection";
 import ReportActions from "./ReportActions";
@@ -81,6 +82,7 @@ export default function PrescriptionResults({ result, toolbar = null }) {
       </section>
 
       <PatientQuestionsSection report={result} />
+      <CombinedNarrative narrative={result?.action_plan?.combined_narrative} />
 
       <TreatmentAuditSection
         treatmentAuditFlags={result.treatment_audit_flags}

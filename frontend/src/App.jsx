@@ -526,6 +526,7 @@ function CheckPage() {
   const bundleSessionRef = useRef(createBundleSession());
   const bundleSourceDocumentsRef = useRef([]);
   const [bundleDocuments, setBundleDocuments] = useState([]);
+  const [preauthDocuments, setPreauthDocuments] = useState([]);
   const [states] = useState(() => getStateOptions());
   const [cities, setCities] = useState([]);
   const [stateUtName, setStateUtName] = useState("");
@@ -652,6 +653,7 @@ function CheckPage() {
 
   const applyBundleExtraction = (merged) => {
     bundleSourceDocumentsRef.current = merged.sourceDocuments || [];
+    setPreauthDocuments(merged.preauthDocuments || []);
     setClinicalContext(merged.clinicalContext || emptyClinicalContext());
 
     if (
@@ -723,6 +725,7 @@ function CheckPage() {
   const handleChangePatient = () => {
     setBillStep("patient");
     setBundleDocuments([]);
+    setPreauthDocuments([]);
     bundleSessionRef.current = createBundleSession();
     bundleSourceDocumentsRef.current = [];
     setError("");
@@ -830,6 +833,7 @@ function CheckPage() {
           prescription_procedures: buildPrescriptionRequestItems().procedures,
           ...clinicalContextToApiPayload(clinicalContext),
           clinical_history: clinicalHistory,
+          preauth_documents: preauthDocuments,
           ocr_text:
             [
               scanMeta?.ocr_text,
@@ -1066,6 +1070,7 @@ function CheckPage() {
     setEditableItems([]);
     setHospitalNameEdit("");
     setBundleDocuments([]);
+    setPreauthDocuments([]);
     bundleSessionRef.current = createBundleSession();
     bundleSourceDocumentsRef.current = [];
     setPrescriptionMeta(null);

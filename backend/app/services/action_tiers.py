@@ -41,6 +41,8 @@ VERIFY_FLAG_TYPES: frozenset[str] = frozenset(
     {
         "NEAR_DUPLICATE_ITEM",
         "MISSING_REQUIRED_INVESTIGATION",
+        "PREAUTH_AMOUNT_ABOVE_APPROVED",
+        "PREAUTH_ITEM_OUTSIDE_AUTHORIZATION",
     }
 )
 

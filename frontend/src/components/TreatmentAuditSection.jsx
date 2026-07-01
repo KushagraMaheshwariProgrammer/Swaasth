@@ -12,6 +12,8 @@ const CATEGORY_LABELS = {
   billing: "Billing",
 };
 
+const CLINICAL_CATEGORIES = new Set(["diagnosis", "investigation", "prescription"]);
+
 function alignmentLabel(supported) {
   if (supported === true) {
     return { text: "Supported by reported clinical evidence", className: "clinical-align-yes" };
@@ -41,10 +43,42 @@ function groupFlags(flags) {
   return groups;
 }
 
+function isClinicalFlag(flag) {
+  return CLINICAL_CATEGORIES.has(flag?.category || "");
+}
+
+function getDisplayConfidenceMeta(flag) {
+  if (
+    isClinicalFlag(flag) &&
+    flag?.confidence === "HIGH" &&
+    flag?.citation_verified !== true
+  ) {
+    return {
+      ...getAuditConfidenceMeta("MEDIUM"),
+      label: "Verify with doctor",
+      hint:
+        "This clinical point was not backed by a verified STG citation in the retrieved excerpts.",
+    };
+  }
+  return getAuditConfidenceMeta(flag.confidence);
+}
+
+function stgReferenceParts(reference) {
+  if (!reference || typeof reference !== "object") {
+    return [];
+  }
+  return [
+    reference.condition,
+    reference.section,
+    reference.page ? `p. ${reference.page}` : "",
+  ].filter(Boolean);
+}
+
 function FlagCard({ flag, index }) {
   const severityMeta = getAuditSeverityMeta(flag.severity);
-  const confidenceMeta = getAuditConfidenceMeta(flag.confidence);
+  const confidenceMeta = getDisplayConfidenceMeta(flag);
   const typeLabel = flag.display_label || flagDisplayLabel(flag.type);
+  const referenceParts = stgReferenceParts(flag.stg_reference);
   return (
     <article
       key={`${flag.type || "flag"}-${flag.item || "item"}-${index}`}
@@ -54,8 +88,14 @@ function FlagCard({ flag, index }) {
         <h4>{flag.item || "--"}</h4>
         <span className={confidenceMeta.badgeClass}>{confidenceMeta.label}</span>
       </div>
+      <p className="audit-confidence-hint">{confidenceMeta.hint}</p>
       <p className="audit-flag-type">{typeLabel}</p>
       <p className="audit-flag-reason">{flag.reason}</p>
+      {referenceParts.length > 0 && (
+        <p className="audit-flag-reference-chip">
+          STG reference: <strong>{referenceParts.join(" · ")}</strong>
+        </p>
+      )}
       {flag.guideline_basis && (
         <p className="audit-flag-reference">
           <strong>Why this matters:</strong> {flag.guideline_basis}

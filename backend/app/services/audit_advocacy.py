@@ -67,6 +67,8 @@ FLAG_DISPLAY_LABELS: dict[str, str] = {
     "PACKAGE_COMPONENT_CHARGED_SEPARATELY": "Package and component both billed",
     "MEDICINE_PRICE_DISCREPANCY": "Medicine price above reference",
     "BILLED_NOT_PRESCRIBED": "Billed without prescription match",
+    "PREAUTH_AMOUNT_ABOVE_APPROVED": "Bill above pre-authorization amount",
+    "PREAUTH_ITEM_OUTSIDE_AUTHORIZATION": "Item not clearly listed in pre-authorization",
     "DUPLICATE_THERAPEUTIC_CLASS": "Duplicate therapeutic class",
     "BROADER_SPECTRUM_ANTIBIOTIC": "Broader-spectrum antibiotic than typical",
     "DRUG_INTERACTION": "Possible drug interaction",

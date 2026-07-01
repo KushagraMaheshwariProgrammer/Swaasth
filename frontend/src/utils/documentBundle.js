@@ -5,6 +5,7 @@ import {
   emptyClinicalContext,
   normalizePrescriptionPayload,
   uploadClinicalDocument,
+  uploadPreauthDocument,
   uploadPrescription,
 } from "../services/prescriptions";
 
@@ -13,6 +14,7 @@ export const DOCUMENT_TYPES = [
   { id: "prescription", label: "Prescription" },
   { id: "lab_report", label: "Lab report" },
   { id: "discharge_summary", label: "Discharge summary" },
+  { id: "preauth_letter", label: "Pre-authorization letter" },
 ];
 
 export function createBundleSession() {
@@ -59,6 +61,9 @@ export function guessDocumentType(filename) {
   }
   if (/discharge|summary|ipd/.test(lower)) {
     return "discharge_summary";
+  }
+  if (/pre.?auth|authorization|approval|claim|insurance|tpa|cashless/.test(lower)) {
+    return "preauth_letter";
   }
   if (/bill|invoice|receipt|estimate/.test(lower)) {
     return "bill";
@@ -216,6 +221,9 @@ export async function processDocumentBundle(documents, location) {
   const dischargeSummaries = documents.filter(
     (doc) => doc.documentType === "discharge_summary"
   );
+  const preauthLetters = documents.filter(
+    (doc) => doc.documentType === "preauth_letter"
+  );
 
   if (bills.length && (!location?.state || !location?.city)) {
     throw new Error(
@@ -223,7 +231,13 @@ export async function processDocumentBundle(documents, location) {
     );
   }
 
-  const [billResults, prescriptionResults, labResults, dischargeResults] =
+  const [
+    billResults,
+    prescriptionResults,
+    labResults,
+    dischargeResults,
+    preauthResults,
+  ] =
     await Promise.all([
       Promise.all(bills.map((doc) => uploadBill(doc.file, location))),
       Promise.all(prescriptions.map((doc) => uploadPrescription(doc.file))),
@@ -235,6 +249,7 @@ export async function processDocumentBundle(documents, location) {
           uploadClinicalDocument(doc.file, "discharge_summary")
         )
       ),
+      Promise.all(preauthLetters.map((doc) => uploadPreauthDocument(doc.file))),
     ]);
 
   const { lineItems, scanMeta } = mergeBillResponses(billResults);
@@ -265,8 +280,10 @@ export async function processDocumentBundle(documents, location) {
     diagnosisConfidence: prescriptionMerged.diagnosisConfidence,
     clinicalContext,
     sourceDocuments,
+    preauthDocuments: preauthResults,
     hasBills: bills.length > 0,
     hasPrescriptions: prescriptions.length > 0,
     hasClinicalDocs: labReports.length + dischargeSummaries.length > 0,
+    hasPreauth: preauthLetters.length > 0,
   };
 }
