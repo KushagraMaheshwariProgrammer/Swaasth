@@ -405,7 +405,7 @@ export default function PatientsPage() {
                       state={{ patientId: selectedPatient.id }}
                       className="analyze-btn patient-check-link"
                     >
-                      Check bill for this patient
+                      Check documents for this patient
                     </Link>
                     {!editing && (
                       <>
@@ -517,7 +517,7 @@ export default function PatientsPage() {
                       {!billsLoading && !patientBills.length && (
                         <p className="auth-info">
                           No bills linked to this patient yet. Upload documents from
-                          Check bill and select this patient.
+                          Check My Documents and select this patient.
                         </p>
                       )}
                       <ul className="history-list">

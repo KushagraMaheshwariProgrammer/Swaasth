@@ -20,7 +20,6 @@ import AccountSettingsPage from "./pages/AccountSettingsPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import TermsDevPreview from "./pages/TermsDevPreview";
 import UserNav from "./components/UserNav";
-import PatientForm, { emptyPatientForm } from "./components/PatientForm";
 import PatientList from "./components/PatientList";
 import LocationSearchPicker from "./components/LocationSearchPicker";
 import ClinicalContextForm from "./components/ClinicalContextForm";
@@ -37,7 +36,7 @@ import {
   fetchBackend,
   parseJsonResponse,
 } from "./services/httpUtils";
-import { createPatient, getPatients, getPatientsLocalSnapshot } from "./services/patients";
+import { getPatients, getPatientsLocalSnapshot } from "./services/patients";
 import { saveReportToAccount } from "./services/bills";
 import {
   analyzeTreatment,
@@ -218,7 +217,7 @@ function LandingPage() {
                 className="cta-button cta-button--hero"
                 onClick={startChecking}
               >
-                Check My Bill
+                Check My Documents
               </button>
             </div>
 
@@ -551,9 +550,6 @@ function CheckPage() {
   const [selectedPatientId, setSelectedPatientId] = useState("");
   const [patientsLoading, setPatientsLoading] = useState(false);
   const [billStep, setBillStep] = useState("patient");
-  const [showNewPatientForm, setShowNewPatientForm] = useState(false);
-  const [patientForm, setPatientForm] = useState(emptyPatientForm);
-  const [patientSaving, setPatientSaving] = useState(false);
   const [patientInfo, setPatientInfo] = useState("");
   const [prescriptionMeta, setPrescriptionMeta] = useState(null);
   const [prescriptionMedicines, setPrescriptionMedicines] = useState([]);
@@ -682,42 +678,8 @@ function CheckPage() {
     }
   };
 
-  const handleSaveNewPatient = async (event) => {
-    event.preventDefault();
-    if (!user?.uid) {
-      setError("You must be signed in to save a patient.");
-      return;
-    }
-    setPatientSaving(true);
-    setError("");
-    setPatientInfo("");
-    try {
-      const result = await createPatient(user.uid, patientForm);
-      const list = await reloadPatients();
-      const saved =
-        list.find((p) => p.id === result.id) ||
-        list.find((p) => p.localId === result.localId) ||
-        result.patient;
-      const patientId = saved?.id || result.id;
-      setSelectedPatientId(patientId);
-      setShowNewPatientForm(false);
-      setPatientForm(emptyPatientForm());
-      setBillStep("bill");
-      setPatientInfo(
-        `Patient "${saved?.name || patientForm.name}" saved. You can upload the bill now.`
-      );
-    } catch (err) {
-      setError(err.message || "Unable to save patient.");
-    } finally {
-      setPatientSaving(false);
-    }
-  };
-
-  const handleContinueWithPatient = () => {
-    if (!selectedPatientId || !selectedPatient) {
-      setError("Select or add a patient before uploading a bill.");
-      return;
-    }
+  const handleSelectPatient = (patientId) => {
+    setSelectedPatientId(patientId);
     setError("");
     setBillStep("bill");
   };
@@ -1247,11 +1209,11 @@ function CheckPage() {
 
         <header className="check-header">
           <h1>
-            {billStep === "patient" ? "Set up patient" : "Upload your documents"}
+            {billStep === "patient" ? "Select patient" : "Upload your documents"}
           </h1>
           <p>
             {billStep === "patient"
-              ? "Add or select a patient before uploading documents."
+              ? "Choose who these documents are for."
               : selectedPatient
               ? `Checking documents for ${selectedPatient.name}.`
               : "We'll analyze them in seconds."}
@@ -1268,104 +1230,38 @@ function CheckPage() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.25 }}
             >
-              <p className="comparison-settings-title">Step 1 — Patient profile</p>
+              <p className="comparison-settings-title">Select patient</p>
 
               {patientsLoading && (
                 <p className="auth-info">Loading patients...</p>
               )}
 
-              {patients.length > 0 && !showNewPatientForm && (
+              {patients.length > 0 && (
                 <PatientList
                   patients={patients}
                   selectedId={selectedPatientId}
                   mode="select"
-                  onSelect={(patientId) => {
-                    setSelectedPatientId(patientId);
-                    setError("");
-                  }}
+                  onSelect={handleSelectPatient}
                 />
               )}
 
-              {selectedPatient && !showNewPatientForm && (
-                <div className="patient-selected-banner">
-                  <p>
-                    <strong>{selectedPatient.name}</strong> · {selectedPatient.age}{" "}
-                    yrs · {selectedPatient.gender}
-                  </p>
-                  <button
-                    type="button"
-                    className="analyze-btn"
-                    onClick={handleContinueWithPatient}
-                  >
-                    Continue to upload documents →
-                  </button>
-                </div>
+              {!patientsLoading && patients.length === 0 && (
+                <p className="auth-info">
+                  No patients yet.{" "}
+                  <Link to="/patients" className="patients-manage-link">
+                    Add a patient
+                  </Link>{" "}
+                  from the Patients tab first.
+                </p>
               )}
 
-              {!showNewPatientForm && (
-                <button
-                  type="button"
-                  className="bill-editor-add patients-add-inline"
-                  onClick={() => {
-                    setShowNewPatientForm(true);
-                    setPatientForm(emptyPatientForm());
-                    setSelectedPatientId("");
-                    setError("");
-                  }}
-                >
-                  + Add new patient
-                </button>
-              )}
-
-              {!showNewPatientForm && patients.length > 0 && (
+              {patients.length > 0 && (
                 <Link to="/patients" className="patients-manage-link">
                   Manage patients
                 </Link>
               )}
 
-              {showNewPatientForm && (
-                <section className="patient-card-shell">
-                  <h2>New patient</h2>
-                  <PatientForm
-                    form={patientForm}
-                    setForm={setPatientForm}
-                    onSubmit={handleSaveNewPatient}
-                    onCancel={() => {
-                      setShowNewPatientForm(false);
-                      setPatientForm(emptyPatientForm());
-                    }}
-                    submitLabel="Save patient & continue"
-                    saving={patientSaving}
-                    error={error}
-                    info={patientInfo}
-                  />
-                </section>
-              )}
-
-              {!showNewPatientForm && patients.length === 0 && !patientsLoading && (
-                <section className="patient-card-shell">
-                  <h2>Add your first patient</h2>
-                  <p className="comparison-settings-hint">
-                    You need a saved patient profile before uploading a bill.
-                  </p>
-                  <PatientForm
-                    form={patientForm}
-                    setForm={setPatientForm}
-                    onSubmit={handleSaveNewPatient}
-                    submitLabel="Save patient & continue"
-                    saving={patientSaving}
-                    error={error}
-                    info={patientInfo}
-                  />
-                </section>
-              )}
-
-              {patientInfo && !showNewPatientForm && patients.length > 0 && (
-                <p className="auth-info">{patientInfo}</p>
-              )}
-              {error && !showNewPatientForm && (
-                <p className="error-text">{error}</p>
-              )}
+              {error && <p className="error-text">{error}</p>}
             </motion.section>
           )}
 
@@ -1394,9 +1290,7 @@ function CheckPage() {
                 </div>
               )}
 
-              <p className="comparison-settings-title">
-                Step 2 — Upload documents
-              </p>
+              <p className="comparison-settings-title">Upload documents</p>
 
               <MultiDocumentUpload
                 documents={bundleDocuments}

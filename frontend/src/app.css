@@ -3320,6 +3320,9 @@ a.analyze-btn:visited {
   appearance: none;
   -webkit-appearance: none;
   margin: 0;
+  background: var(--primary);
+  border-color: var(--primary-dark);
+  box-shadow: 0 4px 14px rgba(107, 140, 255, 0.35);
 }
 
 button.patient-list-card {
@@ -3329,10 +3332,21 @@ button.patient-list-card {
   color: inherit;
 }
 
+.patient-list-card-selectable strong,
+.patient-list-card-selectable p {
+  color: #ffffff;
+}
+
+.patient-list-card-selectable:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  box-shadow: 0 6px 18px rgba(85, 120, 240, 0.4);
+}
+
 .patient-list-card-selectable.is-selected {
-  background: var(--glass-bg-selected);
-  border-color: rgba(37, 99, 235, 0.35);
-  box-shadow: var(--glass-shadow-selected);
+  background: var(--primary-dark);
+  border-color: #3d5fd4;
+  box-shadow: 0 6px 18px rgba(61, 95, 212, 0.45);
   transform: translateY(-2px);
 }
 
