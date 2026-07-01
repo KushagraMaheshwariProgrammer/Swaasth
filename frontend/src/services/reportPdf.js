@@ -42,11 +42,16 @@ function normalizeForJson(value) {
 }
 
 /** Strip non-JSON-safe values before POSTing the report to the PDF endpoint. */
-export function prepareReportForPdf(report) {
+export function prepareReportForPdf(report, exportOptions = null) {
   if (!report || typeof report !== "object") {
     throw new Error("No report data to export.");
   }
   const cleaned = normalizeForJson(report);
+  const opts = exportOptions || report.export_options || {};
+  cleaned.export_options = {
+    include_stg_excerpts: opts.include_stg_excerpts !== false,
+    include_legal_pathways: opts.include_legal_pathways !== false,
+  };
   if (typeof cleaned.ocr_text === "string" && cleaned.ocr_text.length > 100_000) {
     cleaned.ocr_text = cleaned.ocr_text.slice(0, 100_000);
   }
@@ -90,8 +95,8 @@ async function postRenderPdf(payload) {
   return response.blob();
 }
 
-export async function fetchReportPdfBlob(report) {
-  return postRenderPdf(prepareReportForPdf(report));
+export async function fetchReportPdfBlob(report, exportOptions = null) {
+  return postRenderPdf(prepareReportForPdf(report, exportOptions));
 }
 
 /** Request the guardrailed dispute-pack PDF for a report. */
@@ -144,8 +149,8 @@ async function sharePdfFile(blob, filename, reportTitle) {
   return true;
 }
 
-export async function loadReportPdfBlobUrl(report) {
-  const blob = await fetchReportPdfBlob(report);
+export async function loadReportPdfBlobUrl(report, exportOptions = null) {
+  const blob = await fetchReportPdfBlob(report, exportOptions);
   return {
     blob,
     blobUrl: URL.createObjectURL(blob),

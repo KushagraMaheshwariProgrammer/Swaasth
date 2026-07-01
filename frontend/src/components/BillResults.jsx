@@ -5,15 +5,11 @@ import {
   displayableBillLineItems,
   formatCurrency,
   getAuditRiskMeta,
-  getAuditSeverityMeta,
   getFlagMeta,
   HOSPITAL_TYPE_OPTIONS,
 } from "../billUtils";
-import {
-  flagDisplayLabel,
-  getAuditConfidenceMeta,
-} from "../auditAdvocacyUtils";
 import AdvocacyScopeSection from "./AdvocacyScopeSection";
+import AuditFlagCard from "./AuditFlagCard";
 import ClinicalHistoryUsedPanel from "./ClinicalHistoryUsedPanel";
 import CombinedNarrative from "./CombinedNarrative";
 import PatientQuestionsSection from "./PatientQuestionsSection";
@@ -237,29 +233,9 @@ export default function BillResults({ result, toolbar = null }) {
 
         {result?.audit_flags?.flags?.length ? (
           <div className="audit-flags-grid">
-            {result.audit_flags.flags.map((flag, index) => {
-              const confidenceMeta = getAuditConfidenceMeta(flag.confidence);
-              return (
-                <article
-                  key={`${flag.type || "flag"}-${flag.item || "item"}-${index}`}
-                  className={getAuditSeverityMeta(flag.severity).cardClass}
-                >
-                  <div className="result-top">
-                    <h4>{flag.item || "--"}</h4>
-                    <span className={confidenceMeta.badgeClass}>
-                      {confidenceMeta.label}
-                    </span>
-                  </div>
-                  <p className="audit-flag-type">
-                    {flag.display_label || flagDisplayLabel(flag.type)}
-                  </p>
-                  <p className="audit-flag-reason">{flag.reason}</p>
-                  <p className="audit-flag-recommendation">
-                    <strong>Suggested question:</strong> {flag.recommendation}
-                  </p>
-                </article>
-              );
-            })}
+            {result.audit_flags.flags.map((flag, index) => (
+              <AuditFlagCard key={`${flag.type || "flag"}-${index}`} flag={flag} index={index} />
+            ))}
           </div>
         ) : (
           <p className="audit-empty-state">

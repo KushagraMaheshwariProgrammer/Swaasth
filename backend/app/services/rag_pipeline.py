@@ -401,7 +401,13 @@ def validate_stg_citations(
         else:
             support = _find_supporting_chunk(item, chunks)
             if support:
+                matched_chunk = support
                 item["guideline_basis"] = format_guideline_basis(support)
+
+        if matched_chunk and str(matched_chunk.get("text") or "").strip():
+            from app.services.stg_citation import build_stg_citation_from_chunk
+
+            item["stg_citation"] = build_stg_citation_from_chunk(matched_chunk)
 
         item["reason"] = sanitize_display_text(str(item.get("reason") or ""))
         item["recommendation"] = sanitize_display_text(str(item.get("recommendation") or ""))

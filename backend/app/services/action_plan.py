@@ -139,6 +139,18 @@ def _reference_rate(line_item: dict[str, Any] | None) -> dict[str, Any] | None:
 
 
 def _stg_excerpt(flag: dict[str, Any]) -> dict[str, Any] | None:
+    citation = flag.get("stg_citation")
+    if isinstance(citation, dict) and citation.get("full_text"):
+        source = citation.get("source") if isinstance(citation.get("source"), dict) else {}
+        reference = citation.get("reference") if isinstance(citation.get("reference"), dict) else {}
+        return {
+            "condition": reference.get("condition"),
+            "section": reference.get("section"),
+            "page": reference.get("page"),
+            "text": sanitize_text(str(citation.get("full_text") or "")) or None,
+            "source_label": source.get("corpus_label"),
+            "authority": source.get("authority"),
+        }
     reference = flag.get("stg_reference")
     if not isinstance(reference, dict) or not reference.get("condition"):
         return None
@@ -147,6 +159,8 @@ def _stg_excerpt(flag: dict[str, Any]) -> dict[str, Any] | None:
         "section": reference.get("section"),
         "page": reference.get("page"),
         "text": sanitize_text(str(flag.get("guideline_basis") or "")) or None,
+        "source_label": None,
+        "authority": None,
     }
 
 

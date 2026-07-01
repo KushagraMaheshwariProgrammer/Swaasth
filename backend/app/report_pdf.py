@@ -75,6 +75,126 @@ def _render_advocacy_scope_html(report: dict[str, Any]) -> str:
 """
 
 
+def _export_options(report: dict[str, Any]) -> dict[str, bool]:
+    opts = report.get("export_options") or {}
+    return {
+        "include_stg_excerpts": bool(opts.get("include_stg_excerpts", True)),
+        "include_legal_pathways": bool(opts.get("include_legal_pathways", True)),
+    }
+
+
+def _collect_all_flags(report: dict[str, Any]) -> list[dict[str, Any]]:
+    flags: list[dict[str, Any]] = []
+    for source in [
+        (report.get("audit_flags") or {}).get("flags"),
+        (report.get("treatment_audit_flags") or {}).get("flags"),
+    ]:
+        for flag in source or []:
+            if isinstance(flag, dict):
+                flags.append(flag)
+    return flags
+
+
+def _render_guideline_sources_html(report: dict[str, Any]) -> str:
+    treatment_audit = report.get("treatment_audit_flags") or {}
+    sources = treatment_audit.get("guideline_sources") or []
+    if not sources:
+        return ""
+    used_fallback = treatment_audit.get("used_fallback")
+    note = " (CRC reference book used as fallback)" if used_fallback else ""
+    items = "".join(f"<li>{escape(str(source))}</li>" for source in sources)
+    return f"""
+  <h2>Guideline sources used in this review</h2>
+  <ul>{items}</ul>
+  <p class='disclaimer'>
+    Primary sources are ICMR guidelines and MoHFW Clinical Establishments Act STGs
+    where retrieved. CRC Standard Treatment Guidelines may be used when primary
+    excerpts are insufficient.{escape(note)}
+  </p>
+"""
+
+
+def _render_stg_excerpts_html(report: dict[str, Any]) -> str:
+    if not _export_options(report)["include_stg_excerpts"]:
+        return ""
+
+    blocks: list[str] = []
+    for flag in _collect_all_flags(report):
+        citation = flag.get("stg_citation")
+        if not isinstance(citation, dict) or not citation.get("full_text"):
+            continue
+        source = citation.get("source") if isinstance(citation.get("source"), dict) else {}
+        reference = citation.get("reference") if isinstance(citation.get("reference"), dict) else {}
+        label = flag.get("display_label") or flag_display_label(str(flag.get("type") or ""))
+        item = str(flag.get("item") or "").strip()
+        title = f"{label}: {item}" if item else str(label)
+        ref_bits = [
+            str(reference.get("condition") or ""),
+            str(reference.get("section") or ""),
+            str(reference.get("page_label") or ""),
+        ]
+        ref_line = " · ".join(bit for bit in ref_bits if bit)
+        examples = source.get("legal_use_examples") or []
+        examples_html = "".join(f"<li>{escape(str(ex))}</li>" for ex in examples)
+        blocks.append(
+            f"<div class='stg-block'>"
+            f"<h3>{escape(title)}</h3>"
+            f"<p><b>Source:</b> {escape(str(source.get('display_name') or source.get('corpus_label') or 'Guidelines'))}"
+            f" — {escape(str(source.get('authority') or ''))}</p>"
+            f"{f'<p><b>Reference:</b> {escape(ref_line)}</p>' if ref_line else ''}"
+            f"<p><i>{escape(str(source.get('credibility_note') or ''))}</i></p>"
+            f"<pre class='stg-excerpt'>{escape(str(citation.get('full_text') or ''))}</pre>"
+            f"{'<p><b>How this source is used in disputes (examples):</b></p><ul>' + examples_html + '</ul>' if examples_html else ''}"
+            f"</div>"
+        )
+    if not blocks:
+        return ""
+    return (
+        "<h2>Full guideline excerpts (verified citations)</h2>"
+        + "".join(blocks)
+        + "<p class='disclaimer'>Excerpts are reproduced for patient review. "
+        "Verify against the original document before filing any complaint.</p>"
+    )
+
+
+def _render_legal_pathways_html(report: dict[str, Any]) -> str:
+    if not _export_options(report)["include_legal_pathways"]:
+        return ""
+
+    blocks: list[str] = []
+    for flag in _collect_all_flags(report):
+        pathway = flag.get("legal_pathway")
+        if not isinstance(pathway, dict):
+            continue
+        label = flag.get("display_label") or flag_display_label(str(flag.get("type") or ""))
+        item = str(flag.get("item") or "").strip()
+        title = f"{label}: {item}" if item else str(label)
+        blocks.append(
+            f"<div class='legal-block'>"
+            f"<h3>{escape(title)}</h3>"
+            f"<p><b>Broader legal concept (educational):</b> "
+            f"{escape(str(pathway.get('broader_concept') or ''))}</p>"
+            f"<p><b>Possible complaint angle:</b> "
+            f"{escape(str(pathway.get('specific_angle') or ''))}</p>"
+            f"<p><b>What is usually required to pursue this:</b> "
+            f"{escape(str(pathway.get('what_must_be_proven') or ''))}</p>"
+            f"<p><i>{escape(str(pathway.get('not_an_accusation') or ''))}</i></p>"
+            f"</div>"
+        )
+    if not blocks:
+        return ""
+    disclaimer = (
+        "Educational only — not legal advice. Swaasth does not accuse any hospital "
+        "or doctor. Consult a qualified advocate before alleging medical negligence, "
+        "deficiency in service, or unfair trade practice."
+    )
+    return (
+        "<h2>Possible legal pathways (educational — not accusations)</h2>"
+        + "".join(blocks)
+        + f"<p class='disclaimer'>{escape(disclaimer)}</p>"
+    )
+
+
 def _render_clinical_evidence_html(report: dict[str, Any]) -> str:
     clinical_context = report.get("clinical_context") or {}
     symptoms = clinical_context.get("symptoms") or []
@@ -318,6 +438,9 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
     advocacy_scope_html = _render_advocacy_scope_html(report)
     clinical_evidence_html = _render_clinical_evidence_html(report)
     restricted_medicine_html = render_restricted_medicine_flags_html(report)
+    guideline_sources_html = _render_guideline_sources_html(report)
+    stg_excerpts_html = _render_stg_excerpts_html(report)
+    legal_pathways_html = _render_legal_pathways_html(report)
 
     return f"""
 <html>
@@ -332,6 +455,8 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
   td.num, th.num {{ text-align: right; }}
   .summary td {{ border: none; padding: 2px 4px; }}
   .disclaimer {{ margin-top: 14px; font-size: 8.5px; color: #7f8c8d; font-style: italic; }}
+  .stg-excerpt {{ white-space: pre-wrap; font-size: 9px; background: #f8f9fa; padding: 8px; border: 1px solid #d5dbdb; }}
+  .stg-block, .legal-block {{ margin: 10px 0; padding: 8px; border: 1px solid #e5e8e8; border-radius: 4px; }}
   ul {{ margin: 4px 0; padding-left: 16px; }}
   ol {{ margin: 4px 0; padding-left: 16px; }}
 </style></head>
@@ -384,6 +509,9 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
   {clinical_evidence_html}
   {"<p><b>Matched conditions:</b> " + escape(', '.join(treatment_audit.get('matched_stg_conditions') or [])) + "</p>" if treatment_audit.get('matched_stg_conditions') else ""}
   {"<table><tr><th>Item</th><th>Finding</th><th>Confidence</th><th>Reason</th><th>Suggested question</th><th>Government guideline basis</th></tr>" + ''.join(treatment_rows) + "</table>" if treatment_rows else "<p>No treatment items flagged for clarification based on retrieved guidelines.</p>"}
+  {guideline_sources_html}
+  {legal_pathways_html}
+  {stg_excerpts_html}
   <p class='disclaimer'>Recommendations use ICMR and CRC Standard Treatment Guidelines where available. Not a substitute for clinical judgment.</p>
 
   <p class='disclaimer'>{escape(BILL_DISCLAIMER)}</p>
@@ -430,6 +558,9 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
     advocacy_scope_html = _render_advocacy_scope_html(report)
     clinical_evidence_html = _render_clinical_evidence_html(report)
     restricted_medicine_html = render_restricted_medicine_flags_html(report)
+    guideline_sources_html = _render_guideline_sources_html(report)
+    stg_excerpts_html = _render_stg_excerpts_html(report)
+    legal_pathways_html = _render_legal_pathways_html(report)
 
     return f"""
 <html>
@@ -441,6 +572,8 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
   th, td {{ border: 1px solid #d5dbdb; padding: 4px 5px; text-align: left; vertical-align: top; }}
   th {{ background: #eaf2f8; font-size: 9px; }}
   .disclaimer {{ margin-top: 14px; font-size: 8.5px; color: #7f8c8d; font-style: italic; }}
+  .stg-excerpt {{ white-space: pre-wrap; font-size: 9px; background: #f8f9fa; padding: 8px; border: 1px solid #d5dbdb; }}
+  .stg-block, .legal-block {{ margin: 10px 0; padding: 8px; border: 1px solid #e5e8e8; border-radius: 4px; }}
   ul {{ margin: 4px 0; padding-left: 16px; }}
 </style></head>
 <body>
@@ -463,6 +596,9 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
   {clinical_evidence_html}
   {"<p><b>Matched conditions:</b> " + escape(', '.join(treatment_audit.get('matched_stg_conditions') or [])) + "</p>" if treatment_audit.get('matched_stg_conditions') else ""}
   {"<table><tr><th>Item</th><th>Finding</th><th>Confidence</th><th>Reason</th><th>Suggested question</th><th>Government guideline basis</th></tr>" + ''.join(treatment_rows) + "</table>" if treatment_rows else "<p>No treatment items flagged for clarification based on retrieved guidelines.</p>"}
+  {guideline_sources_html}
+  {legal_pathways_html}
+  {stg_excerpts_html}
 
   <p class='disclaimer'>Recommendations use ICMR and CRC Standard Treatment Guidelines where available. Not a substitute for clinical judgment.</p>
 </body>

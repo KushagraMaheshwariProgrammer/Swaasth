@@ -103,7 +103,11 @@ export default function ReportActions({ report, className = "report-actions" }) 
   const [busy, setBusy] = useState("");
   const [viewer, setViewer] = useState(null);
   const [showActionConsent, setShowActionConsent] = useState(false);
-  const pdfCacheRef = useRef({ blob: null, blobUrl: "", filename: "", title: "" });
+  const [exportOptions, setExportOptions] = useState({
+    include_stg_excerpts: true,
+    include_legal_pathways: true,
+  });
+  const pdfCacheRef = useRef({ blob: null, blobUrl: "", filename: "", title: "", optionsKey: "" });
 
   useEffect(() => {
     return () => {
@@ -145,12 +149,15 @@ export default function ReportActions({ report, className = "report-actions" }) 
     setShowActionConsent(false);
   };
 
+  const exportOptionsKey = JSON.stringify(exportOptions);
+
   const ensurePdf = async () => {
-    if (pdfCacheRef.current.blob) {
+    if (pdfCacheRef.current.blob && pdfCacheRef.current.optionsKey === exportOptionsKey) {
       return pdfCacheRef.current;
     }
-    const loaded = await loadReportPdfBlobUrl(report);
-    pdfCacheRef.current = loaded;
+    revokeReportPdfBlobUrl(pdfCacheRef.current.blobUrl);
+    const loaded = await loadReportPdfBlobUrl(report, exportOptions);
+    pdfCacheRef.current = { ...loaded, optionsKey: exportOptionsKey };
     return loaded;
   };
 
@@ -258,6 +265,37 @@ export default function ReportActions({ report, className = "report-actions" }) 
           {pdfMessage}
         </p>
       )}
+      <div className="report-export-options">
+        <p className="report-export-options-label">PDF export includes:</p>
+        <label className="report-export-option">
+          <input
+            type="checkbox"
+            checked={exportOptions.include_stg_excerpts}
+            onChange={(event) => {
+              setExportOptions((prev) => ({
+                ...prev,
+                include_stg_excerpts: event.target.checked,
+              }));
+              pdfCacheRef.current = { blob: null, blobUrl: "", filename: "", title: "", optionsKey: "" };
+            }}
+          />
+          Full STG guideline paragraphs
+        </label>
+        <label className="report-export-option">
+          <input
+            type="checkbox"
+            checked={exportOptions.include_legal_pathways}
+            onChange={(event) => {
+              setExportOptions((prev) => ({
+                ...prev,
+                include_legal_pathways: event.target.checked,
+              }));
+              pdfCacheRef.current = { blob: null, blobUrl: "", filename: "", title: "", optionsKey: "" };
+            }}
+          />
+          Educational legal pathway notes
+        </label>
+      </div>
       <div className={className}>
         {hasActionPlan && (
           <button

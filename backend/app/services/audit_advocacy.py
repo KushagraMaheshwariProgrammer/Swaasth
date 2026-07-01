@@ -272,11 +272,17 @@ def build_advocacy_payload(
     *,
     chunks: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    finalized = finalize_audit_flags(flags, chunks=chunks)
+    from app.services.legal_case_framing import attach_legal_pathways
+    from app.services.rag_pipeline import validate_stg_citations
+
+    chunk_list = chunks or []
+    validated = validate_stg_citations(flags, chunk_list)
+    finalized = finalize_audit_flags(validated, chunks=chunk_list)
+    with_pathways = attach_legal_pathways(finalized)
     return {
-        "flags": finalized,
-        "flags_count": len(finalized),
-        "patient_questions": build_patient_questions(finalized),
+        "flags": with_pathways,
+        "flags_count": len(with_pathways),
+        "patient_questions": build_patient_questions(with_pathways),
         "advocacy_scope": {
             "checked": list(ADVOCACY_SCOPE_CHECKED),
             "not_checked": list(ADVOCACY_SCOPE_NOT_CHECKED),
