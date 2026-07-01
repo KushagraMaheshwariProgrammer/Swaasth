@@ -10,6 +10,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import BillResults from "./components/BillResults";
+import { patientAgeApiPayload, formatPatientAge } from "./utils/patientAge";
 import { getComparisonSchemeCopy, HOSPITAL_TYPE_OPTIONS } from "./billUtils";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
@@ -28,8 +29,10 @@ import PrescriptionResults from "./components/PrescriptionResults";
 import TermsAndConditionsModal from "./components/TermsAndConditionsModal";
 import MedicalHistoryConsentModal from "./components/MedicalHistoryConsentModal";
 import MultiDocumentUpload from "./components/MultiDocumentUpload";
+import DocumentDatePrompt from "./components/DocumentDatePrompt";
 import MedicalHistoryConsentPage from "./pages/MedicalHistoryConsentPage";
 import AppBackground from "./components/AppBackground";
+import AndroidBackButtonHandler from "./components/AndroidBackButtonHandler";
 import { getApiBase } from "./services/apiBase";
 import {
   backendUnreachableMessage,
@@ -52,8 +55,10 @@ import {
   allBundleDocumentsConfirmed,
   bundleHasBills,
   createBundleSession,
+  mergeConfirmedDatesIntoBundle,
   processDocumentBundle,
 } from "./utils/documentBundle";
+import { itemsMissingDates } from "./utils/documentDates";
 import { buildPatientHistoryPayload } from "./utils/patientClinicalHistory";
 
 function formatFetchError(err, fallback) {
@@ -525,6 +530,8 @@ function CheckPage() {
   const bundleSessionRef = useRef(createBundleSession());
   const bundleSourceDocumentsRef = useRef([]);
   const [bundleDocuments, setBundleDocuments] = useState([]);
+  const [pendingBundleMerge, setPendingBundleMerge] = useState(null);
+  const [datePromptItems, setDatePromptItems] = useState(null);
   const [preauthDocuments, setPreauthDocuments] = useState([]);
   const [states] = useState(() => getStateOptions());
   const [cities, setCities] = useState([]);
@@ -786,7 +793,7 @@ function CheckPage() {
           patient_district: location.city || null,
           patient_id: selectedPatient?.id || null,
           patient_name: selectedPatient?.name || null,
-          patient_age: selectedPatient?.age ?? null,
+          ...patientAgeApiPayload(selectedPatient),
           patient_gender: selectedPatient?.gender || null,
           diagnosis: diagnosis.trim() || null,
           diagnosis_user_provided: diagnosisUserProvided,
@@ -908,6 +915,62 @@ function CheckPage() {
     ? "edit"
     : "upload";
 
+  const proceedAfterBundleExtraction = (merged, datedDocuments) => {
+    applyBundleExtraction(merged);
+    if (datedDocuments) {
+      setBundleDocuments(datedDocuments);
+    }
+
+    const hasBillLineItems = merged.lineItems?.length > 0;
+    const hasRxItems =
+      merged.medicines?.length ||
+      merged.tests?.length ||
+      merged.procedures?.length;
+
+    if (!hasBillLineItems && !hasRxItems && !merged.hasClinicalDocs) {
+      setError(
+        "No bill items, prescription items, or clinical data were detected. Check your documents and try again."
+      );
+      return;
+    }
+
+    if (hasBillLineItems) {
+      setPatientInfo(
+        `Extracted ${merged.lineItems.length} bill item${
+          merged.lineItems.length === 1 ? "" : "s"
+        } from your upload.`
+      );
+    } else if (hasRxItems) {
+      setPatientInfo(
+        `Extracted ${merged.medicines?.length || 0} medicine(s), ${
+          merged.tests?.length || 0
+        } test(s), and ${merged.procedures?.length || 0} procedure(s).`
+      );
+    }
+
+    setClinicalStep("clinical");
+  };
+
+  const handleBundleDateConfirm = (confirmedDates) => {
+    if (!pendingBundleMerge) {
+      return;
+    }
+    const merged = mergeConfirmedDatesIntoBundle(
+      pendingBundleMerge,
+      bundleDocuments,
+      confirmedDates
+    );
+    setPendingBundleMerge(null);
+    setDatePromptItems(null);
+    proceedAfterBundleExtraction(merged, merged.datedDocuments);
+  };
+
+  const handleBundleDateCancel = () => {
+    setPendingBundleMerge(null);
+    setDatePromptItems(null);
+    setIsLoading(false);
+  };
+
   const handleAnalyzeBundle = async () => {
     if (!selectedPatient) {
       setError("Save a patient profile before uploading documents.");
@@ -951,36 +1014,24 @@ function CheckPage() {
         hospitalType,
       });
       setLoadingProgress(100);
-      applyBundleExtraction(merged);
 
-      const hasBillLineItems = merged.lineItems?.length > 0;
-      const hasRxItems =
-        merged.medicines?.length ||
-        merged.tests?.length ||
-        merged.procedures?.length;
+      const promptItems = (merged.perDocumentDates || []).map((item) => ({
+        ...item,
+        documentDate: item.detectedDate || item.documentDate || "",
+      }));
 
-      if (!hasBillLineItems && !hasRxItems && !merged.hasClinicalDocs) {
-        setError(
-          "No bill items, prescription items, or clinical data were detected. Check your documents and try again."
-        );
+      if (itemsMissingDates(promptItems).length) {
+        setPendingBundleMerge(merged);
+        setDatePromptItems(promptItems);
         return;
       }
 
-      if (hasBillLineItems) {
-        setPatientInfo(
-          `Extracted ${merged.lineItems.length} bill item${
-            merged.lineItems.length === 1 ? "" : "s"
-          } from your upload.`
-        );
-      } else if (hasRxItems) {
-        setPatientInfo(
-          `Extracted ${merged.medicines?.length || 0} medicine(s), ${
-            merged.tests?.length || 0
-          } test(s), and ${merged.procedures?.length || 0} procedure(s).`
-        );
-      }
-
-      setClinicalStep("clinical");
+      const datedMerge = mergeConfirmedDatesIntoBundle(
+        merged,
+        bundleDocuments,
+        promptItems
+      );
+      proceedAfterBundleExtraction(datedMerge, datedMerge.datedDocuments);
     } catch (err) {
       setError(formatFetchError(err, "Something went wrong during analysis."));
     } finally {
@@ -1278,7 +1329,7 @@ function CheckPage() {
                 <div className="patient-selected-banner patient-selected-banner-compact">
                   <p>
                     Patient: <strong>{selectedPatient.name}</strong> ·{" "}
-                    {selectedPatient.age} yrs
+                    {formatPatientAge(selectedPatient)}
                   </p>
                   <button
                     type="button"
@@ -1811,6 +1862,17 @@ function CheckPage() {
             </motion.section>
           )}
         </AnimatePresence>
+
+        {datePromptItems?.length > 0 && (
+          <DocumentDatePrompt
+            items={datePromptItems}
+            title="When were these documents issued?"
+            description="We could not read a date on some uploaded documents. Enter the date each one relates to so your medical history stays accurate."
+            confirmLabel="Continue to review"
+            onConfirm={handleBundleDateConfirm}
+            onCancel={handleBundleDateCancel}
+          />
+        )}
       </main>
     </motion.div>
   );
@@ -1909,6 +1971,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <AndroidBackButtonHandler />
         <div className="app-shell">
           <AppBackground />
           <div className="app-content">

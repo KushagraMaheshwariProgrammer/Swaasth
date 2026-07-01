@@ -1,5 +1,6 @@
 import { getApiBase } from "./apiBase";
 import { fetchJson } from "./httpUtils";
+import { getPatientAge, getPatientBirthYear } from "../utils/patientAge";
 
 export function emptyClinicalContext() {
   return {
@@ -153,6 +154,9 @@ export async function analyzeTreatment({
       test_results: testResults,
       patient_id: patient?.id || null,
       patient_name: patient?.name || null,
+      patient_birth_year: getPatientBirthYear(patient),
+      patient_age: getPatientAge(patient),
+      patient_gender: patient?.gender || null,
       ocr_text: ocrText || null,
       clinical_history: clinicalHistory,
     }),

@@ -22,6 +22,17 @@ export function isImageFile(file) {
   return file.type?.startsWith("image/") ?? false;
 }
 
+export function isPdfFile(file) {
+  if (!file) {
+    return false;
+  }
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  if (ext === "pdf") {
+    return true;
+  }
+  return file.type === "application/pdf";
+}
+
 export function validateUploadFile(file) {
   if (!file) {
     return { ok: false, error: null };

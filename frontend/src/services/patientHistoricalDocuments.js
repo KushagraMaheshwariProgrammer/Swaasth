@@ -16,6 +16,8 @@ import {
 } from "./prescriptions";
 import { sanitizeForFirestore } from "./bills";
 
+import { canSaveMedicalHistory } from "../utils/medicalHistoryConsent";
+
 const STORAGE_KEY = "swaasth_local_historical_docs_v1";
 
 function readStore() {
@@ -256,9 +258,17 @@ async function pushHistoricalDocumentToCloud(userId, patientId, docId, documentD
   markLocalHistoricalDocumentSynced(userId, docId, docId);
 }
 
-export async function saveHistoricalDocument(userId, patientId, documentInput) {
+export async function saveHistoricalDocument(userId, patientId, documentInput, options = {}) {
   if (!userId || !patientId) {
     throw new Error("Missing user or patient.");
+  }
+
+  if (
+    options.accountConsent != null &&
+    options.patient != null &&
+    !canSaveMedicalHistory(options.accountConsent, options.patient)
+  ) {
+    throw new Error("Medical history consent is required to save documents.");
   }
 
   const {

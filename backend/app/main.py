@@ -25,11 +25,14 @@ from app.services.document_extraction import (
     extract_json_from_text,
     extract_preauth_with_groq,
     normalize_clinical_context,
+    resolve_document_date,
 )
 from app.restricted_medicines import build_restricted_medicine_flags, get_restricted_medicines_store
 from app.services.action_plan import build_action_plan
 from app.services.audit_advocacy import ADVOCACY_SCOPE_CHECKED, ADVOCACY_SCOPE_NOT_CHECKED, merge_patient_questions
 from app.services.preauth_audit import analyze_preauth_mismatches
+from app.services.patient_age import resolve_patient_age
+from app.services.patient_gender import gender_display_label
 from app.services.treatment_audit import analyze_treatment
 
 
@@ -349,6 +352,7 @@ class CompareBillRequest(BaseModel):
     patient_district: str | None = None
     patient_id: str | None = None
     patient_name: str | None = None
+    patient_birth_year: int | None = None
     patient_age: int | None = None
     patient_gender: str | None = None
     diagnosis: str | None = None
@@ -399,6 +403,24 @@ def _normalize_line_items(line_items: list[dict[str, Any]]) -> list[dict[str, An
     return normalized
 
 
+def _prescription_item_payload(
+    entry: PrescriptionItemInput,
+    *,
+    category: str,
+) -> dict[str, Any] | None:
+    name = entry.name.strip()
+    if not name:
+        return None
+    payload: dict[str, Any] = {"name": name, "category": category}
+    if entry.dose:
+        payload["dose"] = entry.dose.strip()
+    if entry.frequency:
+        payload["frequency"] = entry.frequency.strip()
+    if entry.duration:
+        payload["duration"] = entry.duration.strip()
+    return payload
+
+
 def _prescription_items_from_request(
     medicines: list[PrescriptionItemInput],
     tests: list[PrescriptionItemInput],
@@ -406,17 +428,17 @@ def _prescription_items_from_request(
 ) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for entry in medicines:
-        name = entry.name.strip()
-        if name:
-            items.append({"name": name, "category": "medicine"})
+        item = _prescription_item_payload(entry, category="medicine")
+        if item:
+            items.append(item)
     for entry in tests:
-        name = entry.name.strip()
-        if name:
-            items.append({"name": name, "category": "test"})
+        item = _prescription_item_payload(entry, category="test")
+        if item:
+            items.append(item)
     for entry in procedures:
-        name = entry.name.strip()
-        if name:
-            items.append({"name": name, "category": "procedure"})
+        item = _prescription_item_payload(entry, category="procedure")
+        if item:
+            items.append(item)
     return items
 
 
@@ -455,6 +477,7 @@ def _build_comparison_response(
     patient_district: str | None = None,
     patient_id: str | None = None,
     patient_name: str | None = None,
+    patient_birth_year: int | None = None,
     patient_age: int | None = None,
     patient_gender: str | None = None,
     diagnosis: str | None = None,
@@ -501,6 +524,11 @@ def _build_comparison_response(
     treatment_audit_flags: dict[str, Any] | None = None
     prescription_payload: dict[str, Any] | None = None
     clinical_context = clinical_context or {}
+    resolved_patient_age = resolve_patient_age(
+        patient_age=patient_age,
+        patient_birth_year=patient_birth_year,
+    )
+    resolved_patient_gender = gender_display_label(patient_gender)
     if diagnosis and diagnosis.strip():
         prescription_items = prescription_items or []
         treatment_audit_flags = analyze_treatment(
@@ -511,6 +539,9 @@ def _build_comparison_response(
             diagnosis_user_provided=diagnosis_user_provided,
             diagnosis_confidence=clinical_context.get("diagnosis_confidence"),
             clinical_history=clinical_history,
+            patient_age=resolved_patient_age,
+            patient_birth_year=patient_birth_year,
+            patient_gender=resolved_patient_gender,
         )
         if prescription_items or clinical_context:
             prescription_payload = {
@@ -560,7 +591,8 @@ def _build_comparison_response(
         patient_payload = {
             "id": patient_id,
             "name": patient_name,
-            "age": patient_age,
+            "birth_year": patient_birth_year,
+            "age": resolved_patient_age,
             "gender": patient_gender,
         }
 
@@ -670,6 +702,7 @@ def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
         patient_district=body.patient_district,
         patient_id=body.patient_id,
         patient_name=body.patient_name,
+        patient_birth_year=body.patient_birth_year,
         patient_age=body.patient_age,
         patient_gender=body.patient_gender,
         diagnosis=body.diagnosis,
@@ -767,10 +800,16 @@ async def upload_bill(
 
     normalized_items = _normalize_line_items(line_items)
 
+    bill_date = resolve_document_date(
+        ai_date=ai_result.get("bill_date"),
+        ocr_text=extracted_text,
+    )
+
     return {
         "filename": file.filename or "unknown",
         "file_type": file_type,
         "message": "Bill extracted successfully",
+        "bill_date": bill_date,
         "hospital": {
             "name_from_bill": hospital_name,
         },
@@ -846,6 +885,10 @@ async def upload_preauth(file: UploadFile = File(...)) -> dict[str, Any]:
         "file_type": file_type,
         "document_type": "preauth_letter",
         "message": "Pre-authorization extracted successfully",
+        "authorization_date": resolve_document_date(
+            ai_date=payload.get("authorization_date"),
+            ocr_text=extracted_text,
+        ),
         "authorization_id": payload.get("authorization_id"),
         "insurer_or_scheme": payload.get("insurer_or_scheme"),
         "hospital_name": payload.get("hospital_name"),
@@ -855,25 +898,3 @@ async def upload_preauth(file: UploadFile = File(...)) -> dict[str, Any]:
         "approved_items": approved_items,
         "ocr_text": extracted_text,
     }
-
-
-def _extract_bill_date(text: str) -> str | None:
-    """Best-effort bill-date extraction from raw OCR text."""
-    if not text:
-        return None
-    patterns = [
-        r"\b(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})\b",
-        r"\b(\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2})\b",
-        r"\b(\d{1,2}\s+[A-Za-z]{3,9}\.?\s+\d{2,4})\b",
-    ]
-    for line in text.splitlines():
-        if re.search(r"date", line, re.IGNORECASE):
-            for pattern in patterns:
-                match = re.search(pattern, line)
-                if match:
-                    return match.group(1)
-    for pattern in patterns:
-        match = re.search(pattern, text)
-        if match:
-            return match.group(1)
-    return None

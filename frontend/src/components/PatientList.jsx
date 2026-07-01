@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { genderLabel } from "./PatientForm";
+import { formatPatientAge } from "../utils/patientAge";
 
 export default function PatientList({
   patients,
@@ -23,8 +24,7 @@ export default function PatientList({
             <div>
               <strong>{patient.name || "Unnamed patient"}</strong>
               <p>
-                {patient.age != null ? `${patient.age} yrs` : "—"} ·{" "}
-                {genderLabel(patient.gender)}
+                {formatPatientAge(patient)} · {genderLabel(patient.gender)}
               </p>
             </div>
           </>

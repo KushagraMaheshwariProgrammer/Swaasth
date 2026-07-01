@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import sys
+from datetime import datetime
 from io import BytesIO
 from typing import Any
 
@@ -64,6 +65,77 @@ def extract_document_text(file_bytes: bytes, file_type: str) -> str:
     return extract_text_from_image(file_bytes)
 
 
+_DATE_FORMATS = (
+    "%Y-%m-%d",
+    "%d/%m/%Y",
+    "%d-%m-%Y",
+    "%d.%m.%Y",
+    "%m/%d/%Y",
+    "%d/%m/%y",
+    "%d-%m-%y",
+    "%d %b %Y",
+    "%d %B %Y",
+    "%d %b %y",
+    "%d %B %y",
+)
+
+
+def normalize_document_date(value: str | None) -> str | None:
+    """Best-effort ISO date (YYYY-MM-DD) from OCR or AI strings."""
+    if value is None:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
+        return raw
+    for fmt in _DATE_FORMATS:
+        try:
+            return datetime.strptime(raw, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    match = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", raw)
+    if match:
+        return match.group(1)
+    return None
+
+
+def extract_bill_date_from_text(text: str) -> str | None:
+    """Best-effort bill-date extraction from raw OCR text."""
+    if not text:
+        return None
+    patterns = [
+        r"\b(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})\b",
+        r"\b(\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2})\b",
+        r"\b(\d{1,2}\s+[A-Za-z]{3,9}\.?\s+\d{2,4})\b",
+    ]
+    for line in text.splitlines():
+        if re.search(r"date", line, re.IGNORECASE):
+            for pattern in patterns:
+                match = re.search(pattern, line)
+                if match:
+                    return normalize_document_date(match.group(1))
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return normalize_document_date(match.group(1))
+    return None
+
+
+def resolve_document_date(
+    *,
+    ai_date: str | None = None,
+    ocr_text: str | None = None,
+) -> str | None:
+    """Prefer AI-extracted dates, then regex on OCR text."""
+    normalized = normalize_document_date(ai_date)
+    if normalized:
+        return normalized
+    if ocr_text:
+        return extract_bill_date_from_text(ocr_text)
+    return None
+
+
 def _groq_chat(system: str, user: str, *, max_tokens: int = 2000) -> dict[str, Any]:
     return groq_json_chat(system, user, max_tokens=max_tokens)
 
@@ -71,7 +143,9 @@ def _groq_chat(system: str, user: str, *, max_tokens: int = 2000) -> dict[str, A
 def extract_bill_with_groq(extracted_text: str) -> dict[str, Any]:
     system = (
         "You are helping extract hospital bill line items for Indian patients. "
-        "Return ONLY valid JSON with keys: is_medical_bill, error, hospital_name, line_items. "
+        "Return ONLY valid JSON with keys: is_medical_bill, error, hospital_name, "
+        "bill_date, line_items. bill_date is the bill or invoice date in YYYY-MM-DD "
+        "when visible; otherwise null. "
         "Each line item has item_name, quantity, unit_price, total_price, category "
         "(medicine|test|procedure|other). Keep numeric fields as numbers."
     )
@@ -105,7 +179,9 @@ def extract_discharge_summary_with_groq(extracted_text: str) -> dict[str, Any]:
     system = (
         "You are helping extract discharge summary details for Indian patients. "
         "Return ONLY valid JSON with keys: is_discharge_summary, error, diagnosis, "
-        "symptoms, test_results, procedures."
+        "discharge_date, symptoms, test_results, procedures. "
+        "discharge_date is the admission or discharge date in YYYY-MM-DD when visible; "
+        "otherwise null."
     )
     user = f"Discharge summary text:\n{extracted_text}"
     return _groq_chat(system, user)
@@ -115,8 +191,9 @@ def extract_preauth_with_groq(extracted_text: str) -> dict[str, Any]:
     system = (
         "You are helping extract insurance or government-scheme pre-authorization "
         "details for Indian patients. Return ONLY valid JSON with keys: "
-        "is_preauth, error, authorization_id, insurer_or_scheme, hospital_name, "
-        "patient_name, approved_amount, package_name, approved_items. "
+        "is_preauth, error, authorization_id, authorization_date, insurer_or_scheme, "
+        "hospital_name, patient_name, approved_amount, package_name, approved_items. "
+        "authorization_date is the letter date in YYYY-MM-DD when visible; otherwise null. "
         "approved_items is an array of {name, approved_amount, notes}. "
         "Keep approved_amount numeric when visible; otherwise null."
     )

@@ -239,7 +239,9 @@ def analyze_prescription_rationality(
     *,
     diagnosis: str,
     prescription_items: list[dict[str, Any]] | None = None,
+    patient_age: int | None = None,
 ) -> list[dict[str, Any]]:
+    _ = patient_age
     prescription_items = prescription_items or []
     medicine_names = _medicine_names(prescription_items)
     if not medicine_names:

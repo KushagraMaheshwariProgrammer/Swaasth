@@ -31,6 +31,7 @@ _REPORT_TITLES: dict[str, str] = {
     "combined": "Bill and Prescription Review Report",
     "prescription": "Prescription Treatment Appropriateness Report",
     "dispute_pack": "Dispute Pack — Factual Summary",
+    "medical_history": "Medical History Summary",
 }
 
 _HOSPITAL_TYPE_LABELS: dict[str, str] = {
@@ -286,6 +287,20 @@ def validate_report(report: dict[str, Any], report_kind: str) -> None:
     if report_kind == "dispute_pack":
         if not report.get("action_plan"):
             raise ValueError("Invalid dispute pack report payload.")
+        return
+
+    if report_kind == "medical_history":
+        patient = report.get("patient") or {}
+        if not str(patient.get("name") or "").strip():
+            raise ValueError("Invalid medical history report payload.")
+        profile = report.get("profile") or {}
+        timeline = report.get("timeline") or []
+        has_profile = any(
+            profile.get(key)
+            for key in ("conditions", "surgeries", "allergies")
+        )
+        if not timeline and not has_profile:
+            raise ValueError("Medical history has no entries to export.")
         return
 
     if report_kind == "prescription":
@@ -732,6 +747,106 @@ def render_report_pdf(report: dict[str, Any]) -> bytes:
     return html_to_pdf(render_html(report))
 
 
+def render_medical_history_html(report: dict[str, Any]) -> str:
+    patient = report.get("patient") or {}
+    profile = report.get("profile") or {}
+    timeline = report.get("timeline") or []
+    include_swaasth = bool(report.get("include_swaasth_reports", True))
+    generated_at = escape(str(report.get("generated_at") or "")[:10])
+
+    def _list_rows(items: list[Any], label_key: str = "name") -> str:
+        if not items:
+            return "<p>None recorded.</p>"
+        rows = []
+        for item in items:
+            if isinstance(item, dict):
+                name = escape(str(item.get(label_key) or ""))
+                extra_bits = []
+                if item.get("year"):
+                    extra_bits.append(str(item.get("year")))
+                if item.get("status"):
+                    extra_bits.append(str(item.get("status")))
+                if item.get("reaction"):
+                    extra_bits.append(str(item.get("reaction")))
+                suffix = f" ({', '.join(extra_bits)})" if extra_bits else ""
+                rows.append(f"<li>{name}{escape(suffix)}</li>")
+            else:
+                rows.append(f"<li>{escape(str(item))}</li>")
+        return f"<ul>{''.join(rows)}</ul>"
+
+    timeline_blocks: list[str] = []
+    for entry in timeline:
+        date_label = escape(str(entry.get("date") or "Date unknown"))
+        kind = str(entry.get("kind") or "")
+        if kind == "swaasth_report":
+            title = escape(str(entry.get("title") or "Swaasth report"))
+            report_label = escape(str(entry.get("report_kind_label") or "Report"))
+            diagnosis = escape(str(entry.get("diagnosis") or ""))
+            medicines = entry.get("medicines") or []
+            symptoms = entry.get("symptoms") or []
+            test_results = entry.get("test_results") or []
+            med_list = ", ".join(escape(str(name)) for name in medicines if name)
+            symptom_list = ", ".join(escape(str(name)) for name in symptoms if name)
+            timeline_blocks.append(
+                f"<div class='history-entry'>"
+                f"<h3>{date_label} — Swaasth {report_label}</h3>"
+                f"<p><b>{title}</b></p>"
+                f"{f'<p><b>Diagnosis:</b> {diagnosis}</p>' if diagnosis else ''}"
+                f"{f'<p><b>Medicines:</b> {med_list}</p>' if med_list else ''}"
+                f"{f'<p><b>Symptoms:</b> {symptom_list}</p>' if symptom_list else ''}"
+                f"{f'<p><b>Test results:</b> {len(test_results)} recorded</p>' if test_results else ''}"
+                f"</div>"
+            )
+        else:
+            title = escape(str(entry.get("title") or "Document"))
+            doc_type = escape(str(entry.get("document_type_label") or entry.get("document_type") or "Document"))
+            diagnosis = escape(str(entry.get("diagnosis") or ""))
+            timeline_blocks.append(
+                f"<div class='history-entry'>"
+                f"<h3>{date_label} — {doc_type}</h3>"
+                f"<p><b>{title}</b></p>"
+                f"{f'<p><b>Diagnosis:</b> {diagnosis}</p>' if diagnosis else ''}"
+                f"</div>"
+            )
+
+    scope_note = (
+        "Includes Swaasth analysis reports and uploaded historical documents."
+        if include_swaasth
+        else "Includes profile history and uploaded historical documents only (Swaasth reports excluded)."
+    )
+
+    return f"""
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/><title>Medical History Summary</title></head>
+<body>
+  <h1>Medical History Summary</h1>
+  <p><b>Patient:</b> {escape(str(patient.get('name') or 'Patient'))}</p>
+  <p><b>Age:</b> {escape(str(patient.get('age_label') or patient.get('age') or '—'))}</p>
+  <p><b>Gender:</b> {escape(str(patient.get('gender_label') or patient.get('gender') or '—'))}</p>
+  <p><b>Generated:</b> {generated_at}</p>
+  <p class='disclaimer'>{escape(scope_note)}</p>
+
+  <h2>Profile medical history</h2>
+  <p><b>Conditions</b></p>
+  {_list_rows(profile.get('conditions') or [])}
+  <p><b>Surgeries</b></p>
+  {_list_rows(profile.get('surgeries') or [])}
+  <p><b>Allergies</b></p>
+  {_list_rows(profile.get('allergies') or [])}
+
+  <h2>Chronological timeline</h2>
+  {''.join(timeline_blocks) if timeline_blocks else '<p>No dated entries yet.</p>'}
+
+  <p class='disclaimer'>
+    This summary is compiled from information you provided and documents analyzed in Swaasth.
+    It is not a substitute for official medical records. Verify details with your healthcare providers.
+  </p>
+</body>
+</html>
+"""
+
+
 def report_filename_prefix(report_kind: str) -> str:
     return {
         "general": "bill",
@@ -739,6 +854,7 @@ def report_filename_prefix(report_kind: str) -> str:
         "combined": "bill-prescription",
         "prescription": "prescription",
         "dispute_pack": "dispute",
+        "medical_history": "medical-history",
     }.get(report_kind, report_kind.replace("_", "-"))
 
 
@@ -747,3 +863,4 @@ register_report_renderer("bill", render_bill_comparison_html)
 register_report_renderer("combined", render_bill_comparison_html)
 register_report_renderer("prescription", render_prescription_report_html)
 register_report_renderer("dispute_pack", render_dispute_pack_html)
+register_report_renderer("medical_history", render_medical_history_html)

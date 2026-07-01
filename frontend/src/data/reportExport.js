@@ -27,6 +27,12 @@ const REPORT_META = {
     reportTitle: "Bill and Prescription Review Report",
     filenamePrefix: "bill-prescription",
   },
+  medical_history: {
+    id: "medical_history",
+    label: "Medical history",
+    reportTitle: "Medical History Summary",
+    filenamePrefix: "medical-history",
+  },
 };
 
 const REPORT_META_BY_ID = Object.fromEntries(

@@ -16,10 +16,13 @@ from app.services.document_extraction import (
     merge_clinical_contexts,
     normalize_clinical_context,
     normalize_prescription_items,
+    resolve_document_date,
 )
 from app.services.primary_guidelines_index import get_primary_guidelines_store
 from app.services.stg_index import get_stg_index_store
 from app.services.action_plan import build_action_plan
+from app.services.patient_age import resolve_patient_age
+from app.services.patient_gender import gender_display_label
 from app.services.treatment_audit import analyze_treatment
 
 router = APIRouter()
@@ -71,8 +74,29 @@ class AnalyzeTreatmentRequest(BaseModel):
     test_results: list[TestResultInput] = Field(default_factory=list)
     patient_id: str | None = None
     patient_name: str | None = None
+    patient_birth_year: int | None = None
+    patient_age: int | None = None
+    patient_gender: str | None = None
     ocr_text: str | None = None
     clinical_history: dict[str, Any] | None = None
+
+
+def _prescription_item_payload(
+    entry: PrescriptionItemInput,
+    *,
+    category: str,
+) -> dict[str, Any] | None:
+    name = entry.name.strip()
+    if not name:
+        return None
+    payload: dict[str, Any] = {"name": name, "category": category}
+    if entry.dose:
+        payload["dose"] = entry.dose.strip()
+    if entry.frequency:
+        payload["frequency"] = entry.frequency.strip()
+    if entry.duration:
+        payload["duration"] = entry.duration.strip()
+    return payload
 
 
 def _prescription_items_from_payload(
@@ -82,17 +106,17 @@ def _prescription_items_from_payload(
 ) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for entry in medicines:
-        name = entry.name.strip()
-        if name:
-            items.append({"name": name, "category": "medicine"})
+        item = _prescription_item_payload(entry, category="medicine")
+        if item:
+            items.append(item)
     for entry in tests:
-        name = entry.name.strip()
-        if name:
-            items.append({"name": name, "category": "test"})
+        item = _prescription_item_payload(entry, category="test")
+        if item:
+            items.append(item)
     for entry in procedures:
-        name = entry.name.strip()
-        if name:
-            items.append({"name": name, "category": "procedure"})
+        item = _prescription_item_payload(entry, category="procedure")
+        if item:
+            items.append(item)
     return items
 
 
@@ -190,6 +214,11 @@ async def upload_prescription(file: UploadFile = File(...)) -> dict[str, Any]:
             ),
         )
 
+    ai_result["prescription_date"] = resolve_document_date(
+        ai_date=ai_result.get("prescription_date"),
+        ocr_text=extracted_text,
+    )
+
     return {
         "filename": file.filename or "unknown",
         "file_type": file_type,
@@ -242,7 +271,10 @@ async def upload_clinical_document(
         )
         meta = {
             "lab_name": ai_result.get("lab_name"),
-            "report_date": ai_result.get("report_date"),
+            "report_date": resolve_document_date(
+                ai_date=ai_result.get("report_date"),
+                ocr_text=extracted_text,
+            ),
         }
     else:
         ai_result = extract_discharge_summary_with_groq(extracted_text)
@@ -268,7 +300,12 @@ async def upload_clinical_document(
             symptoms_source="discharge",
             test_results_source="discharge",
         )
-        meta = {}
+        meta = {
+            "discharge_date": resolve_document_date(
+                ai_date=ai_result.get("discharge_date"),
+                ocr_text=extracted_text,
+            ),
+        }
 
     return {
         "filename": file.filename or "unknown",
@@ -299,6 +336,11 @@ def analyze_treatment_endpoint(body: AnalyzeTreatmentRequest) -> dict[str, Any]:
         if (item.item_name or item.name or "").strip()
     ]
     clinical_context = _clinical_context_from_request(body.symptoms, body.test_results)
+    patient_age = resolve_patient_age(
+        patient_age=body.patient_age,
+        patient_birth_year=body.patient_birth_year,
+    )
+    patient_gender = gender_display_label(body.patient_gender)
 
     treatment_audit_flags = analyze_treatment(
         diagnosis=body.diagnosis,
@@ -308,6 +350,9 @@ def analyze_treatment_endpoint(body: AnalyzeTreatmentRequest) -> dict[str, Any]:
         diagnosis_user_provided=body.diagnosis_user_provided,
         diagnosis_confidence=body.diagnosis_confidence,
         clinical_history=body.clinical_history,
+        patient_age=patient_age,
+        patient_birth_year=body.patient_birth_year,
+        patient_gender=patient_gender,
     )
 
     restricted_medicine_flags = build_restricted_medicine_flags(
@@ -323,6 +368,9 @@ def analyze_treatment_endpoint(body: AnalyzeTreatmentRequest) -> dict[str, Any]:
         patient={
             "id": body.patient_id,
             "name": body.patient_name,
+            "birth_year": body.patient_birth_year,
+            "age": patient_age,
+            "gender": patient_gender,
         }
         if body.patient_id or body.patient_name
         else None,
@@ -337,6 +385,9 @@ def analyze_treatment_endpoint(body: AnalyzeTreatmentRequest) -> dict[str, Any]:
         "patient": {
             "id": body.patient_id,
             "name": body.patient_name,
+            "birth_year": body.patient_birth_year,
+            "age": patient_age,
+            "gender": patient_gender,
         }
         if body.patient_id or body.patient_name
         else None,

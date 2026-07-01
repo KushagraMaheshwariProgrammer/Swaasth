@@ -3,6 +3,11 @@ import {
   emptyClinicalHistory,
   normalizeClinicalHistory,
 } from "../utils/clinicalHistory";
+import ClinicalHistoryFields from "./ClinicalHistoryFields";
+import {
+  deriveAgeFromBirthYear,
+  getCurrentYear,
+} from "../utils/patientAge";
 
 export const GENDER_OPTIONS = [
   { id: "male", label: "Male" },
@@ -15,7 +20,7 @@ export { emptyClinicalHistory, normalizeClinicalHistory };
 
 export const emptyPatientForm = () => ({
   name: "",
-  age: "",
+  birthYear: "",
   gender: "",
   state: "",
   savePastBills: false,
@@ -24,9 +29,15 @@ export const emptyPatientForm = () => ({
 
 export function patientToFormFields(patient) {
   const history = patient?.clinicalHistory || emptyClinicalHistory();
+  const birthYear =
+    patient?.birthYear != null
+      ? String(patient.birthYear)
+      : patient?.age != null
+      ? String(getCurrentYear() - Number(patient.age))
+      : "";
   return {
     name: patient?.name || "",
-    age: patient?.age != null ? String(patient.age) : "",
+    birthYear,
     gender: patient?.gender || "",
     state: patient?.state || "",
     savePastBills: Boolean(patient?.savePastBills),
@@ -54,73 +65,6 @@ export function genderLabel(gender) {
   );
 }
 
-function createHistoryRow(fields) {
-  return fields.reduce((row, field) => ({ ...row, [field]: "" }), {});
-}
-
-function HistoryRows({ title, rows, fields, fieldLabels, onChange, disabled }) {
-  const updateRow = (index, key, value) => {
-    const next = rows.map((row, rowIndex) =>
-      rowIndex === index ? { ...row, [key]: value } : row
-    );
-    onChange(next);
-  };
-
-  const addRow = () => {
-    onChange([...rows, createHistoryRow(fields)]);
-  };
-
-  const removeRow = (index) => {
-    onChange(rows.filter((_, rowIndex) => rowIndex !== index));
-  };
-
-  return (
-    <div className="clinical-history-group">
-      <div className="clinical-history-group-header">
-        <h3>{title}</h3>
-        <button
-          type="button"
-          className="bill-editor-secondary clinical-history-add-btn"
-          onClick={addRow}
-          disabled={disabled}
-        >
-          Add
-        </button>
-      </div>
-      {rows.length === 0 && (
-        <p className="clinical-history-empty">None added yet.</p>
-      )}
-      {rows.map((row, index) => (
-        <div key={`${title}-${index}`} className="clinical-history-row">
-          {fields.map((field) => (
-            <label key={field} className="setting-field">
-              <span>{fieldLabels[field]}</span>
-              <input
-                type={field === "year" ? "number" : "text"}
-                min={field === "year" ? "1900" : undefined}
-                max={field === "year" ? "2100" : undefined}
-                value={row[field] || ""}
-                placeholder={fieldLabels[field]}
-                onChange={(event) => updateRow(index, field, event.target.value)}
-                disabled={disabled}
-              />
-            </label>
-          ))}
-          <button
-            type="button"
-            className="bill-editor-secondary clinical-history-remove-btn"
-            onClick={() => removeRow(index)}
-            disabled={disabled}
-            aria-label={`Remove ${title} row`}
-          >
-            Remove
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 const STATE_OPTIONS = getStateOptions();
 
 export default function PatientForm({
@@ -132,18 +76,10 @@ export default function PatientForm({
   saving,
   error,
   info,
+  showClinicalHistory = true,
 }) {
-  const history = form.clinicalHistory || emptyClinicalHistory();
-
-  const setHistorySection = (section, rows) => {
-    setForm((prev) => ({
-      ...prev,
-      clinicalHistory: {
-        ...(prev.clinicalHistory || emptyClinicalHistory()),
-        [section]: rows,
-      },
-    }));
-  };
+  const derivedAge = deriveAgeFromBirthYear(form.birthYear);
+  const currentYear = getCurrentYear();
 
   return (
     <form className="patient-form" onSubmit={onSubmit}>
@@ -161,17 +97,23 @@ export default function PatientForm({
       </label>
       <div className="comparison-settings-grid">
         <label className="setting-field">
-          <span>Age</span>
+          <span>Birth year</span>
           <input
             type="number"
-            min="0"
-            max="150"
+            min="1900"
+            max={currentYear}
             required
-            value={form.age}
+            value={form.birthYear}
+            placeholder="e.g. 1985"
             onChange={(event) =>
-              setForm((prev) => ({ ...prev, age: event.target.value }))
+              setForm((prev) => ({ ...prev, birthYear: event.target.value }))
             }
           />
+          {derivedAge != null && (
+            <span className="comparison-settings-hint">
+              Approximate age: {derivedAge} yrs
+            </span>
+          )}
         </label>
         <label className="setting-field">
           <span>Gender</span>
@@ -208,47 +150,17 @@ export default function PatientForm({
         </select>
       </label>
 
-      <section className="clinical-history-section">
-        <h2>Medical history</h2>
-        <p className="comparison-settings-hint">
-          Add long-term conditions, surgeries, and allergies. This profile history is
-          always considered during audits.
-        </p>
-        <HistoryRows
-          title="Conditions"
-          rows={history.conditions || []}
-          fields={["name", "year", "status"]}
-          fieldLabels={{
-            name: "Condition",
-            year: "Year (optional)",
-            status: "Status (optional)",
-          }}
-          onChange={(rows) => setHistorySection("conditions", rows)}
-          disabled={saving}
-        />
-        <HistoryRows
-          title="Surgeries"
-          rows={history.surgeries || []}
-          fields={["name", "year"]}
-          fieldLabels={{
-            name: "Surgery",
-            year: "Year (optional)",
-          }}
-          onChange={(rows) => setHistorySection("surgeries", rows)}
-          disabled={saving}
-        />
-        <HistoryRows
-          title="Allergies"
-          rows={history.allergies || []}
-          fields={["name", "reaction"]}
-          fieldLabels={{
-            name: "Allergen",
-            reaction: "Reaction (optional)",
-          }}
-          onChange={(rows) => setHistorySection("allergies", rows)}
-          disabled={saving}
-        />
-      </section>
+      {showClinicalHistory && (
+        <section className="clinical-history-section">
+          <ClinicalHistoryFields
+            history={form.clinicalHistory}
+            onChange={(clinicalHistory) =>
+              setForm((prev) => ({ ...prev, clinicalHistory }))
+            }
+            disabled={saving}
+          />
+        </section>
+      )}
 
       <label className="patient-checkbox">
         <input

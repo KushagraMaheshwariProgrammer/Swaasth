@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { DEFAULT_FILE_ACCEPT, isImageFile, validateUploadFile } from "../utils/fileUpload";
+import { useCallback, useRef, useState } from "react";
+import DocumentFilePreview from "./DocumentFilePreview";
+import { DEFAULT_FILE_ACCEPT, validateUploadFile } from "../utils/fileUpload";
 
 export default function DragAndDropUpload({
   icon = "↑",
@@ -16,18 +17,6 @@ export default function DragAndDropUpload({
   const inputRef = useRef(null);
   const dragCounterRef = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState(null);
-
-  useEffect(() => {
-    if (!file || !isImageFile(file)) {
-      setPreviewUrl(null);
-      return undefined;
-    }
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
-
   const processFile = useCallback(
     (selectedFile) => {
       if (!selectedFile) {
@@ -108,14 +97,8 @@ export default function DragAndDropUpload({
         disabled={disabled}
         aria-label={title}
       >
-        {previewUrl ? (
-          <div className="upload-preview">
-            <img
-              src={previewUrl}
-              alt="Selected file preview"
-              className="upload-preview-image"
-            />
-          </div>
+        {file ? (
+          <DocumentFilePreview file={file} className="upload-preview" />
         ) : (
           <div className="upload-icon">{icon}</div>
         )}

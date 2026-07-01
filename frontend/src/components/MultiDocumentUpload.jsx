@@ -5,6 +5,7 @@ import {
   DOCUMENT_TYPES,
   documentTypeLabel,
 } from "../utils/documentBundle";
+import DocumentFilePreview from "./DocumentFilePreview";
 import { DEFAULT_FILE_ACCEPT, validateUploadFile } from "../utils/fileUpload";
 
 export default function MultiDocumentUpload({
@@ -170,52 +171,63 @@ export default function MultiDocumentUpload({
                   : "document-bundle-item-unconfirmed"
               }`}
             >
-              <div className="document-bundle-item-main">
-                <span className="file-name">{doc.file?.name}</span>
-                <p className="document-suggested-type">
-                  Suggested: {documentTypeLabel(doc.suggestedType || doc.documentType)}
-                </p>
-                <div className="document-type-row">
-                  <select
-                    className="document-type-select"
-                    value={doc.documentType}
-                    onChange={(event) =>
-                      updateDocumentType(doc.id, event.target.value)
-                    }
-                    disabled={disabled}
-                    aria-label={`Document type for ${doc.file?.name}`}
-                  >
-                    {DOCUMENT_TYPES.map((type) => (
-                      <option key={type.id} value={type.id}>
-                        {type.label}
-                      </option>
-                    ))}
-                  </select>
-                  {doc.typeConfirmed ? (
-                    <span className="document-type-confirmed-badge" aria-label="Type confirmed">
-                      ✓ Confirmed
-                    </span>
-                  ) : (
+              <div className="document-bundle-item-body">
+                <DocumentFilePreview file={doc.file} />
+                <div className="document-bundle-item-content">
+                  <div className="document-bundle-item-header">
+                    <span className="file-name">{doc.file?.name}</span>
                     <button
                       type="button"
-                      className="bill-editor-secondary document-type-confirm-btn"
-                      onClick={() => confirmDocumentType(doc.id)}
+                      className="bill-editor-secondary document-bundle-remove"
+                      onClick={() => removeDocument(doc.id)}
                       disabled={disabled}
+                      aria-label={`Remove ${doc.file?.name}`}
                     >
-                      Confirm type
+                      Remove
                     </button>
-                  )}
+                  </div>
+                  <div className="document-bundle-item-main">
+                    <p className="document-suggested-type">
+                      Suggested:{" "}
+                      {documentTypeLabel(doc.suggestedType || doc.documentType)}
+                    </p>
+                    <div className="document-type-row">
+                      <select
+                        className="document-type-select"
+                        value={doc.documentType}
+                        onChange={(event) =>
+                          updateDocumentType(doc.id, event.target.value)
+                        }
+                        disabled={disabled}
+                        aria-label={`Document type for ${doc.file?.name}`}
+                      >
+                        {DOCUMENT_TYPES.map((type) => (
+                          <option key={type.id} value={type.id}>
+                            {type.label}
+                          </option>
+                        ))}
+                      </select>
+                      {doc.typeConfirmed ? (
+                        <span
+                          className="document-type-confirmed-badge"
+                          aria-label="Type confirmed"
+                        >
+                          ✓ Confirmed
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="bill-editor-secondary document-type-confirm-btn"
+                          onClick={() => confirmDocumentType(doc.id)}
+                          disabled={disabled}
+                        >
+                          Confirm type
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-              <button
-                type="button"
-                className="bill-editor-secondary document-bundle-remove"
-                onClick={() => removeDocument(doc.id)}
-                disabled={disabled}
-                aria-label={`Remove ${doc.file?.name}`}
-              >
-                Remove
-              </button>
             </li>
           ))}
         </ul>

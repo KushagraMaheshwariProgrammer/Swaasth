@@ -4,7 +4,9 @@ import {
   documentTypeLabel,
   guessDocumentType,
 } from "../utils/documentBundle";
+import DocumentFilePreview from "./DocumentFilePreview";
 import { DEFAULT_FILE_ACCEPT, validateUploadFile } from "../utils/fileUpload";
+import { detectDocumentDate, normalizeToIsoDate } from "../utils/documentDates";
 import {
   buildExtractedSummary,
   deleteHistoricalDocument,
@@ -18,15 +20,27 @@ export default function PatientHistoricalDocuments({
   documents = [],
   onChange,
   disabled = false,
+  embedded = false,
 }) {
   const [file, setFile] = useState(null);
   const [documentType, setDocumentType] = useState("lab_report");
   const [suggestedType, setSuggestedType] = useState("lab_report");
   const [typeConfirmed, setTypeConfirmed] = useState(false);
   const [documentDate, setDocumentDate] = useState("");
+  const [detectedDate, setDetectedDate] = useState("");
+  const [extraction, setExtraction] = useState(null);
+  const [extracting, setExtracting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState(null);
+
+  const resetUploadState = () => {
+    setFile(null);
+    setDocumentDate("");
+    setDetectedDate("");
+    setExtraction(null);
+    setTypeConfirmed(false);
+  };
 
   const handleFileChange = (event) => {
     const nextFile = event.target.files?.[0] || null;
@@ -44,41 +58,69 @@ export default function PatientHistoricalDocuments({
     setSuggestedType(guessed);
     setDocumentType(guessed);
     setTypeConfirmed(false);
+    setDocumentDate("");
+    setDetectedDate("");
+    setExtraction(null);
     setError("");
   };
 
-  const handleUpload = async () => {
+  const handleExtract = async () => {
     if (!file) {
       setError("Choose a document to upload.");
       return;
     }
     if (!typeConfirmed) {
-      setError("Confirm the document type before uploading.");
+      setError("Confirm the document type before extracting.");
       return;
     }
-    if (!documentDate) {
-      setError("Enter the document date.");
+
+    setExtracting(true);
+    setError("");
+    try {
+      const result = await extractHistoricalDocument(file, documentType);
+      const foundDate = detectDocumentDate(documentType, result);
+      setExtraction(result);
+      setDetectedDate(foundDate);
+      setDocumentDate(foundDate);
+    } catch (err) {
+      setExtraction(null);
+      setDetectedDate("");
+      setDocumentDate("");
+      setError(err.message || "Unable to extract document.");
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!extraction) {
+      setError("Extract the document before saving.");
+      return;
+    }
+    if (!normalizeToIsoDate(documentDate)) {
+      setError(
+        detectedDate
+          ? "Confirm or correct the document date before saving."
+          : "We could not read a date from this document. Please enter the document date."
+      );
       return;
     }
 
     setUploading(true);
     setError("");
     try {
-      const extraction = await extractHistoricalDocument(file, documentType);
       const extractedSummary = buildExtractedSummary(documentType, extraction);
       const saved = await saveHistoricalDocument(userId, patientId, {
         file,
         filename: file.name,
         documentType,
-        documentDate,
+        documentDate: normalizeToIsoDate(documentDate),
         extractedSummary,
       });
       onChange?.([saved, ...documents]);
-      setFile(null);
-      setDocumentDate("");
-      setTypeConfirmed(false);
+      resetUploadState();
     } catch (err) {
-      setError(err.message || "Unable to upload document.");
+      setError(err.message || "Unable to save document.");
     } finally {
       setUploading(false);
     }
@@ -100,12 +142,19 @@ export default function PatientHistoricalDocuments({
     }
   };
 
+  const HeadingTag = embedded ? "h3" : "h2";
+  const busy = extracting || uploading;
+
   return (
-    <section className="patient-historical-docs">
-      <h2>Historical documents</h2>
+    <section
+      className={`patient-historical-docs${
+        embedded ? " patient-historical-docs-embedded" : ""
+      }`}
+    >
+      <HeadingTag>Historical documents</HeadingTag>
       <p className="clinical-history-hint">
-        Upload older reports with the date they relate to. Confirm the document
-        type before extracting.
+        Upload older reports with the date they relate to. We read dates from
+        documents when possible; otherwise you will be asked to enter them.
       </p>
 
       <div className="patient-historical-upload">
@@ -115,66 +164,99 @@ export default function PatientHistoricalDocuments({
             type="file"
             accept={DEFAULT_FILE_ACCEPT}
             onChange={handleFileChange}
-            disabled={disabled || uploading}
+            disabled={disabled || busy}
           />
         </label>
 
         {file && (
-          <>
-            <p className="document-suggested-type">
-              Suggested: {documentTypeLabel(suggestedType)}
-            </p>
-            <label className="setting-field setting-field-full">
-              <span>Document type</span>
-              <select
-                value={documentType}
-                onChange={(event) => {
-                  setDocumentType(event.target.value);
-                  setTypeConfirmed(false);
-                }}
-                disabled={disabled || uploading}
-              >
-                {DOCUMENT_TYPES.map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {typeConfirmed ? (
-              <span className="document-type-confirmed-badge">✓ Type confirmed</span>
-            ) : (
-              <button
-                type="button"
-                className="bill-editor-secondary document-type-confirm-btn"
-                onClick={() => setTypeConfirmed(true)}
-                disabled={disabled || uploading}
-              >
-                Confirm type
-              </button>
-            )}
-          </>
+          <div className="document-upload-preview-panel">
+            <DocumentFilePreview file={file} />
+            <div className="document-upload-preview-details">
+              <p className="document-suggested-type">
+                Suggested: {documentTypeLabel(suggestedType)}
+              </p>
+              <label className="setting-field setting-field-full">
+                <span>Document type</span>
+                <select
+                  value={documentType}
+                  onChange={(event) => {
+                    setDocumentType(event.target.value);
+                    setTypeConfirmed(false);
+                    setExtraction(null);
+                    setDetectedDate("");
+                    setDocumentDate("");
+                  }}
+                  disabled={disabled || busy}
+                >
+                  {DOCUMENT_TYPES.map((type) => (
+                    <option key={type.id} value={type.id}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {typeConfirmed ? (
+                <span className="document-type-confirmed-badge">
+                  ✓ Type confirmed
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="bill-editor-secondary document-type-confirm-btn"
+                  onClick={() => setTypeConfirmed(true)}
+                  disabled={disabled || busy}
+                >
+                  Confirm type
+                </button>
+              )}
+            </div>
+          </div>
         )}
 
-        <label className="setting-field setting-field-full">
-          <span>Document date</span>
-          <input
-            type="date"
-            value={documentDate}
-            onChange={(event) => setDocumentDate(event.target.value)}
-            disabled={disabled || uploading}
-            required
-          />
-        </label>
+        {file && typeConfirmed && !extraction && (
+          <button
+            type="button"
+            className="analyze-btn"
+            onClick={handleExtract}
+            disabled={disabled || busy}
+          >
+            {extracting ? "Extracting..." : "Extract document"}
+          </button>
+        )}
 
-        <button
-          type="button"
-          className="analyze-btn"
-          onClick={handleUpload}
-          disabled={disabled || uploading || !file || !typeConfirmed || !documentDate}
-        >
-          {uploading ? "Uploading & extracting..." : "Upload & extract"}
-        </button>
+        {extraction && (
+          <>
+            <label className="setting-field setting-field-full">
+              <span>Document date</span>
+              <input
+                type="date"
+                value={normalizeToIsoDate(documentDate)}
+                onChange={(event) => setDocumentDate(event.target.value)}
+                disabled={disabled || busy}
+                required
+              />
+            </label>
+            {detectedDate ? (
+              <p className="auth-info">
+                Date detected from the document. Confirm or correct it before
+                saving.
+              </p>
+            ) : (
+              <p className="clinical-history-hint">
+                We could not read a date from this document. Please enter when
+                it was issued.
+              </p>
+            )}
+            <button
+              type="button"
+              className="analyze-btn"
+              onClick={handleSave}
+              disabled={disabled || busy || !normalizeToIsoDate(documentDate)}
+            >
+              {uploading ? "Saving..." : "Save to medical history"}
+            </button>
+          </>
+        )}
       </div>
 
       {error && <p className="error-text">{error}</p>}

@@ -39,12 +39,11 @@ export function persistLocalPatient(userId, patientData, localId = null) {
       : `local-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   const existing = entries.find((entry) => entry.localId === id);
-  const patientAge = Number(patientData.age) || 0;
   const record = {
     localId: id,
     patientData: {
       name: patientData.name?.trim() || "",
-      age: patientAge,
+      birthYear: Number(patientData.birthYear) || null,
       gender: patientData.gender || "",
       state: patientData.state?.trim() || "",
       savePastBills: patientData?.savePastBills === true,

@@ -1,3 +1,8 @@
+import {
+  buildDatePromptItem,
+  detectDocumentDate,
+  normalizeToIsoDate,
+} from "./documentDates";
 import { getApiBase } from "../services/apiBase";
 import { fetchBackend, parseJsonResponse } from "../services/httpUtils";
 import {
@@ -108,6 +113,7 @@ function mergeBillResponses(responses) {
   const lineItems = [];
   const ocrTexts = [];
   let firstBill = null;
+  let billDate = "";
 
   for (const response of responses) {
     if (!response) {
@@ -115,6 +121,9 @@ function mergeBillResponses(responses) {
     }
     if (!firstBill) {
       firstBill = response;
+    }
+    if (!billDate) {
+      billDate = normalizeToIsoDate(response.bill_date);
     }
     lineItems.push(...(response.line_items || []));
     if (response.ocr_text) {
@@ -130,6 +139,7 @@ function mergeBillResponses(responses) {
           file_type: firstBill.file_type,
           hospital: firstBill.hospital,
           comparison_settings: firstBill.comparison_settings,
+          bill_date: billDate || null,
           ocr_text: ocrTexts.join("\n"),
         }
       : null,
@@ -212,6 +222,62 @@ export function bundleHasBills(documents) {
   return documents.some((doc) => doc.documentType === "bill");
 }
 
+export function applyDocumentDatesToBundle(documents, confirmedDates) {
+  const dateMap = new Map(
+    (confirmedDates || []).map((item) => [item.id, normalizeToIsoDate(item.documentDate)])
+  );
+  return documents.map((doc) => ({
+    ...doc,
+    documentDate: dateMap.get(doc.id) || normalizeToIsoDate(doc.documentDate) || "",
+  }));
+}
+
+export function mergeConfirmedDatesIntoBundle(merged, documents, confirmedDates) {
+  const datedDocuments = applyDocumentDatesToBundle(documents, confirmedDates);
+  const dateMap = new Map(
+    confirmedDates.map((item) => [item.id, normalizeToIsoDate(item.documentDate)])
+  );
+
+  const sourceDocuments = datedDocuments.map((doc) => ({
+    type: doc.documentType,
+    filename: doc.file?.name || "document",
+    file_type: doc.file?.type || null,
+    document_date: dateMap.get(doc.id) || null,
+  }));
+
+  const billDate =
+    confirmedDates.find((item) => item.documentType === "bill")?.documentDate ||
+    merged.scanMeta?.bill_date ||
+    null;
+
+  const prescriptionDate =
+    confirmedDates.find((item) => item.documentType === "prescription")
+      ?.documentDate ||
+    merged.prescriptionMeta?.prescriptionDate ||
+    null;
+
+  return {
+    ...merged,
+    sourceDocuments,
+    scanMeta: merged.scanMeta
+      ? {
+          ...merged.scanMeta,
+          bill_date: normalizeToIsoDate(billDate) || merged.scanMeta.bill_date || null,
+        }
+      : merged.scanMeta,
+    prescriptionMeta: merged.prescriptionMeta
+      ? {
+          ...merged.prescriptionMeta,
+          prescriptionDate:
+            normalizeToIsoDate(prescriptionDate) ||
+            merged.prescriptionMeta.prescriptionDate ||
+            "",
+        }
+      : merged.prescriptionMeta,
+    datedDocuments,
+  };
+}
+
 export async function processDocumentBundle(documents, location) {
   const bills = documents.filter((doc) => doc.documentType === "bill");
   const prescriptions = documents.filter(
@@ -267,7 +333,54 @@ export async function processDocumentBundle(documents, location) {
     type: doc.documentType,
     filename: doc.file?.name || "document",
     file_type: doc.file?.type || null,
+    document_date: normalizeToIsoDate(doc.documentDate) || null,
   }));
+
+  const perDocumentDates = [
+    ...bills.map((doc, index) =>
+      buildDatePromptItem({
+        id: doc.id,
+        filename: doc.file?.name,
+        documentType: "bill",
+        detectedDate: detectDocumentDate("bill", billResults[index]),
+      })
+    ),
+    ...prescriptions.map((doc, index) =>
+      buildDatePromptItem({
+        id: doc.id,
+        filename: doc.file?.name,
+        documentType: "prescription",
+        detectedDate: detectDocumentDate("prescription", prescriptionResults[index]),
+      })
+    ),
+    ...labReports.map((doc, index) =>
+      buildDatePromptItem({
+        id: doc.id,
+        filename: doc.file?.name,
+        documentType: "lab_report",
+        detectedDate: detectDocumentDate("lab_report", labResults[index]),
+      })
+    ),
+    ...dischargeSummaries.map((doc, index) =>
+      buildDatePromptItem({
+        id: doc.id,
+        filename: doc.file?.name,
+        documentType: "discharge_summary",
+        detectedDate: detectDocumentDate(
+          "discharge_summary",
+          dischargeResults[index]
+        ),
+      })
+    ),
+    ...preauthLetters.map((doc, index) =>
+      buildDatePromptItem({
+        id: doc.id,
+        filename: doc.file?.name,
+        documentType: "preauth_letter",
+        detectedDate: detectDocumentDate("preauth_letter", preauthResults[index]),
+      })
+    ),
+  ];
 
   return {
     lineItems,
@@ -280,6 +393,7 @@ export async function processDocumentBundle(documents, location) {
     diagnosisConfidence: prescriptionMerged.diagnosisConfidence,
     clinicalContext,
     sourceDocuments,
+    perDocumentDates,
     preauthDocuments: preauthResults,
     hasBills: bills.length > 0,
     hasPrescriptions: prescriptions.length > 0,

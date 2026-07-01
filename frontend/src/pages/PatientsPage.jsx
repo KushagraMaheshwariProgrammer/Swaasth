@@ -6,13 +6,14 @@ import PatientForm, {
   genderLabel,
   patientToFormFields,
 } from "../components/PatientForm";
-import PatientHistoricalDocuments from "../components/PatientHistoricalDocuments";
+import PatientMedicalHistorySection from "../components/PatientMedicalHistorySection";
 import PatientList from "../components/PatientList";
 import {
   computeBillSummary,
   formatCurrency,
   getBillPatientName,
 } from "../billUtils";
+import { formatPatientAge } from "../utils/patientAge";
 import { reportKindLabel } from "../data/reportExport";
 import { useAuth } from "../context/AuthContext";
 import UserNav from "../components/UserNav";
@@ -30,7 +31,6 @@ import {
 import { getPatientHistoricalDocuments } from "../services/patientHistoricalDocuments";
 import {
   clinicalHistorySummary,
-  normalizeClinicalHistory,
 } from "../utils/clinicalHistory";
 import { canViewMedicalHistory, patientAllowsHistory } from "../utils/medicalHistoryConsent";
 
@@ -293,13 +293,6 @@ export default function PatientsPage() {
       redirect: true,
     });
 
-  const clinicalHistory = normalizeClinicalHistory(selectedPatient?.clinicalHistory);
-  const historySummaryParts = [
-    clinicalHistory.conditions.length,
-    clinicalHistory.surgeries.length,
-    clinicalHistory.allergies.length,
-  ].some(Boolean);
-
   return (
     <motion.div className="check-page" {...pageTransition}>
       <main className="check-wrap patients-wrap">
@@ -393,7 +386,7 @@ export default function PatientsPage() {
                   <div>
                     <h1>{selectedPatient.name}</h1>
                     <p>
-                      {selectedPatient.age} yrs · {genderLabel(selectedPatient.gender)}
+                      {formatPatientAge(selectedPatient)} · {genderLabel(selectedPatient.gender)}
                     </p>
                     <p className="patient-history-summary">
                       {clinicalHistorySummary(selectedPatient.clinicalHistory)}
@@ -443,73 +436,30 @@ export default function PatientsPage() {
                       submitLabel="Save changes"
                       saving={saving}
                       error={error}
+                      showClinicalHistory={false}
                     />
                   </section>
-                ) : (
-                  <section className="patient-clinical-history-summary">
-                    <h2>Medical history</h2>
-                    {clinicalHistory.conditions.length > 0 && (
-                      <div>
-                        <h3>Conditions</h3>
-                        <ul>
-                          {clinicalHistory.conditions.map((item, index) => (
-                            <li key={`condition-${index}`}>
-                              {item.name}
-                              {item.year ? ` (${item.year})` : ""}
-                              {item.status ? ` — ${item.status}` : ""}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {clinicalHistory.surgeries.length > 0 && (
-                      <div>
-                        <h3>Surgeries</h3>
-                        <ul>
-                          {clinicalHistory.surgeries.map((item, index) => (
-                            <li key={`surgery-${index}`}>
-                              {item.name}
-                              {item.year ? ` (${item.year})` : ""}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {clinicalHistory.allergies.length > 0 && (
-                      <div>
-                        <h3>Allergies</h3>
-                        <ul>
-                          {clinicalHistory.allergies.map((item, index) => (
-                            <li key={`allergy-${index}`}>
-                              {item.name}
-                              {item.reaction ? ` — ${item.reaction}` : ""}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {!historySummaryParts && (
-                      <p className="clinical-history-empty">
-                        No medical history recorded yet. Edit the profile to add
-                        conditions, surgeries, or allergies.
-                      </p>
-                    )}
-                  </section>
-                )}
+                ) : null}
+
+                <PatientMedicalHistorySection
+                  userId={user.uid}
+                  patient={selectedPatient}
+                  documents={historicalDocuments}
+                  onDocumentsChange={setHistoricalDocuments}
+                  onPatientUpdated={(updated) => {
+                    setSelectedPatient(updated);
+                    setForm(patientToFormFields(updated));
+                  }}
+                  documentsEnabled={patientHistoryAllowed}
+                  accountHistoryAllowed={historyAllowed}
+                  accountConsent={{ accepted: Boolean(medicalHistoryConsentAccepted) }}
+                  disabled={saving}
+                />
 
                 {syncMessage && <p className="auth-info">{syncMessage}</p>}
 
                 {patientHistoryAllowed ? (
-                  <>
-                    <PatientHistoricalDocuments
-                      userId={user.uid}
-                      patientId={selectedPatient.id}
-                      documents={historicalDocuments}
-                      onChange={setHistoricalDocuments}
-                      disabled={saving}
-                    />
-
-                    <section className="patient-bills-section">
+                  <section className="patient-bills-section">
                       <h2>Past bills for this patient</h2>
                       {billsLoading && (
                         <p className="auth-info">Syncing bills from your account...</p>
@@ -567,7 +517,6 @@ export default function PatientsPage() {
                         })}
                       </ul>
                     </section>
-                  </>
                 ) : (
                   <section className="patient-bills-section">
                     <h2>Past bills for this patient</h2>

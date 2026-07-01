@@ -14,6 +14,7 @@ import { auth, db } from "../firebase";
 import { deleteBillsForPatientIds, getBillsForPatientIds } from "./bills";
 import { deleteHistoricalDocumentsForPatientIds } from "./patientHistoricalDocuments";
 import { normalizeClinicalHistory } from "../utils/clinicalHistory";
+import { validateBirthYearInput } from "../utils/patientAge";
 import {
   getLocalPatientById,
   getLocalPatients,
@@ -69,15 +70,12 @@ export function validatePatientInput(patientData) {
   if (!gender) {
     throw new Error("Please select a gender.");
   }
-  const age = Number(patientData?.age);
-  if (!Number.isFinite(age) || age < 0 || age > 150) {
-    throw new Error("Please enter a valid age (0–150).");
-  }
+  const birthYear = validateBirthYearInput(patientData?.birthYear);
   const state = patientData?.state?.trim() || "";
   return {
     name,
     gender,
-    age,
+    birthYear,
     state,
     savePastBills: patientData?.savePastBills === true,
     clinicalHistory: normalizeClinicalHistory(patientData?.clinicalHistory),
@@ -109,7 +107,7 @@ function buildFirestorePayload(patientData) {
   const validated = validatePatientInput(patientData);
   return {
     name: validated.name,
-    age: validated.age,
+    birthYear: validated.birthYear,
     gender: validated.gender,
     state: validated.state,
     savePastBills: validated.savePastBills,

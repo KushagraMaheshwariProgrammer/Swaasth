@@ -47,3 +47,37 @@ def test_unified_render_pdf_general_bill() -> None:
 def test_unified_render_pdf_rejects_empty_report() -> None:
     res = client.post("/api/reports/render-pdf", json={})
     assert res.status_code == 400
+
+
+def test_unified_render_pdf_medical_history() -> None:
+    payload = {
+        "report_kind": "medical_history",
+        "patient": {
+            "name": "Test Patient",
+            "age_label": "45 years",
+            "gender_label": "Male",
+        },
+        "profile": {
+            "conditions": [{"name": "Hypertension", "year": 2020}],
+            "surgeries": [],
+            "allergies": [],
+        },
+        "timeline": [
+            {
+                "kind": "legacy_document",
+                "date": "2024-06-01",
+                "title": "cbc-report.pdf",
+                "document_type_label": "Lab report",
+                "diagnosis": "",
+            }
+        ],
+        "include_swaasth_reports": False,
+        "generated_at": "2026-07-01T00:00:00.000Z",
+    }
+    res = client.post("/api/reports/render-pdf", json=payload)
+    assert res.status_code == 200, res.text
+    assert res.headers["content-type"] == "application/pdf"
+    assert res.content[:5] == b"%PDF-"
+    assert "medical-history-Test-Patient.pdf" in res.headers.get(
+        "content-disposition", ""
+    )

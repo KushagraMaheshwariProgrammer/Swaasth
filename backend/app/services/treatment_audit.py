@@ -96,6 +96,36 @@ def _collect_item_names(items: list[dict[str, Any]]) -> list[str]:
     return names
 
 
+def _prescription_items_for_audit(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    audited: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        category = str(item.get("category") or "").lower()
+        if category not in {"medicine", "drug", "test", "procedure", "investigation", ""}:
+            if item.get("item_name"):
+                category = "other"
+            else:
+                continue
+        name = str(
+            item.get("item_name")
+            or item.get("name")
+            or item.get("description")
+            or ""
+        ).strip()
+        if not name:
+            continue
+        payload: dict[str, Any] = {"name": name}
+        if category:
+            payload["category"] = category
+        for field in ("dose", "frequency", "duration"):
+            value = str(item.get(field) or "").strip()
+            if value:
+                payload[field] = value
+        audited.append(payload)
+    return audited
+
+
 def _symptom_names(clinical_context: dict[str, Any] | None) -> list[str]:
     if not clinical_context:
         return []
@@ -519,6 +549,15 @@ Return ONLY valid JSON with this shape:
 
 Rules:
 - Evaluate the TRIANGLE: diagnosis vs symptoms/test results vs prescription/bill items.
+- When patient age is provided, consider whether the diagnosis, investigations, and
+  medicines are appropriate for that age group per the guideline excerpts (for example
+  pediatric vs adult conditions, or age-specific first-line treatments).
+- When patient sex is provided, apply sex-specific guideline sections only when they
+  match the patient (for example pregnancy/obstetric guidance for female patients,
+  prostate/testicular guidance for male patients). Do not flag against excerpts that
+  apply only to the opposite sex.
+- When prescription items include dose, frequency, or duration, compare strength and
+  dosing against age-appropriate recommendations in the excerpts when available.
 - Base every flag on the supplied guideline excerpts only.
 - Reasons must explain the clinical concern in plain language.
 - Recommendations must be concrete actions for the patient, for example:
@@ -549,12 +588,15 @@ def _groq_triangle_audit(
     diagnosis_user_provided: bool,
     symptoms: list[str],
     test_results: list[dict[str, Any]],
-    prescription_items: list[str],
+    prescription_items: list[dict[str, Any]],
     bill_items: list[str],
     context_text: str,
     matched_conditions: list[str],
     retrieval_chunks: list[dict[str, Any]],
     filtered_history: dict[str, Any] | None = None,
+    patient_age: int | None = None,
+    patient_birth_year: int | None = None,
+    patient_gender: str | None = None,
 ) -> dict[str, Any]:
     history_block = ""
     if filtered_history and (
@@ -568,18 +610,32 @@ def _groq_triangle_audit(
             f"{json.dumps(filtered_history, ensure_ascii=False)}"
         )
 
+    age_block = ""
+    if patient_age is not None or patient_birth_year is not None:
+        age_block = (
+            "\n\nPatient age context:\n"
+            f"{json.dumps({'birth_year': patient_birth_year, 'approximate_age_years': patient_age}, ensure_ascii=False)}"
+        )
+
+    gender_block = ""
+    if patient_gender:
+        gender_block = (
+            "\n\nPatient sex context:\n"
+            f"{json.dumps({'gender': patient_gender}, ensure_ascii=False)}"
+        )
+
     user = f"""
 Diagnosis: {diagnosis}
 Diagnosis user-provided: {diagnosis_user_provided}
 Matched government guideline topics: {json.dumps(matched_conditions)}
-
+{age_block}{gender_block}
 Symptoms:
 {json.dumps(symptoms, ensure_ascii=False)}
 
 Test results:
 {json.dumps(test_results, ensure_ascii=False)}
 
-Prescribed / ordered items:
+Prescribed / ordered items (include dose/frequency/duration when available):
 {json.dumps(prescription_items, ensure_ascii=False)}
 
 Billed items (optional):
@@ -611,6 +667,9 @@ def analyze_treatment(
     diagnosis_user_provided: bool = False,
     diagnosis_confidence: str | None = None,
     clinical_history: dict[str, Any] | None = None,
+    patient_age: int | None = None,
+    patient_birth_year: int | None = None,
+    patient_gender: str | None = None,
 ) -> dict[str, Any]:
     diagnosis = str(diagnosis or "").strip()
     if not diagnosis:
@@ -646,6 +705,8 @@ def analyze_treatment(
         symptoms=symptoms,
         test_results=test_results,
         clinical_history=history_for_retrieval,
+        patient_age=patient_age,
+        patient_gender=patient_gender,
     )
     matched_conditions = retrieval.get("matched_conditions") or []
     context_text = retrieval.get("context_text") or ""
@@ -666,6 +727,7 @@ def analyze_treatment(
         analyze_prescription_rationality(
             diagnosis=diagnosis,
             prescription_items=prescription_items,
+            patient_age=patient_age,
         )
     )
 
@@ -721,12 +783,15 @@ def analyze_treatment(
             diagnosis_user_provided=diagnosis_user_provided,
             symptoms=symptoms,
             test_results=test_results,
-            prescription_items=rx_names,
+            prescription_items=_prescription_items_for_audit(prescription_items),
             bill_items=bill_names,
             context_text=context_text,
             matched_conditions=matched_conditions,
             retrieval_chunks=retrieval_chunks,
             filtered_history=filtered_history,
+            patient_age=patient_age,
+            patient_birth_year=patient_birth_year,
+            patient_gender=patient_gender,
         )
         clinical_alignment = audit_result.get("clinical_alignment") or clinical_alignment
         for flag in audit_result.get("flags") or []:

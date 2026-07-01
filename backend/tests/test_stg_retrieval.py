@@ -97,7 +97,7 @@ def test_retrieve_stg_context_uses_primary_without_fallback(monkeypatch) -> None
     )
     monkeypatch.setattr(
         "app.services.stg_retrieval.map_diagnosis_to_primary_documents",
-        lambda diagnosis, limit=4: ["Malaria"],
+        lambda diagnosis, limit=4, patient_gender=None: ["Malaria"],
     )
     monkeypatch.setattr(
         "app.services.stg_retrieval.rerank_chunks",
@@ -166,11 +166,11 @@ def test_retrieve_stg_context_falls_back_when_primary_insufficient(monkeypatch) 
     )
     monkeypatch.setattr(
         "app.services.stg_retrieval.map_diagnosis_to_primary_documents",
-        lambda diagnosis, limit=4: [],
+        lambda diagnosis, limit=4, patient_gender=None: [],
     )
     monkeypatch.setattr(
         "app.services.stg_retrieval.map_diagnosis_to_stg_conditions",
-        lambda diagnosis, limit=3: ["Malaria"],
+        lambda diagnosis, limit=3, patient_gender=None: ["Malaria"],
     )
     monkeypatch.setattr(
         "app.services.stg_retrieval.rerank_chunks",

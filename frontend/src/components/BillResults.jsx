@@ -8,6 +8,7 @@ import {
   getFlagMeta,
   HOSPITAL_TYPE_OPTIONS,
 } from "../billUtils";
+import { formatPatientAge, getPatientAge } from "../utils/patientAge";
 import AdvocacyScopeSection from "./AdvocacyScopeSection";
 import AuditFlagCard from "./AuditFlagCard";
 import ClinicalHistoryUsedPanel from "./ClinicalHistoryUsedPanel";
@@ -84,7 +85,9 @@ export default function BillResults({ result, toolbar = null }) {
       {result?.patient?.name && (
         <p className="comparison-context">
           Patient: <strong>{result.patient.name}</strong>
-          {result.patient.age != null && <> · {result.patient.age} yrs</>}
+          {getPatientAge(result.patient) != null && (
+            <> · {formatPatientAge(result.patient)}</>
+          )}
           {result.patient.gender && <> · {result.patient.gender}</>}
         </p>
       )}

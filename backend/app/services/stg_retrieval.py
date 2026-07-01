@@ -7,7 +7,9 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from app.services.gender_guidelines import filter_chunks_by_gender, filter_conditions_by_gender
 from app.services.groq_client import groq_json_chat
+from app.services.patient_gender import gender_display_label
 from app.services.primary_guidelines_index import get_primary_guidelines_store
 from app.services.rag_pipeline import (
     DEFAULT_MAX_CONTEXT_CHARS,
@@ -44,7 +46,23 @@ def _groq_json(system: str, user: str) -> dict[str, Any]:
     return parsed
 
 
-def map_diagnosis_to_primary_documents(diagnosis: str, limit: int = 4) -> list[str]:
+def _gender_prompt_clause(patient_gender: str | None) -> str:
+    label = gender_display_label(patient_gender)
+    if not label:
+        return ""
+    return (
+        f" Patient sex: {label}. Exclude guideline topics that apply only to the "
+        "opposite sex (for example pregnancy/obstetric/gynaecological topics for "
+        "male patients, or prostate/testicular topics for female patients)."
+    )
+
+
+def map_diagnosis_to_primary_documents(
+    diagnosis: str,
+    limit: int = 4,
+    *,
+    patient_gender: str | None = None,
+) -> list[str]:
     store = get_primary_guidelines_store()
     document_names = store.condition_names()
     if not document_names:
@@ -64,6 +82,7 @@ def map_diagnosis_to_primary_documents(diagnosis: str, limit: int = 4) -> list[s
         "Prefer ICMR and Clinical Establishments Act STG documents that best match "
         f"the diagnosis. Return at most {limit} names. "
         "If no reasonable match exists, return an empty list."
+        f"{_gender_prompt_clause(patient_gender)}"
     )
     user = (
         f"Patient diagnosis: {diagnosis}\n\n"
@@ -84,10 +103,15 @@ def map_diagnosis_to_primary_documents(diagnosis: str, limit: int = 4) -> list[s
         canonical = valid.get(label.lower())
         if canonical and canonical not in resolved:
             resolved.append(canonical)
-    return resolved[:limit]
+    return filter_conditions_by_gender(resolved[:limit], patient_gender)
 
 
-def map_diagnosis_to_stg_conditions(diagnosis: str, limit: int = 3) -> list[str]:
+def map_diagnosis_to_stg_conditions(
+    diagnosis: str,
+    limit: int = 3,
+    *,
+    patient_gender: str | None = None,
+) -> list[str]:
     store = get_stg_index_store()
     condition_names = store.condition_names()
     if not condition_names:
@@ -106,6 +130,7 @@ def map_diagnosis_to_stg_conditions(diagnosis: str, limit: int = 3) -> list[str]
         "Use exact condition names from the provided list whenever possible. "
         f"Prefer the closest clinical match; return at most {limit} names. "
         "If no reasonable match exists, return an empty list."
+        f"{_gender_prompt_clause(patient_gender)}"
     )
     user = (
         f"Patient diagnosis: {diagnosis}\n\n"
@@ -126,7 +151,7 @@ def map_diagnosis_to_stg_conditions(diagnosis: str, limit: int = 3) -> list[str]
         canonical = valid.get(label.lower())
         if canonical and canonical not in resolved:
             resolved.append(canonical)
-    return resolved[:limit]
+    return filter_conditions_by_gender(resolved[:limit], patient_gender)
 
 
 def _dedupe_chunks(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -195,6 +220,8 @@ def _build_semantic_query(
     symptoms: list[Any] | None = None,
     test_results: list[dict[str, Any]] | None = None,
     clinical_history: dict[str, Any] | None = None,
+    patient_age: int | None = None,
+    patient_gender: str | None = None,
 ) -> str:
     from app.services.clinical_history_relevance import history_context_labels
 
@@ -207,11 +234,22 @@ def _build_semantic_query(
         if history_labels
         else ""
     )
+    age_clause = (
+        f" Patient age (approximate): {patient_age} years."
+        if patient_age is not None
+        else ""
+    )
+    gender_label = gender_display_label(patient_gender)
+    gender_clause = (
+        f" Patient sex: {gender_label}."
+        if gender_label
+        else ""
+    )
     return (
         f"{diagnosis}. Diagnostic criteria, salient features, signs and symptoms, "
         f"investigations, test interpretation, treatment. "
         f"Symptoms: {symptom_text}. Test results: {test_text}. "
-        f"Items to evaluate: {item_summary}.{history_clause}"
+        f"Items to evaluate: {item_summary}.{history_clause}{age_clause}{gender_clause}"
     )
 
 
@@ -239,6 +277,7 @@ def _hybrid_retrieve_chunks(
     pool_k: int = DEFAULT_RETRIEVAL_POOL_K,
     rerank_top_k: int = DEFAULT_RERANK_TOP_K,
     enrich_fn: Any = None,
+    patient_gender: str | None = None,
 ) -> list[dict[str, Any]]:
     toc_chunks = store.get_chunks_for_conditions(matched_labels, limit_per_condition=12)
     for chunk in toc_chunks:
@@ -257,10 +296,11 @@ def _hybrid_retrieve_chunks(
     fused = reciprocal_rank_fusion([toc_chunks, semantic_chunks, keyword_chunks])
     reranked = rerank_chunks(semantic_query, fused, top_k=rerank_top_k)
     prioritized = _prioritize_chunks(reranked)
+    gender_filtered = filter_chunks_by_gender(prioritized, patient_gender)
 
     if enrich_fn:
-        return [enrich_fn(chunk) for chunk in prioritized]
-    return prioritized
+        return [enrich_fn(chunk) for chunk in gender_filtered]
+    return gender_filtered
 
 
 def _retrieve_primary_context(
@@ -268,6 +308,7 @@ def _retrieve_primary_context(
     semantic_query: str,
     *,
     top_k: int = DEFAULT_RETRIEVAL_POOL_K,
+    patient_gender: str | None = None,
 ) -> dict[str, Any]:
     store = get_primary_guidelines_store()
     if not store.is_ready:
@@ -277,12 +318,16 @@ def _retrieve_primary_context(
             "guideline_sources": [],
         }
 
-    matched_documents = map_diagnosis_to_primary_documents(diagnosis)
+    matched_documents = map_diagnosis_to_primary_documents(
+        diagnosis,
+        patient_gender=patient_gender,
+    )
     chunks = _hybrid_retrieve_chunks(
         store,
         semantic_query,
         matched_documents,
         pool_k=top_k,
+        patient_gender=patient_gender,
     )
     guideline_sources = sorted(
         {
@@ -303,12 +348,16 @@ def _retrieve_crc_fallback_context(
     semantic_query: str,
     *,
     top_k: int = DEFAULT_RETRIEVAL_POOL_K,
+    patient_gender: str | None = None,
 ) -> dict[str, Any]:
     store = get_stg_index_store()
     if not store.is_ready:
         return {"matched_conditions": [], "chunks": []}
 
-    matched_conditions = map_diagnosis_to_stg_conditions(diagnosis)
+    matched_conditions = map_diagnosis_to_stg_conditions(
+        diagnosis,
+        patient_gender=patient_gender,
+    )
 
     def enrich(chunk: dict[str, Any]) -> dict[str, Any]:
         item = dict(chunk)
@@ -322,6 +371,7 @@ def _retrieve_crc_fallback_context(
         matched_conditions,
         pool_k=top_k,
         enrich_fn=enrich,
+        patient_gender=patient_gender,
     )
 
     return {
@@ -337,6 +387,8 @@ def retrieve_stg_context(
     symptoms: list[Any] | None = None,
     test_results: list[dict[str, Any]] | None = None,
     clinical_history: dict[str, Any] | None = None,
+    patient_age: int | None = None,
+    patient_gender: str | None = None,
     top_k: int = DEFAULT_RETRIEVAL_POOL_K,
 ) -> dict[str, Any]:
     semantic_query = _build_semantic_query(
@@ -345,16 +397,28 @@ def retrieve_stg_context(
         symptoms=symptoms,
         test_results=test_results,
         clinical_history=clinical_history,
+        patient_age=patient_age,
+        patient_gender=patient_gender,
     )
 
-    primary = _retrieve_primary_context(diagnosis, semantic_query, top_k=top_k)
+    primary = _retrieve_primary_context(
+        diagnosis,
+        semantic_query,
+        top_k=top_k,
+        patient_gender=patient_gender,
+    )
     primary_chunks = primary["chunks"]
     use_fallback = not _primary_is_sufficient(primary_chunks)
 
     fallback_chunks: list[dict[str, Any]] = []
     fallback_matched: list[str] = []
     if use_fallback:
-        fallback = _retrieve_crc_fallback_context(diagnosis, semantic_query, top_k=top_k)
+        fallback = _retrieve_crc_fallback_context(
+            diagnosis,
+            semantic_query,
+            top_k=top_k,
+            patient_gender=patient_gender,
+        )
         fallback_chunks = fallback["chunks"]
         fallback_matched = fallback["matched_conditions"]
         if not primary_chunks and not fallback_chunks:
@@ -395,4 +459,5 @@ def retrieve_stg_context(
         "primary_chunk_count": len(primary_chunks),
         "fallback_chunk_count": len(fallback_chunks),
         "used_fallback": bool(fallback_chunks),
+        "patient_gender": gender_display_label(patient_gender),
     }

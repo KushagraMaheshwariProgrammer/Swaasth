@@ -1024,13 +1024,48 @@ body.capacitor-native *::-webkit-scrollbar {
 
 .document-bundle-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
   padding: 0.75rem 0.9rem;
   border: 1px solid rgba(37, 99, 235, 0.12);
   border-radius: 12px;
   background: #ffffff;
+}
+
+.document-bundle-item-body {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+}
+
+.document-bundle-item-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.document-bundle-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.document-bundle-item-header .file-name {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.document-bundle-remove {
+  flex-shrink: 0;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
 }
 
 .document-bundle-item-main {
@@ -1038,7 +1073,6 @@ body.capacitor-native *::-webkit-scrollbar {
   flex-direction: column;
   gap: 0.45rem;
   min-width: 0;
-  flex: 1;
 }
 
 .document-type-select {
@@ -1079,6 +1113,31 @@ body.capacitor-native *::-webkit-scrollbar {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.55rem;
+}
+
+@media (max-width: 640px) {
+  .document-bundle-item-body,
+  .document-upload-preview-panel {
+    flex-direction: column;
+  }
+
+  .document-file-preview {
+    width: 100%;
+  }
+
+  .document-file-preview-image,
+  .document-file-preview-iframe {
+    width: 100%;
+    height: auto;
+    max-height: 200px;
+    object-fit: contain;
+  }
+
+  .document-type-select {
+    max-width: none;
+    flex: 1 1 100%;
+    min-width: 0;
+  }
 }
 
 .document-type-confirm-btn {
@@ -1141,6 +1200,33 @@ body.capacitor-native *::-webkit-scrollbar {
   font-size: 0.9rem;
 }
 
+.patient-medical-history-section {
+  margin-top: 1.5rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(37, 99, 235, 0.1);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.patient-medical-history-actions {
+  margin-top: 0.85rem;
+}
+
+.patient-historical-docs-embedded {
+  margin-top: 1.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  border-top: 1px solid rgba(37, 99, 235, 0.08);
+  padding-top: 1rem;
+}
+
+.patient-historical-docs-embedded h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
 .patient-historical-docs {
   margin-top: 1.5rem;
   padding: 1rem 1.1rem;
@@ -1154,6 +1240,61 @@ body.capacitor-native *::-webkit-scrollbar {
   flex-direction: column;
   gap: 0.75rem;
   margin-top: 0.75rem;
+}
+
+.document-upload-preview-panel {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.document-upload-preview-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.document-file-preview {
+  flex-shrink: 0;
+  width: 96px;
+}
+
+.document-file-preview-image,
+.document-file-preview-iframe {
+  display: block;
+  width: 96px;
+  height: 124px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.06);
+  background: #ffffff;
+}
+
+.document-file-preview-iframe {
+  object-fit: unset;
+  pointer-events: none;
+}
+
+.document-file-preview-pdf {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.06);
+  background: #ffffff;
+}
+
+.document-file-preview-pdf .document-file-preview-iframe {
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
 }
 
 .patient-historical-list {
@@ -1173,6 +1314,81 @@ body.capacitor-native *::-webkit-scrollbar {
   padding: 0.75rem 0.9rem;
   border: 1px solid rgba(37, 99, 235, 0.12);
   border-radius: 12px;
+}
+
+.document-date-prompt-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.document-date-prompt-card {
+  width: min(640px, 100%);
+  max-height: min(85vh, 720px);
+  overflow: auto;
+  padding: 1.25rem 1.35rem;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+}
+
+.document-date-prompt-list {
+  list-style: none;
+  margin: 1rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.document-date-prompt-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 12px;
+}
+
+.document-date-prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.medical-history-export-panel {
+  margin-top: 1.25rem;
+  padding: 1rem 1.1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  background: #f8fbff;
+}
+
+.medical-history-export-panel h3 {
+  margin: 0 0 0.35rem;
+}
+
+.medical-history-export-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.85rem 0;
+}
+
+.medical-history-export-toggle input {
+  width: auto;
+}
+
+.medical-history-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
 }
 
 .clinical-history-used-panel {
@@ -1223,6 +1439,21 @@ body.capacitor-native *::-webkit-scrollbar {
 .upload-preview {
   margin: 0 auto 0.75rem;
   max-width: 220px;
+  width: auto;
+}
+
+.upload-preview.document-file-preview {
+  width: 100%;
+  max-width: 220px;
+}
+
+.upload-preview .document-file-preview-image,
+.upload-preview .document-file-preview-iframe {
+  width: 100%;
+  max-width: 220px;
+  height: auto;
+  max-height: 160px;
+  object-fit: contain;
 }
 
 .upload-preview-image {

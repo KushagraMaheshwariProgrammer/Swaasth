@@ -22,6 +22,7 @@ import {
 } from "./localBillStore";
 import { getLocalMedicalHistoryConsent } from "./localMedicalHistoryConsentStore";
 import { canSaveMedicalHistory } from "../utils/medicalHistoryConsent";
+import { getPatientAge, getPatientBirthYear } from "../utils/patientAge";
 
 function billsCollection(userId) {
   return collection(db, "users", userId, "bills");
@@ -178,7 +179,8 @@ export function buildReportSavePayload(reportData, patient) {
     patient: {
       id: patient.id,
       name: patient.name,
-      age: patient.age,
+      birthYear: getPatientBirthYear(patient),
+      age: getPatientAge(patient),
       gender: patient.gender,
     },
   };
