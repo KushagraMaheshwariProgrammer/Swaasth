@@ -12,7 +12,7 @@ import {
   formatCurrency,
   getBillPatientName,
 } from "../billUtils";
-import { reportKindLabel } from "../data/reportExport";
+import { resolveScheme } from "../data/schemes";
 import { useAuth } from "../context/AuthContext";
 import UserNav from "../components/UserNav";
 import { deleteBill } from "../services/bills";
@@ -36,7 +36,7 @@ const pageTransition = {
 
 export default function PatientsPage() {
   const { patientId } = useParams();
-  const { user, medicalHistoryConsentAccepted } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [patients, setPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -108,7 +108,10 @@ export default function PatientsPage() {
       }
 
       try {
-        const patient = await getPatient(user.uid, patientId);
+        const [patient, bills] = await Promise.all([
+          getPatient(user.uid, patientId),
+          getPatientBills(user.uid, patientId),
+        ]);
         if (cancelled) {
           return;
         }
@@ -120,25 +123,16 @@ export default function PatientsPage() {
         }
         setSelectedPatient(patient);
         setForm(patientToFormFields(patient));
-
-        if (medicalHistoryConsentAccepted && patient.savePastBills === true) {
-          const bills = await getPatientBills(user.uid, patientId);
-          if (cancelled) {
-            return;
-          }
-          setPatientBills(bills);
-          const pendingLocal = bills.filter((bill) => bill.localOnly).length;
-          if (pendingLocal > 0) {
-            setSyncMessage(
-              `${pendingLocal} bill${pendingLocal === 1 ? "" : "s"} on this device — syncing with your account.`
-            );
-          } else if (bills.length > 0) {
-            setSyncMessage(
-              `${bills.length} past bill${bills.length === 1 ? "" : "s"} loaded from your account.`
-            );
-          }
-        } else {
-          setPatientBills([]);
+        setPatientBills(bills);
+        const pendingLocal = bills.filter((bill) => bill.localOnly).length;
+        if (pendingLocal > 0) {
+          setSyncMessage(
+            `${pendingLocal} bill${pendingLocal === 1 ? "" : "s"} on this device — syncing with your account.`
+          );
+        } else if (bills.length > 0) {
+          setSyncMessage(
+            `${bills.length} past bill${bills.length === 1 ? "" : "s"} loaded from your account.`
+          );
         }
       } catch (err) {
         if (!cancelled) {
@@ -156,7 +150,7 @@ export default function PatientsPage() {
     return () => {
       cancelled = true;
     };
-  }, [user, patientId, medicalHistoryConsentAccepted]);
+  }, [user, patientId]);
 
   const handleCreate = async (event) => {
     event.preventDefault();
@@ -363,7 +357,7 @@ export default function PatientsPage() {
             {selectedPatient && (
               <>
                 <header className="check-header patient-detail-header">
-                  <div className="patient-detail-identity">
+                  <div>
                     <h1>{selectedPatient.name}</h1>
                     <p>
                       {selectedPatient.age} yrs · {genderLabel(selectedPatient.gender)}
@@ -419,26 +413,6 @@ export default function PatientsPage() {
 
                 {syncMessage && <p className="auth-info">{syncMessage}</p>}
 
-                {!medicalHistoryConsentAccepted ? (
-                  <section className="patient-bills-section">
-                    <h2>Past bills for this patient</h2>
-                    <p className="auth-info">
-                      Medical history is disabled for your account.{" "}
-                      <Link to="/consent/medical-history">
-                        Enable medical history consent
-                      </Link>{" "}
-                      to view saved reports.
-                    </p>
-                  </section>
-                ) : selectedPatient?.savePastBills !== true ? (
-                  <section className="patient-bills-section">
-                    <h2>Past bills for this patient</h2>
-                    <p className="auth-info">
-                      This patient has not opted in to saving medical history. Edit
-                      the patient profile to enable saving reports.
-                    </p>
-                  </section>
-                ) : (
                 <section className="patient-bills-section">
                   <h2>Past bills for this patient</h2>
                   {billsLoading && (
@@ -446,8 +420,8 @@ export default function PatientsPage() {
                   )}
                   {!billsLoading && !patientBills.length && (
                     <p className="auth-info">
-                      No bills linked to this patient yet. Upload documents from
-                      Check bill and select this patient.
+                      No bills linked to this patient yet. Upload a bill from Check
+                      bill and select this patient.
                     </p>
                   )}
                   <ul className="history-list">
@@ -474,7 +448,7 @@ export default function PatientsPage() {
                                 )}
                                 {bill.comparison_settings?.city &&
                                   `${bill.comparison_settings.city} · `}
-                                {reportKindLabel(bill)}
+                                {resolveScheme(bill).label}
                               </p>
                             </div>
                             <div className="history-list-meta">
@@ -497,7 +471,6 @@ export default function PatientsPage() {
                     })}
                   </ul>
                 </section>
-                )}
 
               </>
             )}

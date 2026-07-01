@@ -21,7 +21,7 @@ export function patientToFormFields(patient) {
     age: patient?.age != null ? String(patient.age) : "",
     gender: patient?.gender || "",
     state: patient?.state || "",
-    savePastBills: patient?.savePastBills === true,
+    savePastBills: Boolean(patient?.savePastBills),
   };
 }
 
@@ -106,10 +106,10 @@ export default function PatientForm({
         </select>
       </label>
 
-      <label className="terms-checkbox-label patient-consent-label">
+      <label className="patient-checkbox">
         <input
           type="checkbox"
-          checked={Boolean(form.savePastBills)}
+          checked={form.savePastBills}
           onChange={(event) =>
             setForm((prev) => ({
               ...prev,
@@ -117,10 +117,7 @@ export default function PatientForm({
             }))
           }
         />
-        <span>
-          Save medical history for this patient (stores analysis reports to your
-          account when you run checks)
-        </span>
+        <span>Do you want to save this patient&apos;s past bills?</span>
       </label>
 
       {info && <p className="auth-info">{info}</p>}

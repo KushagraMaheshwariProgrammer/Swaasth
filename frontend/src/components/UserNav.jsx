@@ -6,7 +6,7 @@ import { useAuth } from "../context/AuthContext";
 
 const NAV_LINKS = [
   { to: "/patients", label: "Patients" },
-  { to: "/history", label: "Past bills", requiresHistoryConsent: true },
+  { to: "/history", label: "Past bills" },
   { to: "/account", label: "Account" },
 ];
 
@@ -37,7 +37,7 @@ function useIsMobileNav() {
 }
 
 export default function UserNav({ className = "" }) {
-  const { user, logOut, loading, medicalHistoryConsentAccepted } = useAuth();
+  const { user, logOut, loading } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState({});
   const location = useLocation();
@@ -120,9 +120,6 @@ export default function UserNav({ className = "" }) {
 
   const email = user.email || "Signed in";
   const initial = getUserInitial(user);
-  const navLinks = NAV_LINKS.filter(
-    (link) => !link.requiresHistoryConsent || medicalHistoryConsentAccepted
-  );
 
   const accountMenu = (
     <AnimatePresence>
@@ -165,7 +162,7 @@ export default function UserNav({ className = "" }) {
             </div>
 
             <div className="user-account-menu-links">
-              {navLinks.map((link) => (
+              {NAV_LINKS.map((link) => (
                 <Link
                   key={link.to}
                   to={link.to}
@@ -197,7 +194,7 @@ export default function UserNav({ className = "" }) {
         aria-label="Account navigation"
       >
         <div className="user-nav-desktop" aria-label="Main navigation">
-          {navLinks.map((link) => (
+          {NAV_LINKS.map((link) => (
             <Link key={link.to} to={link.to} className="user-nav-link">
               {link.label}
             </Link>

@@ -195,17 +195,6 @@ export default function AccountSettingsPage() {
             </p>
           </section>
         )}
-
-        <section className="account-section">
-          <h2>Medical history</h2>
-          <p className="account-section-copy">
-            Control whether analysis reports are saved to your account and view the consent
-            details.
-          </p>
-          <Link to="/consent/medical-history" className="analyze-btn account-section-action">
-            Medical history consent
-          </Link>
-        </section>
       </main>
     </motion.div>
   );

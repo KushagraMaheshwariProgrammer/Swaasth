@@ -81,6 +81,10 @@ export function getBillComparisonCopy() {
   };
 }
 
+export function getComparisonSchemeCopy() {
+  return getBillComparisonCopy();
+}
+
 export function CountUp({ value, isCurrency = false, duration = 1200 }) {
   const [displayValue, setDisplayValue] = useState(0);
 
