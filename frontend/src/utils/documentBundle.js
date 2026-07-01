@@ -24,14 +24,29 @@ export function createBundleSession() {
 }
 
 export function createBundleDocument(file, documentType = null) {
+  const suggestedType = documentType || guessDocumentType(file?.name || "");
   return {
     id:
       typeof crypto !== "undefined" && crypto.randomUUID
         ? crypto.randomUUID()
         : `doc-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     file,
-    documentType: documentType || guessDocumentType(file?.name || ""),
+    suggestedType,
+    documentType: suggestedType,
+    typeConfirmed: false,
   };
+}
+
+export function allBundleDocumentsConfirmed(documents) {
+  return (
+    Array.isArray(documents) &&
+    documents.length > 0 &&
+    documents.every((doc) => doc.typeConfirmed === true)
+  );
+}
+
+export function documentTypeLabel(typeId) {
+  return DOCUMENT_TYPES.find((type) => type.id === typeId)?.label || typeId;
 }
 
 export function guessDocumentType(filename) {

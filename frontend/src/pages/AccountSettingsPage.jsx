@@ -28,7 +28,13 @@ function PasswordField({ label, value, onChange, autoComplete }) {
 }
 
 export default function AccountSettingsPage() {
-  const { user, usesPasswordProvider, changePassword, changeEmail } = useAuth();
+  const {
+    user,
+    usesPasswordProvider,
+    changePassword,
+    changeEmail,
+    medicalHistoryConsentAccepted,
+  } = useAuth();
 
   const [passwordForm, setPasswordForm] = useState({
     current: "",
@@ -108,6 +114,18 @@ export default function AccountSettingsPage() {
             Signed in as <strong>{user?.email || "your account"}</strong> via {identityLabel}.
           </p>
         </header>
+
+        <section className="account-section">
+          <h2>Medical history</h2>
+          <p className="account-section-copy">
+            {medicalHistoryConsentAccepted
+              ? "Medical history is enabled. Reports can be saved for patients who opt in."
+              : "Medical history is off. You can analyze documents, but reports will not be saved."}
+          </p>
+          <Link to="/consent/medical-history" className="patients-manage-link">
+            Manage medical history consent →
+          </Link>
+        </section>
 
         {usesPasswordProvider && (
           <section className="account-section">

@@ -127,6 +127,7 @@ export async function analyzeTreatment({
   testResults = [],
   patient = null,
   ocrText = "",
+  clinicalHistory = null,
 }) {
   return fetchJson(`${getApiBase()}/analyze-treatment`, {
     method: "POST",
@@ -144,6 +145,7 @@ export async function analyzeTreatment({
       patient_id: patient?.id || null,
       patient_name: patient?.name || null,
       ocr_text: ocrText || null,
+      clinical_history: clinicalHistory,
     }),
   });
 }

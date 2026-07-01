@@ -30,6 +30,7 @@ _REPORT_TITLES: dict[str, str] = {
     "bill": "Bill Review Report",
     "combined": "Bill and Prescription Review Report",
     "prescription": "Prescription Treatment Appropriateness Report",
+    "dispute_pack": "Dispute Pack — Factual Summary",
 }
 
 _HOSPITAL_TYPE_LABELS: dict[str, str] = {
@@ -162,6 +163,11 @@ def resolve_report_kind(report: dict[str, Any]) -> str:
 
 
 def validate_report(report: dict[str, Any], report_kind: str) -> None:
+    if report_kind == "dispute_pack":
+        if not report.get("action_plan"):
+            raise ValueError("Invalid dispute pack report payload.")
+        return
+
     if report_kind == "prescription":
         if not report.get("treatment_audit_flags"):
             raise ValueError("Invalid prescription report payload.")
@@ -464,6 +470,95 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
 """
 
 
+def render_dispute_pack_html(report: dict[str, Any]) -> str:
+    """Render a dispute / evidence pack PDF from action_plan data."""
+    action_plan = report.get("action_plan") or {}
+    patient = report.get("patient") or {}
+    hospital = report.get("hospital") or {}
+    discharge = action_plan.get("discharge_guidance") or {}
+    recoverable = action_plan.get("recoverable_estimate") or {}
+
+    evidence_rows = []
+    for item in action_plan.get("evidence_pack_items") or []:
+        ref = item.get("reference_rate") or {}
+        stg = item.get("stg_excerpt") or {}
+        evidence_rows.append(
+            "<tr>"
+            f"<td>{escape(str(item.get('display_label') or item.get('item') or ''))}</td>"
+            f"<td>{escape(str(item.get('tier') or ''))}</td>"
+            f"<td>{escape(_fmt_currency(ref.get('value')) if ref.get('value') is not None else '—')}</td>"
+            f"<td>{escape(str(stg.get('condition') or '—'))}</td>"
+            f"<td>{escape('; '.join(item.get('questions') or []))}</td>"
+            "</tr>"
+        )
+
+    ladder_html = []
+    for step in action_plan.get("escalation_ladder") or []:
+        attachments = step.get("what_to_attach") or []
+        attach_html = "".join(f"<li>{escape(str(a))}</li>" for a in attachments)
+        ladder_html.append(
+            f"<h3>{escape(str(step.get('title') or ''))}</h3>"
+            f"<p><b>When:</b> {escape(str(step.get('when') or ''))}</p>"
+            f"<p><b>Typical timeline:</b> {escape(str(step.get('typical_timeline') or ''))}</p>"
+            f"<p><b>Attach:</b></p><ul>{attach_html}</ul>"
+            f"<p><i>{escape(str(step.get('disclaimer') or ''))}</i></p>"
+        )
+
+    template_blocks = []
+    for template in action_plan.get("complaint_templates") or []:
+        template_blocks.append(
+            f"<h3>{escape(str(template.get('audience') or ''))}</h3>"
+            f"<p><b>Subject:</b> {escape(str(template.get('subject') or ''))}</p>"
+            f"<pre style='white-space:pre-wrap;font-size:9px;'>{escape(str(template.get('body') or ''))}</pre>"
+        )
+
+    reasons = discharge.get("reasons") or []
+    reasons_html = "".join(f"<li>{escape(str(r))}</li>" for r in reasons)
+
+    return f"""
+<html>
+<head><style>
+  body {{ font-family: Helvetica, Arial, sans-serif; color: #2c3e50; font-size: 10px; }}
+  h1 {{ font-size: 16px; color: #1a5276; }}
+  h2 {{ font-size: 12px; color: #1a5276; border-bottom: 1px solid #aed6f1; margin-top: 14px; }}
+  table {{ width: 100%; border-collapse: collapse; margin-top: 6px; }}
+  th, td {{ border: 1px solid #d5dbdb; padding: 4px 5px; text-align: left; vertical-align: top; }}
+  th {{ background: #eaf2f8; font-size: 9px; }}
+  .disclaimer {{ margin-top: 14px; font-size: 8.5px; color: #7f8c8d; font-style: italic; }}
+  ul {{ margin: 4px 0; padding-left: 16px; }}
+</style></head>
+<body>
+  <h1>Dispute Pack — Factual Summary</h1>
+  <p><b>Patient:</b> {escape(str(patient.get('name', '—')))}</p>
+  <p><b>Hospital:</b> {escape(str(hospital.get('name_from_bill', '—')))}</p>
+
+  <h2>Discharge payment guidance</h2>
+  <p><b>Status:</b> {escape(str(discharge.get('status', '—')))}</p>
+  <ul>{reasons_html}</ul>
+  <p><i>{escape(str(discharge.get('emergency_note') or ''))}</i></p>
+
+  <h2>Recoverable amount estimate</h2>
+  <p><b>Overpriced vs NPPA:</b> {_fmt_currency(recoverable.get('overpriced_total'))}</p>
+  <p><b>Jan Aushadhi savings potential:</b> {_fmt_currency(recoverable.get('jan_aushadhi_savings'))}</p>
+  <p><b>Total estimate:</b> {_fmt_currency(recoverable.get('total'))}</p>
+  <p class='disclaimer'>{escape(str(recoverable.get('disclaimer') or ''))}</p>
+
+  <h2>Evidence pack items</h2>
+  {"<table><tr><th>Item</th><th>Tier</th><th>Reference</th><th>Guideline</th><th>Questions</th></tr>" + ''.join(evidence_rows) + "</table>" if evidence_rows else "<p>No Tier A/B evidence items.</p>"}
+
+  <h2>Escalation ladder</h2>
+  {''.join(ladder_html)}
+
+  <h2>Complaint draft templates</h2>
+  {''.join(template_blocks) if template_blocks else "<p>No templates generated.</p>"}
+
+  <p class='disclaimer'>{escape(str(action_plan.get('disclaimer') or ''))}</p>
+  <p class='disclaimer'>Swaasth does not make final medical, legal, or regulatory findings.</p>
+</body>
+</html>
+"""
+
+
 def _story_from_html(html: str) -> Any:
     """Build a MuPDF Story with bundled fonts for headless Linux CI runners."""
     import fitz
@@ -507,6 +602,7 @@ def report_filename_prefix(report_kind: str) -> str:
         "bill": "bill",
         "combined": "bill-prescription",
         "prescription": "prescription",
+        "dispute_pack": "dispute",
     }.get(report_kind, report_kind.replace("_", "-"))
 
 
@@ -514,3 +610,4 @@ register_report_renderer("general", render_bill_comparison_html)
 register_report_renderer("bill", render_bill_comparison_html)
 register_report_renderer("combined", render_bill_comparison_html)
 register_report_renderer("prescription", render_prescription_report_html)
+register_report_renderer("dispute_pack", render_dispute_pack_html)

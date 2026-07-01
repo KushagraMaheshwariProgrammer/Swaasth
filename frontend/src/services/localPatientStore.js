@@ -1,3 +1,5 @@
+import { normalizeClinicalHistory } from "../utils/clinicalHistory";
+
 const STORAGE_KEY = "swaasth_local_patients_v1";
 
 function readStore() {
@@ -46,6 +48,7 @@ export function persistLocalPatient(userId, patientData, localId = null) {
       gender: patientData.gender || "",
       state: patientData.state?.trim() || "",
       savePastBills: patientData?.savePastBills === true,
+      clinicalHistory: normalizeClinicalHistory(patientData?.clinicalHistory),
     },
     firestoreId: existing?.firestoreId || null,
     synced: false,

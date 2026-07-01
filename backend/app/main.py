@@ -8,6 +8,7 @@ from typing import Any
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field, model_validator
 
 from app.report_routes import router as report_router
@@ -25,6 +26,7 @@ from app.services.document_extraction import (
     normalize_clinical_context,
 )
 from app.restricted_medicines import build_restricted_medicine_flags, get_restricted_medicines_store
+from app.services.action_plan import build_action_plan
 from app.services.audit_advocacy import ADVOCACY_SCOPE_CHECKED, ADVOCACY_SCOPE_NOT_CHECKED, merge_patient_questions
 from app.services.treatment_audit import analyze_treatment
 
@@ -136,7 +138,7 @@ def load_reference_data() -> None:
         print(f"WARNING: Restricted medicines catalog failed to load: {exc}")
 
 
-@app.get("/health")
+@app.get("/health", response_class=PlainTextResponse)
 def health_check() -> str:
     return "Backend is running"
 
@@ -355,6 +357,7 @@ class CompareBillRequest(BaseModel):
     symptoms: list[SymptomInput] = Field(default_factory=list)
     test_results: list[TestResultInput] = Field(default_factory=list)
     ocr_text: str | None = None
+    clinical_history: dict[str, Any] | None = None
 
     @model_validator(mode="after")
     def resolve_state(self) -> "CompareBillRequest":
@@ -457,6 +460,7 @@ def _build_comparison_response(
     clinical_context: dict[str, Any] | None = None,
     report_kind: str = "bill",
     ocr_text: str | None = None,
+    clinical_history: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not line_items:
         raise HTTPException(status_code=400, detail="Add at least one line item.")
@@ -487,6 +491,7 @@ def _build_comparison_response(
             clinical_context=clinical_context,
             diagnosis_user_provided=diagnosis_user_provided,
             diagnosis_confidence=clinical_context.get("diagnosis_confidence"),
+            clinical_history=clinical_history,
         )
         if prescription_items or clinical_context:
             prescription_payload = {
@@ -559,6 +564,18 @@ def _build_comparison_response(
         "not_checked": list(ADVOCACY_SCOPE_NOT_CHECKED),
     }
 
+    combined_flags = list(audit_flags.get("flags") or [])
+    if treatment_audit_flags:
+        combined_flags += list(treatment_audit_flags.get("flags") or [])
+    action_plan = build_action_plan(
+        flags=combined_flags,
+        line_items=compared_line_items,
+        jan_aushadhi=jan_aushadhi,
+        patient=patient_payload,
+        hospital={"name_from_bill": hospital_name},
+        clinical=clinical_context if clinical_context else None,
+    )
+
     return {
         "filename": filename,
         "file_type": file_type,
@@ -585,6 +602,12 @@ def _build_comparison_response(
         "restricted_medicine_flags": restricted_medicine_flags,
         "patient_questions": patient_questions,
         "advocacy_scope": advocacy_scope,
+        "action_plan": action_plan,
+        "clinical_history_used": (
+            treatment_audit_flags.get("clinical_history_used")
+            if treatment_audit_flags
+            else None
+        ),
     }
 
 
@@ -635,6 +658,7 @@ def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
         clinical_context=clinical_context,
         report_kind=report_kind,
         ocr_text=body.ocr_text,
+        clinical_history=body.clinical_history,
     )
 
 

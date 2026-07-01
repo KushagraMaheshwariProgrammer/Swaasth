@@ -4,9 +4,9 @@ import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-const NAV_LINKS = [
+const BASE_NAV_LINKS = [
   { to: "/patients", label: "Patients" },
-  { to: "/history", label: "Past bills" },
+  { to: "/history", label: "Past bills", requiresHistoryConsent: true },
   { to: "/account", label: "Account" },
 ];
 
@@ -37,7 +37,7 @@ function useIsMobileNav() {
 }
 
 export default function UserNav({ className = "" }) {
-  const { user, logOut, loading } = useAuth();
+  const { user, logOut, loading, medicalHistoryConsentAccepted } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState({});
   const location = useLocation();
@@ -120,6 +120,10 @@ export default function UserNav({ className = "" }) {
 
   const email = user.email || "Signed in";
   const initial = getUserInitial(user);
+  const navLinks = BASE_NAV_LINKS.filter(
+    (link) =>
+      !link.requiresHistoryConsent || Boolean(medicalHistoryConsentAccepted)
+  );
 
   const accountMenu = (
     <AnimatePresence>
@@ -162,7 +166,7 @@ export default function UserNav({ className = "" }) {
             </div>
 
             <div className="user-account-menu-links">
-              {NAV_LINKS.map((link) => (
+              {navLinks.map((link) => (
                 <Link
                   key={link.to}
                   to={link.to}
@@ -194,7 +198,7 @@ export default function UserNav({ className = "" }) {
         aria-label="Account navigation"
       >
         <div className="user-nav-desktop" aria-label="Main navigation">
-          {NAV_LINKS.map((link) => (
+          {navLinks.map((link) => (
             <Link key={link.to} to={link.to} className="user-nav-link">
               {link.label}
             </Link>

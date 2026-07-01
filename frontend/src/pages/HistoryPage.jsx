@@ -19,6 +19,7 @@ import {
   getUserBillsLocalSnapshot,
 } from "../services/bills";
 import { getPatients, getPatientsLocalSnapshot } from "../services/patients";
+import { canViewMedicalHistory, patientAllowsHistory } from "../utils/medicalHistoryConsent";
 
 const pageTransition = {
   initial: { opacity: 0, y: 12 },
@@ -42,11 +43,30 @@ function formatBillDate(bill) {
   }).format(new Date(sortTime));
 }
 
+function reportKindLabel(bill) {
+  if (bill.report_kind === "bundle") {
+    const count = bill.source_documents?.length;
+    return count ? `${count} documents` : "Multi-document session";
+  }
+  if (bill.report_kind === "prescription") {
+    return "Prescription review";
+  }
+  if (bill.report_kind === "combined") {
+    return "Bill + prescription review";
+  }
+  return `${bill.line_items?.length || 0} items`;
+}
+
 export default function HistoryPage() {
   const { billId } = useParams();
-  const { user } = useAuth();
+  const {
+    user,
+    medicalHistoryConsentAccepted,
+    medicalHistoryConsentLoading,
+  } = useAuth();
   const navigate = useNavigate();
   const [bills, setBills] = useState([]);
+  const [patients, setPatients] = useState([]);
   const [patientNameById, setPatientNameById] = useState({});
   const [selectedBill, setSelectedBill] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -82,6 +102,16 @@ export default function HistoryPage() {
     }
   };
 
+  const accountConsent = { accepted: Boolean(medicalHistoryConsentAccepted) };
+  const historyAllowed = canViewMedicalHistory(accountConsent);
+  const consentedPatientIds = new Set(
+    patients.filter((patient) => patientAllowsHistory(patient)).map((p) => p.id)
+  );
+  const visibleBills = bills.filter((bill) => {
+    const patientId = bill.patientId || bill.patient?.id;
+    return !patientId || consentedPatientIds.has(patientId);
+  });
+
   useEffect(() => {
     let cancelled = false;
 
@@ -114,6 +144,7 @@ export default function HistoryPage() {
           }
           const localPatients = getPatientsLocalSnapshot(user.uid);
           if (localPatients.length) {
+            setPatients(localPatients);
             setPatientNameById(buildPatientNameMap(localPatients));
           }
           const [entries, patients] = await Promise.all([
@@ -124,6 +155,7 @@ export default function HistoryPage() {
             return;
           }
           setPatientNameById(buildPatientNameMap(patients));
+          setPatients(patients);
           const pendingLocal = entries.filter((bill) => bill.localOnly).length;
           const syncMessage = getPendingBillSyncMessage(pendingLocal);
           if (syncMessage) {
@@ -168,26 +200,49 @@ export default function HistoryPage() {
           <p>
             {billId
               ? "Review a saved analysis from your account."
-              : "Every compared bill is saved to your account automatically."}
+              : historyAllowed
+              ? "Saved reports from patients who opted in to medical history."
+              : "Enable medical history consent to view saved reports."}
           </p>
         </header>
 
-        {loading && <p className="history-status">Loading your bills...</p>}
+        {medicalHistoryConsentLoading && (
+          <p className="history-status">Loading consent settings...</p>
+        )}
+
+        {!medicalHistoryConsentLoading && !historyAllowed && !billId && (
+          <section className="history-empty">
+            <p>
+              Medical history is turned off for your account. You can still analyze
+              documents, but reports will not be saved until you enable consent.
+            </p>
+            <Link
+              to="/consent/medical-history"
+              className="analyze-btn history-empty-cta"
+            >
+              Manage medical history consent →
+            </Link>
+          </section>
+        )}
+
+        {loading && historyAllowed && (
+          <p className="history-status">Loading your bills...</p>
+        )}
         {syncMessage && !loading && <p className="auth-info">{syncMessage}</p>}
         {error && <p className="error-text">{error}</p>}
 
-        {!loading && !billId && !bills.length && !error && (
+        {!loading && historyAllowed && !billId && !visibleBills.length && !error && (
           <section className="history-empty">
-            <p>No saved bills yet.</p>
+            <p>No saved bills yet for patients with medical history enabled.</p>
             <Link to="/check" className="analyze-btn history-empty-cta">
               Check your first bill →
             </Link>
           </section>
         )}
 
-        {!loading && !billId && bills.length > 0 && (
+        {!loading && historyAllowed && !billId && visibleBills.length > 0 && (
           <ul className="history-list">
-            {bills.map((bill) => {
+            {visibleBills.map((bill) => {
               const summary = computeBillSummary(bill);
               const patientName = getBillPatientName(bill, patientNameById);
               const title = billDisplayTitle(bill);
@@ -215,11 +270,7 @@ export default function HistoryPage() {
                         ? `${bill.comparison_settings.city}, ${bill.comparison_settings.state_name}`
                         : "Location not recorded"}
                       {" · "}
-                      {bill.report_kind === "prescription"
-                        ? "Prescription review"
-                        : bill.report_kind === "combined"
-                        ? "Bill + prescription review"
-                        : `${bill.line_items?.length || 0} items`}
+                      {reportKindLabel(bill)}
                       {(bill.clinical_context?.symptoms?.length ||
                         bill.clinical_context?.test_results?.length) > 0 && (
                         <span className="history-clinical-badge">Clinical review</span>

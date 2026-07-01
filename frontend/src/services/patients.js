@@ -12,6 +12,8 @@ import {
 import { ensureFirebaseWebAuth } from "../auth/ensureFirebaseWebAuth";
 import { auth, db } from "../firebase";
 import { deleteBillsForPatientIds, getBillsForPatientIds } from "./bills";
+import { deleteHistoricalDocumentsForPatientIds } from "./patientHistoricalDocuments";
+import { normalizeClinicalHistory } from "../utils/clinicalHistory";
 import {
   getLocalPatientById,
   getLocalPatients,
@@ -78,6 +80,7 @@ export function validatePatientInput(patientData) {
     age,
     state,
     savePastBills: patientData?.savePastBills === true,
+    clinicalHistory: normalizeClinicalHistory(patientData?.clinicalHistory),
   };
 }
 
@@ -110,6 +113,7 @@ function buildFirestorePayload(patientData) {
     gender: validated.gender,
     state: validated.state,
     savePastBills: validated.savePastBills,
+    clinicalHistory: validated.clinicalHistory,
     updatedAt: serverTimestamp(),
   };
 }
@@ -340,6 +344,7 @@ export async function deletePatient(userId, patientId) {
 
   const patientIds = collectPatientIdVariants(userId, patientId);
   await deleteBillsForPatientIds(userId, patientIds);
+  await deleteHistoricalDocumentsForPatientIds(userId, patientIds);
 
   const localEntries = getLocalPatients(userId);
   const localMatch = localEntries.find(

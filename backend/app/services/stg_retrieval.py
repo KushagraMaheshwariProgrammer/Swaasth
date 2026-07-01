@@ -194,15 +194,24 @@ def _build_semantic_query(
     *,
     symptoms: list[Any] | None = None,
     test_results: list[dict[str, Any]] | None = None,
+    clinical_history: dict[str, Any] | None = None,
 ) -> str:
+    from app.services.clinical_history_relevance import history_context_labels
+
     symptom_text = ", ".join(_symptom_names(symptoms))[:400]
     test_text = ", ".join(_test_result_summary(test_results))[:400]
     item_summary = ", ".join(item for item in items if item.strip())[:400]
+    history_labels = ", ".join(history_context_labels(clinical_history))[:400]
+    history_clause = (
+        f" Relevant patient history: {history_labels}."
+        if history_labels
+        else ""
+    )
     return (
         f"{diagnosis}. Diagnostic criteria, salient features, signs and symptoms, "
         f"investigations, test interpretation, treatment. "
         f"Symptoms: {symptom_text}. Test results: {test_text}. "
-        f"Items to evaluate: {item_summary}"
+        f"Items to evaluate: {item_summary}.{history_clause}"
     )
 
 
@@ -327,6 +336,7 @@ def retrieve_stg_context(
     *,
     symptoms: list[Any] | None = None,
     test_results: list[dict[str, Any]] | None = None,
+    clinical_history: dict[str, Any] | None = None,
     top_k: int = DEFAULT_RETRIEVAL_POOL_K,
 ) -> dict[str, Any]:
     semantic_query = _build_semantic_query(
@@ -334,6 +344,7 @@ def retrieve_stg_context(
         items,
         symptoms=symptoms,
         test_results=test_results,
+        clinical_history=clinical_history,
     )
 
     primary = _retrieve_primary_context(diagnosis, semantic_query, top_k=top_k)

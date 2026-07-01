@@ -6,13 +6,14 @@ import PatientForm, {
   genderLabel,
   patientToFormFields,
 } from "../components/PatientForm";
+import PatientHistoricalDocuments from "../components/PatientHistoricalDocuments";
 import PatientList from "../components/PatientList";
 import {
   computeBillSummary,
   formatCurrency,
   getBillPatientName,
 } from "../billUtils";
-import { resolveScheme } from "../data/schemes";
+import { reportKindLabel } from "../data/reportExport";
 import { useAuth } from "../context/AuthContext";
 import UserNav from "../components/UserNav";
 import { deleteBill } from "../services/bills";
@@ -26,6 +27,12 @@ import {
   getPatientsWithSyncStatus,
   updatePatient,
 } from "../services/patients";
+import { getPatientHistoricalDocuments } from "../services/patientHistoricalDocuments";
+import {
+  clinicalHistorySummary,
+  normalizeClinicalHistory,
+} from "../utils/clinicalHistory";
+import { canViewMedicalHistory, patientAllowsHistory } from "../utils/medicalHistoryConsent";
 
 const pageTransition = {
   initial: { opacity: 0, y: 12 },
@@ -36,7 +43,7 @@ const pageTransition = {
 
 export default function PatientsPage() {
   const { patientId } = useParams();
-  const { user } = useAuth();
+  const { user, medicalHistoryConsentAccepted } = useAuth();
   const navigate = useNavigate();
   const [patients, setPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -51,6 +58,13 @@ export default function PatientsPage() {
   const [saving, setSaving] = useState(false);
   const [deletingBillId, setDeletingBillId] = useState(null);
   const [deletingPatientId, setDeletingPatientId] = useState(null);
+  const [historicalDocuments, setHistoricalDocuments] = useState([]);
+
+  const historyAllowed = canViewMedicalHistory({
+    accepted: Boolean(medicalHistoryConsentAccepted),
+  });
+  const patientHistoryAllowed =
+    historyAllowed && patientAllowsHistory(selectedPatient);
 
   const loadPatients = useCallback(async () => {
     if (!user) {
@@ -91,6 +105,7 @@ export default function PatientsPage() {
       if (!user || !patientId) {
         setSelectedPatient(null);
         setPatientBills([]);
+        setHistoricalDocuments([]);
         return;
       }
       setBillsLoading(true);
@@ -108,10 +123,7 @@ export default function PatientsPage() {
       }
 
       try {
-        const [patient, bills] = await Promise.all([
-          getPatient(user.uid, patientId),
-          getPatientBills(user.uid, patientId),
-        ]);
+        const patient = await getPatient(user.uid, patientId);
         if (cancelled) {
           return;
         }
@@ -119,11 +131,25 @@ export default function PatientsPage() {
           setError("Patient not found.");
           setSelectedPatient(null);
           setPatientBills([]);
+          setHistoricalDocuments([]);
           return;
         }
+
+        const billsPromise = getPatientBills(user.uid, patientId);
+        const legacyPromise = patientHistoryAllowed || patientAllowsHistory(patient)
+          ? getPatientHistoricalDocuments(user.uid, patientId)
+          : Promise.resolve([]);
+
+        const [bills, legacyDocs] = await Promise.all([billsPromise, legacyPromise]);
+        if (cancelled) {
+          return;
+        }
+
         setSelectedPatient(patient);
         setForm(patientToFormFields(patient));
         setPatientBills(bills);
+        setHistoricalDocuments(legacyDocs);
+
         const pendingLocal = bills.filter((bill) => bill.localOnly).length;
         if (pendingLocal > 0) {
           setSyncMessage(
@@ -150,7 +176,7 @@ export default function PatientsPage() {
     return () => {
       cancelled = true;
     };
-  }, [user, patientId]);
+  }, [user, patientId, patientHistoryAllowed]);
 
   const handleCreate = async (event) => {
     event.preventDefault();
@@ -267,6 +293,13 @@ export default function PatientsPage() {
       redirect: true,
     });
 
+  const clinicalHistory = normalizeClinicalHistory(selectedPatient?.clinicalHistory);
+  const historySummaryParts = [
+    clinicalHistory.conditions.length,
+    clinicalHistory.surgeries.length,
+    clinicalHistory.allergies.length,
+  ].some(Boolean);
+
   return (
     <motion.div className="check-page" {...pageTransition}>
       <main className="check-wrap patients-wrap">
@@ -362,6 +395,9 @@ export default function PatientsPage() {
                     <p>
                       {selectedPatient.age} yrs · {genderLabel(selectedPatient.gender)}
                     </p>
+                    <p className="patient-history-summary">
+                      {clinicalHistorySummary(selectedPatient.clinicalHistory)}
+                    </p>
                   </div>
                   <div className="patient-detail-actions">
                     <Link
@@ -409,69 +445,146 @@ export default function PatientsPage() {
                       error={error}
                     />
                   </section>
-                ) : null}
+                ) : (
+                  <section className="patient-clinical-history-summary">
+                    <h2>Medical history</h2>
+                    {clinicalHistory.conditions.length > 0 && (
+                      <div>
+                        <h3>Conditions</h3>
+                        <ul>
+                          {clinicalHistory.conditions.map((item, index) => (
+                            <li key={`condition-${index}`}>
+                              {item.name}
+                              {item.year ? ` (${item.year})` : ""}
+                              {item.status ? ` — ${item.status}` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {clinicalHistory.surgeries.length > 0 && (
+                      <div>
+                        <h3>Surgeries</h3>
+                        <ul>
+                          {clinicalHistory.surgeries.map((item, index) => (
+                            <li key={`surgery-${index}`}>
+                              {item.name}
+                              {item.year ? ` (${item.year})` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {clinicalHistory.allergies.length > 0 && (
+                      <div>
+                        <h3>Allergies</h3>
+                        <ul>
+                          {clinicalHistory.allergies.map((item, index) => (
+                            <li key={`allergy-${index}`}>
+                              {item.name}
+                              {item.reaction ? ` — ${item.reaction}` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {!historySummaryParts && (
+                      <p className="clinical-history-empty">
+                        No medical history recorded yet. Edit the profile to add
+                        conditions, surgeries, or allergies.
+                      </p>
+                    )}
+                  </section>
+                )}
 
                 {syncMessage && <p className="auth-info">{syncMessage}</p>}
 
-                <section className="patient-bills-section">
-                  <h2>Past bills for this patient</h2>
-                  {billsLoading && (
-                    <p className="auth-info">Syncing bills from your account...</p>
-                  )}
-                  {!billsLoading && !patientBills.length && (
-                    <p className="auth-info">
-                      No bills linked to this patient yet. Upload a bill from Check
-                      bill and select this patient.
-                    </p>
-                  )}
-                  <ul className="history-list">
-                    {patientBills.map((bill) => {
-                      const summary = computeBillSummary(bill);
-                      const patientName =
-                        getBillPatientName(bill) || selectedPatient.name;
-                      const title = bill.filename || "Hospital bill";
-                      const isDeleting = deletingBillId === bill.id;
-                      return (
-                        <li key={bill.id} className="history-list-row">
-                          <Link
-                            to={`/history/${bill.id}`}
-                            className="history-list-item history-list-item-flex"
-                          >
-                            <div>
-                              <strong>{title}</strong>
-                              <p>
-                                {patientName && (
-                                  <>
-                                    Patient: <strong>{patientName}</strong>
-                                    {" · "}
-                                  </>
-                                )}
-                                {bill.comparison_settings?.city &&
-                                  `${bill.comparison_settings.city} · `}
-                                {resolveScheme(bill).label}
-                              </p>
-                            </div>
-                            <div className="history-list-meta">
-                              <span className="history-overcharge">
-                                {formatCurrency(summary.totalOvercharged)} over
-                              </span>
-                            </div>
-                          </Link>
-                          <button
-                            type="button"
-                            className="history-delete-btn"
-                            disabled={isDeleting}
-                            aria-label={`Delete bill ${title}`}
-                            onClick={() => handleDeleteBill(bill)}
-                          >
-                            {isDeleting ? "Deleting…" : "Delete"}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
+                {patientHistoryAllowed ? (
+                  <>
+                    <PatientHistoricalDocuments
+                      userId={user.uid}
+                      patientId={selectedPatient.id}
+                      documents={historicalDocuments}
+                      onChange={setHistoricalDocuments}
+                      disabled={saving}
+                    />
 
+                    <section className="patient-bills-section">
+                      <h2>Past bills for this patient</h2>
+                      {billsLoading && (
+                        <p className="auth-info">Syncing bills from your account...</p>
+                      )}
+                      {!billsLoading && !patientBills.length && (
+                        <p className="auth-info">
+                          No bills linked to this patient yet. Upload documents from
+                          Check bill and select this patient.
+                        </p>
+                      )}
+                      <ul className="history-list">
+                        {patientBills.map((bill) => {
+                          const summary = computeBillSummary(bill);
+                          const patientName =
+                            getBillPatientName(bill) || selectedPatient.name;
+                          const title = bill.filename || "Hospital bill";
+                          const isDeleting = deletingBillId === bill.id;
+                          return (
+                            <li key={bill.id} className="history-list-row">
+                              <Link
+                                to={`/history/${bill.id}`}
+                                className="history-list-item history-list-item-flex"
+                              >
+                                <div>
+                                  <strong>{title}</strong>
+                                  <p>
+                                    {patientName && (
+                                      <>
+                                        Patient: <strong>{patientName}</strong>
+                                        {" · "}
+                                      </>
+                                    )}
+                                    {bill.comparison_settings?.city &&
+                                      `${bill.comparison_settings.city} · `}
+                                    {reportKindLabel(bill)}
+                                  </p>
+                                </div>
+                                <div className="history-list-meta">
+                                  <span className="history-overcharge">
+                                    {formatCurrency(summary.totalOvercharged)} over
+                                  </span>
+                                </div>
+                              </Link>
+                              <button
+                                type="button"
+                                className="history-delete-btn"
+                                disabled={isDeleting}
+                                aria-label={`Delete bill ${title}`}
+                                onClick={() => handleDeleteBill(bill)}
+                              >
+                                {isDeleting ? "Deleting…" : "Delete"}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  </>
+                ) : (
+                  <section className="patient-bills-section">
+                    <h2>Past bills for this patient</h2>
+                    <p className="auth-info">
+                      {!historyAllowed
+                        ? "Enable medical history in your account settings to view saved reports."
+                        : !selectedPatient?.savePastBills
+                        ? "This patient has not opted in to saving medical history. Edit the patient profile to enable it."
+                        : "Saved reports are not available for this patient."}
+                    </p>
+                    {!historyAllowed && (
+                      <Link to="/consent/medical-history" className="patients-manage-link">
+                        Manage medical history consent
+                      </Link>
+                    )}
+                  </section>
+                )}
               </>
             )}
             {error && (!selectedPatient || !editing) && (

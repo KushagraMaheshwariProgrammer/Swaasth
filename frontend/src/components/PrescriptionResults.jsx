@@ -1,4 +1,5 @@
 import TreatmentAuditSection from "./TreatmentAuditSection";
+import ClinicalHistoryUsedPanel from "./ClinicalHistoryUsedPanel";
 import PatientQuestionsSection from "./PatientQuestionsSection";
 import RestrictedMedicinesSection from "./RestrictedMedicinesSection";
 import ReportActions from "./ReportActions";
@@ -84,6 +85,14 @@ export default function PrescriptionResults({ result, toolbar = null }) {
       <TreatmentAuditSection
         treatmentAuditFlags={result.treatment_audit_flags}
         report={result}
+      />
+
+      <ClinicalHistoryUsedPanel
+        clinicalHistoryUsed={
+          result?.clinical_history_used ||
+          result?.treatment_audit_flags?.clinical_history_used
+        }
+        patientId={result?.patient?.id}
       />
 
       <RestrictedMedicinesSection

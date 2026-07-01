@@ -14,6 +14,7 @@ import {
   getAuditConfidenceMeta,
 } from "../auditAdvocacyUtils";
 import AdvocacyScopeSection from "./AdvocacyScopeSection";
+import ClinicalHistoryUsedPanel from "./ClinicalHistoryUsedPanel";
 import PatientQuestionsSection from "./PatientQuestionsSection";
 import ReportActions from "./ReportActions";
 import TreatmentAuditSection from "./TreatmentAuditSection";
@@ -268,6 +269,14 @@ export default function BillResults({ result, toolbar = null }) {
       <TreatmentAuditSection
         treatmentAuditFlags={result?.treatment_audit_flags}
         report={result}
+      />
+
+      <ClinicalHistoryUsedPanel
+        clinicalHistoryUsed={
+          result?.clinical_history_used ||
+          result?.treatment_audit_flags?.clinical_history_used
+        }
+        patientId={result?.patient?.id}
       />
 
       <AdvocacyScopeSection advocacyScope={result?.advocacy_scope} />

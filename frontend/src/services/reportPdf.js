@@ -1,3 +1,5 @@
+import { Capacitor } from "@capacitor/core";
+import { resolveActionPlan } from "../actionPlanUtils";
 import { getApiBase } from "./apiBase";
 import { buildReportFilename, resolveReportMeta } from "../data/reportExport";
 import { backendUnreachableMessage, fetchBackend } from "./httpUtils";
@@ -51,16 +53,7 @@ export function prepareReportForPdf(report) {
   return cleaned;
 }
 
-function openPreviewWindow() {
-  const preview = window.open("about:blank", "_blank", "noopener,noreferrer");
-  if (!preview) {
-    throw new Error("Pop-up blocked. Allow pop-ups for this site and try again.");
-  }
-  return preview;
-}
-
-async function fetchReportPdfBlob(report) {
-  const payload = prepareReportForPdf(report);
+async function postRenderPdf(payload) {
   let response;
   try {
     response = await fetchBackend(`${getApiBase()}/api/reports/render-pdf`, {
@@ -97,57 +90,162 @@ async function fetchReportPdfBlob(report) {
   return response.blob();
 }
 
-export async function openReportPdf(report) {
-  const preview = openPreviewWindow();
-  try {
-    const blob = await fetchReportPdfBlob(report);
-    const blobUrl = URL.createObjectURL(blob);
-    preview.location.replace(blobUrl);
-  } catch (error) {
-    preview.close();
-    throw error;
-  }
+export async function fetchReportPdfBlob(report) {
+  return postRenderPdf(prepareReportForPdf(report));
 }
 
-export async function downloadReportPdf(report, filename) {
-  const blob = await fetchReportPdfBlob(report);
-  const blobUrl = URL.createObjectURL(blob);
+/** Request the guardrailed dispute-pack PDF for a report. */
+export async function fetchDisputePackPdfBlob(report) {
+  return postRenderPdf({
+    ...prepareReportForPdf(report),
+    report_kind: "dispute_pack",
+    action_plan: resolveActionPlan(report),
+  });
+}
+
+function buildPdfFile(blob, filename) {
+  if (typeof File === "undefined") {
+    return null;
+  }
+  return new File([blob], filename, { type: "application/pdf" });
+}
+
+function triggerAnchorDownload(blobUrl, filename) {
   const anchor = document.createElement("a");
   anchor.href = blobUrl;
-  anchor.download = filename || buildReportFilename(report);
+  anchor.download = filename;
   anchor.rel = "noopener";
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 }
 
-export async function shareReportPdf(report) {
-  const reportMeta = resolveReportMeta(report);
-  const filename = buildReportFilename(report);
-  const blob = await fetchReportPdfBlob(report);
-  const file =
-    typeof File !== "undefined"
-      ? new File([blob], filename, { type: "application/pdf" })
-      : null;
+function prefersNativeFileShare() {
+  return Capacitor.isNativePlatform() || /Android|iPhone|iPad/i.test(navigator.userAgent);
+}
 
-  if (file && navigator.canShare?.({ files: [file] }) && navigator.share) {
+async function sharePdfFile(blob, filename, reportTitle) {
+  const file = buildPdfFile(blob, filename);
+  if (!file || typeof navigator.share !== "function") {
+    return false;
+  }
+
+  const sharePayload = {
+    title: reportTitle,
+    text: reportTitle,
+    files: [file],
+  };
+
+  if (navigator.canShare && !navigator.canShare(sharePayload)) {
+    return false;
+  }
+
+  await navigator.share(sharePayload);
+  return true;
+}
+
+export async function loadReportPdfBlobUrl(report) {
+  const blob = await fetchReportPdfBlob(report);
+  return {
+    blob,
+    blobUrl: URL.createObjectURL(blob),
+    filename: buildReportFilename(report),
+    title: resolveReportMeta(report).reportTitle,
+  };
+}
+
+export function revokeReportPdfBlobUrl(blobUrl) {
+  if (blobUrl) {
+    URL.revokeObjectURL(blobUrl);
+  }
+}
+
+export async function downloadReportPdf(report, filename, blobOverride = null) {
+  const blob = blobOverride || (await fetchReportPdfBlob(report));
+  const name = filename || buildReportFilename(report);
+  const reportTitle = resolveReportMeta(report).reportTitle;
+
+  if (prefersNativeFileShare()) {
     try {
-      await navigator.share({
-        title: reportMeta.reportTitle,
-        text: reportMeta.reportTitle,
-        files: [file],
-      });
-      return true;
+      const shared = await sharePdfFile(blob, name, reportTitle);
+      if (shared) {
+        return { method: "share" };
+      }
     } catch (error) {
       if (error?.name === "AbortError") {
-        return false;
+        return { method: "cancelled" };
       }
     }
   }
 
-  const preview = openPreviewWindow();
   const blobUrl = URL.createObjectURL(blob);
-  preview.location.replace(blobUrl);
-  return false;
+  try {
+    triggerAnchorDownload(blobUrl, name);
+    return { method: "download" };
+  } finally {
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  }
+}
+
+export function buildDisputePackFilename(report) {
+  const patientName = (report?.patient?.name || "report").replace(/\s+/g, "-");
+  return `dispute-pack-${patientName}.pdf`;
+}
+
+export async function downloadDisputePackPdf(report) {
+  const blob = await fetchDisputePackPdfBlob(report);
+  const name = buildDisputePackFilename(report);
+  const reportTitle = "Dispute Pack — Factual Summary";
+
+  if (prefersNativeFileShare()) {
+    try {
+      const shared = await sharePdfFile(blob, name, reportTitle);
+      if (shared) {
+        return { method: "share" };
+      }
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        return { method: "cancelled" };
+      }
+    }
+  }
+
+  const blobUrl = URL.createObjectURL(blob);
+  try {
+    triggerAnchorDownload(blobUrl, name);
+    return { method: "download" };
+  } finally {
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  }
+}
+
+export async function shareReportPdf(report, blobOverride = null) {
+  const reportMeta = resolveReportMeta(report);
+  const filename = buildReportFilename(report);
+  const blob = blobOverride || (await fetchReportPdfBlob(report));
+
+  try {
+    const shared = await sharePdfFile(blob, filename, reportMeta.reportTitle);
+    if (shared) {
+      return { shared: true, method: "file" };
+    }
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      return { shared: false, cancelled: true };
+    }
+    throw error;
+  }
+
+  if (typeof navigator.share === "function") {
+    const textPayload = {
+      title: reportMeta.reportTitle,
+      text: reportMeta.reportTitle,
+    };
+    if (!navigator.canShare || navigator.canShare(textPayload)) {
+      await navigator.share(textPayload);
+      return { shared: true, method: "text" };
+    }
+  }
+
+  return { shared: false };
 }

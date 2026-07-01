@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from app.services.audit_advocacy import build_advocacy_payload, finalize_audit_flags
+from app.services.clinical_history_relevance import filter_relevant_clinical_history
 from app.services.groq_client import groq_json_chat
 from app.services.investigation_audit import analyze_investigations
 from app.services.prescription_rationality import analyze_prescription_rationality
@@ -160,6 +161,7 @@ def _rule_based_clinical_flags(
     diagnosis: str,
     clinical_context: dict[str, Any] | None,
     prescription_items: list[dict[str, Any]] | None = None,
+    filtered_history: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     if not clinical_context:
         return []
@@ -256,6 +258,43 @@ def _rule_based_clinical_flags(
                     }
                 )
                 break
+
+    if filtered_history and rx_names:
+        prior_medicines: list[str] = []
+        for report in filtered_history.get("prior_reports") or []:
+            if isinstance(report, dict):
+                prior_medicines.extend(
+                    str(name).strip()
+                    for name in report.get("medicines") or []
+                    if str(name).strip()
+                )
+        prior_norms = {_normalize_name(name) for name in prior_medicines}
+        for rx_name in rx_names:
+            rx_norm = _normalize_name(rx_name)
+            if not any(abx in rx_norm for abx in ANTIBIOTIC_MARKERS):
+                continue
+            for prior_norm in prior_norms:
+                if not any(abx in prior_norm for abx in ANTIBIOTIC_MARKERS):
+                    continue
+                if _similarity(rx_norm, prior_norm) >= 0.7:
+                    flags.append(
+                        {
+                            "type": "PRESCRIPTION_CLINICAL_MISMATCH",
+                            "severity": "MEDIUM",
+                            "item": rx_name,
+                            "category": "prescription",
+                            "reason": (
+                                f"'{rx_name}' matches a prior antibiotic from the "
+                                "patient's recent history."
+                            ),
+                            "recommendation": (
+                                "Ask your doctor whether repeating the same antibiotic "
+                                "class is appropriate for this visit."
+                            ),
+                            "stg_reference": None,
+                        }
+                    )
+                    break
 
     return flags
 
@@ -405,7 +444,20 @@ def _groq_triangle_audit(
     context_text: str,
     matched_conditions: list[str],
     retrieval_chunks: list[dict[str, Any]],
+    filtered_history: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    history_block = ""
+    if filtered_history and (
+        filtered_history.get("included")
+        or filtered_history.get("profile")
+        or filtered_history.get("prior_reports")
+        or filtered_history.get("legacy_documents")
+    ):
+        history_block = (
+            "\n\nRelevant patient history:\n"
+            f"{json.dumps(filtered_history, ensure_ascii=False)}"
+        )
+
     user = f"""
 Diagnosis: {diagnosis}
 Diagnosis user-provided: {diagnosis_user_provided}
@@ -422,6 +474,7 @@ Prescribed / ordered items:
 
 Billed items (optional):
 {json.dumps(bill_items, ensure_ascii=False)}
+{history_block}
 
 Government guideline excerpts (ICMR / Clinical Establishments / CRC STG fallback):
 {context_text}
@@ -447,6 +500,7 @@ def analyze_treatment(
     clinical_context: dict[str, Any] | None = None,
     diagnosis_user_provided: bool = False,
     diagnosis_confidence: str | None = None,
+    clinical_history: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     diagnosis = str(diagnosis or "").strip()
     if not diagnosis:
@@ -462,11 +516,26 @@ def analyze_treatment(
     symptoms = _symptom_names(clinical_context)
     test_results = _test_results(clinical_context)
 
+    relevance_cache: dict[str, dict[str, Any]] = {}
+    filtered_history = filter_relevant_clinical_history(
+        diagnosis,
+        symptoms,
+        test_results,
+        clinical_history,
+        _cache=relevance_cache,
+    )
+    history_for_retrieval = {
+        "profile": filtered_history.get("profile") or {},
+        "prior_reports": filtered_history.get("prior_reports") or [],
+        "legacy_documents": filtered_history.get("legacy_documents") or [],
+    }
+
     retrieval = retrieve_stg_context(
         diagnosis,
         all_items,
         symptoms=symptoms,
         test_results=test_results,
+        clinical_history=history_for_retrieval,
     )
     matched_conditions = retrieval.get("matched_conditions") or []
     context_text = retrieval.get("context_text") or ""
@@ -479,6 +548,7 @@ def analyze_treatment(
             diagnosis,
             clinical_context,
             prescription_items=prescription_items,
+            filtered_history=filtered_history,
         )
     )
 
@@ -546,6 +616,7 @@ def analyze_treatment(
             context_text=context_text,
             matched_conditions=matched_conditions,
             retrieval_chunks=retrieval_chunks,
+            filtered_history=filtered_history,
         )
         clinical_alignment = audit_result.get("clinical_alignment") or clinical_alignment
         for flag in audit_result.get("flags") or []:
@@ -601,4 +672,5 @@ def analyze_treatment(
         "patient_questions": advocacy["patient_questions"],
         "advocacy_scope": advocacy["advocacy_scope"],
         "diagnosis_confidence": diagnosis_confidence,
+        "clinical_history_used": filtered_history,
     }

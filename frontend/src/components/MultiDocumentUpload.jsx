@@ -1,8 +1,9 @@
 import { useCallback, useRef, useState } from "react";
 import {
+  allBundleDocumentsConfirmed,
   createBundleDocument,
   DOCUMENT_TYPES,
-  guessDocumentType,
+  documentTypeLabel,
 } from "../utils/documentBundle";
 import { DEFAULT_FILE_ACCEPT, validateUploadFile } from "../utils/fileUpload";
 
@@ -12,10 +13,13 @@ export default function MultiDocumentUpload({
   onValidationError,
   disabled = false,
   className = "",
+  showTypeConfirmBanner = true,
 }) {
   const inputRef = useRef(null);
   const dragCounterRef = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
+
+  const hasUnconfirmed = documents.length > 0 && !allBundleDocumentsConfirmed(documents);
 
   const addFiles = useCallback(
     (fileList) => {
@@ -33,7 +37,7 @@ export default function MultiDocumentUpload({
           errors.push(`${file.name}: ${validation.error}`);
           continue;
         }
-        next.push(createBundleDocument(file, guessDocumentType(file.name)));
+        next.push(createBundleDocument(file));
       }
 
       if (errors.length) {
@@ -100,7 +104,17 @@ export default function MultiDocumentUpload({
   const updateDocumentType = (id, documentType) => {
     onChange(
       documents.map((doc) =>
-        doc.id === id ? { ...doc, documentType } : doc
+        doc.id === id
+          ? { ...doc, documentType, typeConfirmed: false }
+          : doc
+      )
+    );
+  };
+
+  const confirmDocumentType = (id) => {
+    onChange(
+      documents.map((doc) =>
+        doc.id === id ? { ...doc, typeConfirmed: true } : doc
       )
     );
   };
@@ -139,27 +153,59 @@ export default function MultiDocumentUpload({
         disabled={disabled}
       />
 
+      {showTypeConfirmBanner && hasUnconfirmed && (
+        <p className="document-type-confirm-banner" role="status">
+          Confirm the type for every document before analyzing.
+        </p>
+      )}
+
       {documents.length > 0 && (
         <ul className="document-bundle-list">
           {documents.map((doc) => (
-            <li key={doc.id} className="document-bundle-item">
+            <li
+              key={doc.id}
+              className={`document-bundle-item ${
+                doc.typeConfirmed
+                  ? "document-bundle-item-confirmed"
+                  : "document-bundle-item-unconfirmed"
+              }`}
+            >
               <div className="document-bundle-item-main">
                 <span className="file-name">{doc.file?.name}</span>
-                <select
-                  className="document-type-select"
-                  value={doc.documentType}
-                  onChange={(event) =>
-                    updateDocumentType(doc.id, event.target.value)
-                  }
-                  disabled={disabled}
-                  aria-label={`Document type for ${doc.file?.name}`}
-                >
-                  {DOCUMENT_TYPES.map((type) => (
-                    <option key={type.id} value={type.id}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
+                <p className="document-suggested-type">
+                  Suggested: {documentTypeLabel(doc.suggestedType || doc.documentType)}
+                </p>
+                <div className="document-type-row">
+                  <select
+                    className="document-type-select"
+                    value={doc.documentType}
+                    onChange={(event) =>
+                      updateDocumentType(doc.id, event.target.value)
+                    }
+                    disabled={disabled}
+                    aria-label={`Document type for ${doc.file?.name}`}
+                  >
+                    {DOCUMENT_TYPES.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                  {doc.typeConfirmed ? (
+                    <span className="document-type-confirmed-badge" aria-label="Type confirmed">
+                      ✓ Confirmed
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="bill-editor-secondary document-type-confirm-btn"
+                      onClick={() => confirmDocumentType(doc.id)}
+                      disabled={disabled}
+                    >
+                      Confirm type
+                    </button>
+                  )}
+                </div>
               </div>
               <button
                 type="button"

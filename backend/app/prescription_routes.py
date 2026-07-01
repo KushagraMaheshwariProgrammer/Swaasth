@@ -19,6 +19,7 @@ from app.services.document_extraction import (
 )
 from app.services.primary_guidelines_index import get_primary_guidelines_store
 from app.services.stg_index import get_stg_index_store
+from app.services.action_plan import build_action_plan
 from app.services.treatment_audit import analyze_treatment
 
 router = APIRouter()
@@ -71,6 +72,7 @@ class AnalyzeTreatmentRequest(BaseModel):
     patient_id: str | None = None
     patient_name: str | None = None
     ocr_text: str | None = None
+    clinical_history: dict[str, Any] | None = None
 
 
 def _prescription_items_from_payload(
@@ -305,12 +307,27 @@ def analyze_treatment_endpoint(body: AnalyzeTreatmentRequest) -> dict[str, Any]:
         clinical_context=clinical_context,
         diagnosis_user_provided=body.diagnosis_user_provided,
         diagnosis_confidence=body.diagnosis_confidence,
+        clinical_history=body.clinical_history,
     )
 
     restricted_medicine_flags = build_restricted_medicine_flags(
         ocr_text=body.ocr_text,
         line_items=bill_items,
         prescription_items=prescription_items,
+    )
+
+    action_plan = build_action_plan(
+        flags=list(treatment_audit_flags.get("flags") or []),
+        line_items=bill_items,
+        jan_aushadhi=None,
+        patient={
+            "id": body.patient_id,
+            "name": body.patient_name,
+        }
+        if body.patient_id or body.patient_name
+        else None,
+        hospital=None,
+        clinical=clinical_context,
     )
 
     return {
@@ -329,5 +346,7 @@ def analyze_treatment_endpoint(body: AnalyzeTreatmentRequest) -> dict[str, Any]:
         "restricted_medicine_flags": restricted_medicine_flags,
         "patient_questions": treatment_audit_flags.get("patient_questions") or [],
         "advocacy_scope": treatment_audit_flags.get("advocacy_scope"),
+        "action_plan": action_plan,
         "report_kind": "prescription",
+        "clinical_history_used": treatment_audit_flags.get("clinical_history_used"),
     }
