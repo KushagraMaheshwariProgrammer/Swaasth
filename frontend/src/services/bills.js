@@ -9,7 +9,7 @@ import {
   serverTimestamp,
   where,
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { awaitFirestoreReady, db } from "../firebase";
 import {
   getLocalBillById,
   getLocalBills,
@@ -110,11 +110,13 @@ function mapCloudBillDocs(docs) {
 }
 
 async function fetchCloudBills(userId) {
+  await awaitFirestoreReady();
   const snapshot = await getDocs(billsCollection(userId));
   return mapCloudBillDocs(snapshot.docs);
 }
 
 async function fetchCloudBillsForPatientIds(userId, patientIds) {
+  await awaitFirestoreReady();
   const ids = [...new Set(patientIds.filter(Boolean))].slice(0, 10);
   if (!ids.length) {
     return [];
@@ -309,6 +311,7 @@ export async function getBill(userId, billId) {
   }
 
   try {
+    await awaitFirestoreReady();
     const billRef = doc(db, "users", userId, "bills", billId);
     const snapshot = await getDoc(billRef);
     if (snapshot.exists()) {

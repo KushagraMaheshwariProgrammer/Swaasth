@@ -6,7 +6,7 @@ import {
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { awaitFirestoreReady, db } from "../firebase";
 import { getApiBase } from "./apiBase";
 import { fetchBackend, parseJsonResponse } from "./httpUtils";
 import {
@@ -88,6 +88,7 @@ export function getLocalHistoricalDocuments(userId, patientIds) {
 }
 
 async function fetchCloudHistoricalDocuments(userId, patientIds) {
+  await awaitFirestoreReady();
   const ids = [...collectPatientIdSet(patientIds)].slice(0, 10);
   if (!ids.length) {
     return [];
@@ -335,6 +336,7 @@ export async function deleteHistoricalDocumentsForPatientIds(userId, patientIds)
 
   for (const patientId of patientIds) {
     try {
+      await awaitFirestoreReady();
       const snapshot = await getDocs(historicalDocsCollection(userId, patientId));
       await Promise.all(snapshot.docs.map((entry) => deleteDoc(entry.ref)));
     } catch (error) {

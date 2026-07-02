@@ -1,5 +1,5 @@
 import { deleteField, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { awaitFirestoreReady, db } from "../firebase";
 import { TERMS_VERSION } from "../data/termsAndConditions";
 import { MEDICAL_HISTORY_CONSENT_VERSION } from "../data/medicalHistoryConsent";
 import {
@@ -39,6 +39,7 @@ export async function getTermsAcceptance(userId) {
   }
 
   try {
+    await awaitFirestoreReady();
     const snapshot = await withTimeout(getDoc(userProfileRef(userId)));
     if (!snapshot.exists()) {
       return { accepted: false, version: null };
@@ -99,6 +100,7 @@ export async function getMedicalHistoryConsent(userId) {
   }
 
   try {
+    await awaitFirestoreReady();
     const snapshot = await withTimeout(getDoc(userProfileRef(userId)));
     if (!snapshot.exists()) {
       return { accepted: false, declined: false, version: null };

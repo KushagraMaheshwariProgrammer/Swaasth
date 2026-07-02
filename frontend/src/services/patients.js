@@ -3,14 +3,13 @@ import {
   collection,
   deleteDoc,
   doc,
-  enableNetwork,
   getDoc,
   getDocsFromServer,
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
 import { ensureFirebaseWebAuth } from "../auth/ensureFirebaseWebAuth";
-import { auth, db } from "../firebase";
+import { auth, awaitFirestoreReady, db } from "../firebase";
 import { deleteBillsForPatientIds, getBillsForPatientIds } from "./bills";
 import { deleteHistoricalDocumentsForPatientIds } from "./patientHistoricalDocuments";
 import { normalizeClinicalHistory } from "../utils/clinicalHistory";
@@ -118,13 +117,13 @@ function buildFirestorePayload(patientData) {
 
 async function fetchCloudPatients(userId) {
   await ensureFirebaseWebAuth();
+  await awaitFirestoreReady();
   if (!auth.currentUser) {
     throw Object.assign(new Error("Firebase session expired. Sign out and sign in again."), {
       code: "auth/user-not-found",
     });
   }
 
-  await enableNetwork(db);
   const snapshot = await getDocsFromServer(patientsCollection(userId));
   return snapshot.docs.map((entry) => ({
     id: entry.id,
@@ -251,6 +250,7 @@ export async function getPatient(userId, patientId) {
   }
 
   try {
+    await awaitFirestoreReady();
     const snapshot = await getDoc(patientDocRef(userId, patientId));
     if (snapshot.exists()) {
       return {

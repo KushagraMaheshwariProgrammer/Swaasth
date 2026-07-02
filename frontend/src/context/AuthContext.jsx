@@ -29,7 +29,7 @@ import {
   getVerificationErrorMessage,
 } from "../auth/emailVerification";
 import { ensureFirebaseWebAuth } from "../auth/ensureFirebaseWebAuth";
-import { auth } from "../firebase";
+import { anchorFirestoreSession, auth } from "../firebase";
 import { syncPendingBills } from "../services/bills";
 import { syncPendingPatients } from "../services/patients";
 import {
@@ -104,10 +104,17 @@ export function AuthProvider({ children }) {
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
-      setUser(nextUser);
-      setLoading(false);
       if (nextUser && !needsEmailVerification(nextUser)) {
         await ensureFirebaseWebAuth();
+        await anchorFirestoreSession(nextUser.uid);
+      } else {
+        anchorFirestoreSession(null);
+      }
+
+      setUser(nextUser);
+      setLoading(false);
+
+      if (nextUser && !needsEmailVerification(nextUser)) {
         syncPendingPatients(nextUser.uid).catch((error) => {
           console.error("Background patient sync failed:", error);
         });
