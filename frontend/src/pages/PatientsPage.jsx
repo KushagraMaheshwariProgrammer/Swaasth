@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import PatientForm, {
   emptyPatientForm,
   genderLabel,
@@ -44,6 +44,7 @@ const pageTransition = {
 export default function PatientsPage() {
   const { patientId } = useParams();
   const { user, medicalHistoryConsentAccepted } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
   const [patients, setPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -97,6 +98,16 @@ export default function PatientsPage() {
     }
     loadPatients();
   }, [user, patientId, loadPatients]);
+
+  useEffect(() => {
+    if (patientId || !location.state?.openAddForm) {
+      return;
+    }
+    setForm(emptyPatientForm());
+    setShowAddForm(true);
+    setError("");
+    navigate(location.pathname, { replace: true, state: null });
+  }, [patientId, location.pathname, location.state, navigate]);
 
   useEffect(() => {
     let cancelled = false;

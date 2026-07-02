@@ -526,6 +526,7 @@ function MedicalHistoryConsentGate({ children }) {
 function CheckPage() {
   const { user, medicalHistoryConsentAccepted } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const compareLocationRef = useRef({ state: "", city: "" });
   const bundleSessionRef = useRef(createBundleSession());
   const bundleSourceDocumentsRef = useRef([]);
@@ -1297,13 +1298,18 @@ function CheckPage() {
               )}
 
               {!patientsLoading && patients.length === 0 && (
-                <p className="auth-info">
-                  No patients yet.{" "}
-                  <Link to="/patients" className="patients-manage-link">
-                    Add a patient
-                  </Link>{" "}
-                  from the Patients tab first.
-                </p>
+                <>
+                  <p className="auth-info">No patients yet</p>
+                  <button
+                    type="button"
+                    className="analyze-btn patients-add-btn"
+                    onClick={() =>
+                      navigate("/patients", { state: { openAddForm: true } })
+                    }
+                  >
+                    add patients
+                  </button>
+                </>
               )}
 
               {patients.length > 0 && (
