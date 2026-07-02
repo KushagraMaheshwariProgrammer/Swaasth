@@ -58,6 +58,43 @@ def test_list_stg_conditions_merges_primary_and_crc(monkeypatch) -> None:
     assert payload["sources"]["crc"] == 2
 
 
+def test_classify_document_returns_low_confidence_without_text(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.prescription_routes.extract_document_text",
+        lambda _bytes, _ftype: "",
+    )
+    response = client.post(
+        "/classify-document",
+        files={"file": ("blank.pdf", b"%PDF-1.4", "application/pdf")},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["confidence"] == "low"
+    assert payload["document_type"] == "bill"
+
+
+def test_classify_document_uses_groq_result(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.prescription_routes.extract_document_text",
+        lambda _bytes, _ftype: "CBC report with haemoglobin results",
+    )
+    monkeypatch.setattr(
+        "app.prescription_routes.classify_document_with_groq",
+        lambda _text: {
+            "document_type": "lab_report",
+            "confidence": "high",
+        },
+    )
+    response = client.post(
+        "/classify-document",
+        files={"file": ("report.pdf", b"%PDF-1.4", "application/pdf")},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["document_type"] == "lab_report"
+    assert payload["confidence"] == "high"
+
+
 def test_analyze_treatment_requires_diagnosis() -> None:
     response = client.post(
         "/analyze-treatment",

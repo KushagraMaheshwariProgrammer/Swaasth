@@ -33,6 +33,7 @@ from app.services.audit_advocacy import ADVOCACY_SCOPE_CHECKED, ADVOCACY_SCOPE_N
 from app.services.preauth_audit import analyze_preauth_mismatches
 from app.services.patient_age import resolve_patient_age
 from app.services.patient_gender import gender_display_label
+from app.services.patient_errors import patient_facing_detail
 from app.services.treatment_audit import analyze_treatment
 
 
@@ -783,8 +784,9 @@ async def upload_bill(
     if not is_medical_bill:
         raise HTTPException(
             status_code=400,
-            detail=ai_result.get(
-                "error", "Uploaded document does not appear to be a medical bill."
+            detail=patient_facing_detail(
+                ai_result.get("error"),
+                "Uploaded document does not appear to be a medical bill.",
             ),
         )
 
@@ -859,8 +861,8 @@ async def upload_preauth(file: UploadFile = File(...)) -> dict[str, Any]:
     if not payload.get("is_preauth"):
         raise HTTPException(
             status_code=400,
-            detail=payload.get(
-                "error",
+            detail=patient_facing_detail(
+                payload.get("error"),
                 "Uploaded document does not appear to be a pre-authorization or claim approval letter.",
             ),
         )

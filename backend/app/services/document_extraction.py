@@ -28,7 +28,11 @@ else:
     TESSERACT_PATH = "/usr/bin/tesseract"
 pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
 
-GROQ_MODEL = "llama-3.3-70b-versatile"
+_AI_ERROR_HINT = (
+    " If the document is the wrong type, set error to a short patient-friendly "
+    "explanation (for example, 'This looks like a prescription, not a hospital bill.'). "
+    "Never use HTTP status phrases like 'Bad Request'."
+)
 
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
@@ -148,6 +152,7 @@ def extract_bill_with_groq(extracted_text: str) -> dict[str, Any]:
         "when visible; otherwise null. "
         "Each line item has item_name, quantity, unit_price, total_price, category "
         "(medicine|test|procedure|other). Keep numeric fields as numbers."
+        f"{_AI_ERROR_HINT}"
     )
     user = f"Bill text:\n{extracted_text}"
     return _groq_chat(system, user)
@@ -160,6 +165,7 @@ def extract_prescription_with_groq(extracted_text: str) -> dict[str, Any]:
         "diagnosis_confidence (high|low|missing), prescriber, prescription_date, "
         "medicines, tests, procedures, symptoms. "
         "If diagnosis is absent or unclear, set diagnosis=null and diagnosis_confidence=missing."
+        f"{_AI_ERROR_HINT}"
     )
     user = f"Prescription text:\n{extracted_text}"
     return _groq_chat(system, user)
@@ -170,6 +176,7 @@ def extract_lab_report_with_groq(extracted_text: str) -> dict[str, Any]:
         "You are helping extract laboratory test results for Indian patients. "
         "Return ONLY valid JSON with keys: is_lab_report, error, lab_name, report_date, "
         "test_results. Use result=positive/negative for antigen/antibody/microscopy results."
+        f"{_AI_ERROR_HINT}"
     )
     user = f"Lab report text:\n{extracted_text}"
     return _groq_chat(system, user)
@@ -182,9 +189,55 @@ def extract_discharge_summary_with_groq(extracted_text: str) -> dict[str, Any]:
         "discharge_date, symptoms, test_results, procedures. "
         "discharge_date is the admission or discharge date in YYYY-MM-DD when visible; "
         "otherwise null."
+        f"{_AI_ERROR_HINT}"
     )
     user = f"Discharge summary text:\n{extracted_text}"
     return _groq_chat(system, user)
+
+
+VALID_DOCUMENT_TYPES = frozenset(
+    {
+        "bill",
+        "prescription",
+        "lab_report",
+        "discharge_summary",
+        "preauth_letter",
+    }
+)
+
+
+def classify_document_with_groq(extracted_text: str) -> dict[str, Any]:
+    system = (
+        "You classify Indian medical documents. Return ONLY valid JSON with keys: "
+        "document_type, confidence, error. "
+        "document_type must be exactly one of: bill, prescription, lab_report, "
+        "discharge_summary, preauth_letter. "
+        "bill = hospital invoice or receipt with charges and line items. "
+        "prescription = doctor prescription with medicines, tests, or procedures ordered. "
+        "lab_report = pathology or diagnostic laboratory test results. "
+        "discharge_summary = hospital inpatient discharge note with admission or discharge details. "
+        "preauth_letter = insurance, TPA, or government scheme pre-authorization or "
+        "cashless approval letter. "
+        "Set confidence to high when the document clearly matches one type; "
+        "set confidence to low when the text is ambiguous, too short, illegible, "
+        "or could reasonably match more than one type."
+    )
+    user = f"Document text:\n{extracted_text[:8000]}"
+    return _groq_chat(system, user, max_tokens=300)
+
+
+def normalize_document_classification(payload: dict[str, Any]) -> dict[str, Any]:
+    doc_type = str(payload.get("document_type") or "bill").strip().lower()
+    if doc_type not in VALID_DOCUMENT_TYPES:
+        doc_type = "bill"
+    confidence = str(payload.get("confidence") or "low").lower()
+    if confidence not in {"high", "low"}:
+        confidence = "low"
+    return {
+        "document_type": doc_type,
+        "confidence": confidence,
+        "error": payload.get("error"),
+    }
 
 
 def extract_preauth_with_groq(extracted_text: str) -> dict[str, Any]:
@@ -196,6 +249,7 @@ def extract_preauth_with_groq(extracted_text: str) -> dict[str, Any]:
         "authorization_date is the letter date in YYYY-MM-DD when visible; otherwise null. "
         "approved_items is an array of {name, approved_amount, notes}. "
         "Keep approved_amount numeric when visible; otherwise null."
+        f"{_AI_ERROR_HINT}"
     )
     user = f"Pre-authorization or claim approval text:\n{extracted_text}"
     return _groq_chat(system, user)

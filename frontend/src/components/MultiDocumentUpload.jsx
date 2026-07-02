@@ -1,12 +1,86 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  allBundleDocumentsConfirmed,
+  applyDocumentClassification,
+  bundleHasClassifyingDocuments,
   createBundleDocument,
   DOCUMENT_TYPES,
   documentTypeLabel,
+  documentsNeedingConfirmation,
 } from "../utils/documentBundle";
 import DocumentFilePreview from "./DocumentFilePreview";
+import DocumentTypeDetailView from "./DocumentTypeDetailView";
 import { DEFAULT_FILE_ACCEPT, validateUploadFile } from "../utils/fileUpload";
+import { classifyDocument } from "../services/prescriptions";
+
+function DocumentTypeControls({
+  doc,
+  disabled,
+  onUpdateType,
+  onConfirm,
+}) {
+  const isAutoClassified = doc.autoClassified && doc.typeConfirmed;
+
+  return (
+    <>
+      {doc.classifying && (
+        <p className="document-classifying-status" role="status">
+          Classifying… you can choose or confirm the type below while we check.
+        </p>
+      )}
+      {isAutoClassified ? (
+        <p className="document-auto-classified-note">
+          Classified by the system as{" "}
+          <strong>{documentTypeLabel(doc.documentType)}</strong>
+        </p>
+      ) : doc.typeConfirmed ? (
+        <p className="document-suggested-type">
+          Type: {documentTypeLabel(doc.documentType)}
+        </p>
+      ) : (
+        <p className="document-needs-confirmation-note">
+          Please confirm: suggested{" "}
+          {documentTypeLabel(doc.suggestedType || doc.documentType)}
+        </p>
+      )}
+      <div className="document-type-row">
+        <select
+          className={`document-type-select ${
+            isAutoClassified ? "document-type-select-auto" : ""
+          }`}
+          value={doc.documentType}
+          onChange={(event) => onUpdateType(doc.id, event.target.value)}
+          disabled={disabled}
+          aria-label={`Document type for ${doc.file?.name}`}
+        >
+          {DOCUMENT_TYPES.map((type) => (
+            <option key={type.id} value={type.id}>
+              {type.label}
+            </option>
+          ))}
+        </select>
+        {doc.typeConfirmed ? (
+          <span
+            className={`document-type-confirmed-badge ${
+              isAutoClassified ? "document-type-auto-badge" : ""
+            }`}
+            aria-label={isAutoClassified ? "Classified by system" : "Type confirmed"}
+          >
+            {isAutoClassified ? "✓ Classified by system" : "✓ Confirmed"}
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="bill-editor-secondary document-type-confirm-btn"
+            onClick={() => onConfirm(doc.id)}
+            disabled={disabled}
+          >
+            Confirm type
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
 
 export default function MultiDocumentUpload({
   documents = [],
@@ -18,9 +92,58 @@ export default function MultiDocumentUpload({
 }) {
   const inputRef = useRef(null);
   const dragCounterRef = useRef(0);
+  const documentsRef = useRef(documents);
+  const scrollRestoreRef = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [activeDocId, setActiveDocId] = useState(null);
 
-  const hasUnconfirmed = documents.length > 0 && !allBundleDocumentsConfirmed(documents);
+  useEffect(() => {
+    documentsRef.current = documents;
+  }, [documents]);
+
+  const needsConfirmation = documentsNeedingConfirmation(documents);
+  const hasUnconfirmed = needsConfirmation.length > 0;
+  const isClassifying = bundleHasClassifyingDocuments(documents);
+  const activeDocument = documents.find((doc) => doc.id === activeDocId) || null;
+
+  const classifyDocumentById = useCallback(
+    async (docId, file) => {
+      try {
+        const result = await classifyDocument(file);
+        onChange(
+          documentsRef.current.map((doc) => {
+            if (doc.id !== docId) {
+              return doc;
+            }
+            if (doc.typeConfirmed && !doc.autoClassified) {
+              return {
+                ...doc,
+                classifying: false,
+                classificationConfidence: result?.confidence || doc.classificationConfidence,
+              };
+            }
+            return applyDocumentClassification(doc, result);
+          })
+        );
+      } catch {
+        onChange(
+          documentsRef.current.map((doc) =>
+            doc.id === docId
+              ? {
+                  ...doc,
+                  classifying: false,
+                  classificationConfidence: "low",
+                  autoClassified: false,
+                  typeConfirmed:
+                    doc.typeConfirmed && !doc.autoClassified ? doc.typeConfirmed : false,
+                }
+              : doc
+          )
+        );
+      }
+    },
+    [onChange]
+  );
 
   const addFiles = useCallback(
     (fileList) => {
@@ -31,6 +154,7 @@ export default function MultiDocumentUpload({
 
       const next = [...documents];
       const errors = [];
+      const addedDocs = [];
 
       for (const file of files) {
         const validation = validateUploadFile(file);
@@ -38,7 +162,9 @@ export default function MultiDocumentUpload({
           errors.push(`${file.name}: ${validation.error}`);
           continue;
         }
-        next.push(createBundleDocument(file));
+        const doc = createBundleDocument(file);
+        next.push(doc);
+        addedDocs.push(doc);
       }
 
       if (errors.length) {
@@ -47,11 +173,14 @@ export default function MultiDocumentUpload({
         onValidationError?.("");
       }
 
-      if (next.length !== documents.length) {
+      if (addedDocs.length) {
         onChange(next);
+        for (const doc of addedDocs) {
+          classifyDocumentById(doc.id, doc.file);
+        }
       }
     },
-    [documents, onChange, onValidationError]
+    [documents, onChange, onValidationError, classifyDocumentById]
   );
 
   const handleDragEnter = (event) => {
@@ -99,6 +228,9 @@ export default function MultiDocumentUpload({
   };
 
   const removeDocument = (id) => {
+    if (activeDocId === id) {
+      setActiveDocId(null);
+    }
     onChange(documents.filter((doc) => doc.id !== id));
   };
 
@@ -106,7 +238,12 @@ export default function MultiDocumentUpload({
     onChange(
       documents.map((doc) =>
         doc.id === id
-          ? { ...doc, documentType, typeConfirmed: false }
+          ? {
+              ...doc,
+              documentType,
+              typeConfirmed: false,
+              autoClassified: false,
+            }
           : doc
       )
     );
@@ -115,9 +252,37 @@ export default function MultiDocumentUpload({
   const confirmDocumentType = (id) => {
     onChange(
       documents.map((doc) =>
-        doc.id === id ? { ...doc, typeConfirmed: true } : doc
+        doc.id === id
+          ? { ...doc, typeConfirmed: true, autoClassified: false }
+          : doc
       )
     );
+  };
+
+  const openDocumentDetail = (docId) => {
+    scrollRestoreRef.current = window.scrollY;
+    setActiveDocId(docId);
+  };
+
+  const closeDocumentDetail = () => {
+    setActiveDocId(null);
+    const scrollY = scrollRestoreRef.current;
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: scrollY, left: 0, behavior: "instant" });
+    });
+  };
+
+  const itemClassName = (doc) => {
+    if (doc.autoClassified && doc.typeConfirmed) {
+      return "document-bundle-item-auto";
+    }
+    if (doc.typeConfirmed) {
+      return "document-bundle-item-confirmed";
+    }
+    if (doc.classifying) {
+      return "document-bundle-item-classifying";
+    }
+    return "document-bundle-item-unconfirmed";
   };
 
   return (
@@ -154,9 +319,18 @@ export default function MultiDocumentUpload({
         disabled={disabled}
       />
 
-      {showTypeConfirmBanner && hasUnconfirmed && (
+      {showTypeConfirmBanner && isClassifying && (
+        <p className="document-type-classifying-banner" role="status">
+          Classifying uploaded documents… you can choose or confirm the type for
+          any file while this runs.
+        </p>
+      )}
+
+      {showTypeConfirmBanner && !isClassifying && hasUnconfirmed && (
         <p className="document-type-confirm-banner" role="status">
-          Confirm the type for every document before analyzing.
+          {needsConfirmation.length === 1
+            ? "1 document needs your confirmation before analyzing."
+            : `${needsConfirmation.length} documents need your confirmation before analyzing.`}
         </p>
       )}
 
@@ -165,14 +339,15 @@ export default function MultiDocumentUpload({
           {documents.map((doc) => (
             <li
               key={doc.id}
-              className={`document-bundle-item ${
-                doc.typeConfirmed
-                  ? "document-bundle-item-confirmed"
-                  : "document-bundle-item-unconfirmed"
-              }`}
+              className={`document-bundle-item ${itemClassName(doc)}`}
             >
               <div className="document-bundle-item-body">
-                <DocumentFilePreview file={doc.file} />
+                <DocumentFilePreview
+                  file={doc.file}
+                  clickable
+                  onClick={() => openDocumentDetail(doc.id)}
+                  ariaLabel={`Open preview of ${doc.file?.name}`}
+                />
                 <div className="document-bundle-item-content">
                   <div className="document-bundle-item-header">
                     <span className="file-name">{doc.file?.name}</span>
@@ -187,50 +362,28 @@ export default function MultiDocumentUpload({
                     </button>
                   </div>
                   <div className="document-bundle-item-main">
-                    <p className="document-suggested-type">
-                      Suggested:{" "}
-                      {documentTypeLabel(doc.suggestedType || doc.documentType)}
-                    </p>
-                    <div className="document-type-row">
-                      <select
-                        className="document-type-select"
-                        value={doc.documentType}
-                        onChange={(event) =>
-                          updateDocumentType(doc.id, event.target.value)
-                        }
-                        disabled={disabled}
-                        aria-label={`Document type for ${doc.file?.name}`}
-                      >
-                        {DOCUMENT_TYPES.map((type) => (
-                          <option key={type.id} value={type.id}>
-                            {type.label}
-                          </option>
-                        ))}
-                      </select>
-                      {doc.typeConfirmed ? (
-                        <span
-                          className="document-type-confirmed-badge"
-                          aria-label="Type confirmed"
-                        >
-                          ✓ Confirmed
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="bill-editor-secondary document-type-confirm-btn"
-                          onClick={() => confirmDocumentType(doc.id)}
-                          disabled={disabled}
-                        >
-                          Confirm type
-                        </button>
-                      )}
-                    </div>
+                    <DocumentTypeControls
+                      doc={doc}
+                      disabled={disabled}
+                      onUpdateType={updateDocumentType}
+                      onConfirm={confirmDocumentType}
+                    />
                   </div>
                 </div>
               </div>
             </li>
           ))}
         </ul>
+      )}
+
+      {activeDocument && (
+        <DocumentTypeDetailView
+          document={activeDocument}
+          onClose={closeDocumentDetail}
+          onUpdateType={updateDocumentType}
+          onConfirm={confirmDocumentType}
+          disabled={disabled}
+        />
       )}
     </div>
   );

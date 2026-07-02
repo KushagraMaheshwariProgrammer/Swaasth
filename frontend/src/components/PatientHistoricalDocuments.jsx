@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   DOCUMENT_TYPES,
   documentTypeLabel,
   guessDocumentType,
 } from "../utils/documentBundle";
 import DocumentFilePreview from "./DocumentFilePreview";
+import DocumentTypeDetailView from "./DocumentTypeDetailView";
 import { DEFAULT_FILE_ACCEPT, validateUploadFile } from "../utils/fileUpload";
 import { detectDocumentDate, normalizeToIsoDate } from "../utils/documentDates";
 import {
@@ -13,6 +14,7 @@ import {
   extractHistoricalDocument,
   saveHistoricalDocument,
 } from "../services/patientHistoricalDocuments";
+import { classifyDocument } from "../services/prescriptions";
 
 export default function PatientHistoricalDocuments({
   userId,
@@ -22,10 +24,16 @@ export default function PatientHistoricalDocuments({
   disabled = false,
   embedded = false,
 }) {
+  const scrollRestoreRef = useRef(0);
+  const manualTypeOverrideRef = useRef(false);
   const [file, setFile] = useState(null);
   const [documentType, setDocumentType] = useState("lab_report");
   const [suggestedType, setSuggestedType] = useState("lab_report");
   const [typeConfirmed, setTypeConfirmed] = useState(false);
+  const [autoClassified, setAutoClassified] = useState(false);
+  const [classifying, setClassifying] = useState(false);
+  const [classificationConfidence, setClassificationConfidence] = useState(null);
+  const [showDetail, setShowDetail] = useState(false);
   const [documentDate, setDocumentDate] = useState("");
   const [detectedDate, setDetectedDate] = useState("");
   const [extraction, setExtraction] = useState(null);
@@ -40,6 +48,48 @@ export default function PatientHistoricalDocuments({
     setDetectedDate("");
     setExtraction(null);
     setTypeConfirmed(false);
+    setAutoClassified(false);
+    setClassifying(false);
+    setClassificationConfidence(null);
+    setShowDetail(false);
+    manualTypeOverrideRef.current = false;
+  };
+
+  const applyClassification = (result) => {
+    if (manualTypeOverrideRef.current) {
+      return;
+    }
+    const nextType = result?.document_type || suggestedType;
+    const confidence = result?.confidence === "high" ? "high" : "low";
+    const isAuto = confidence === "high";
+    setSuggestedType(nextType);
+    setDocumentType(nextType);
+    setClassificationConfidence(confidence);
+    setAutoClassified(isAuto);
+    setTypeConfirmed(isAuto);
+  };
+
+  const classifySelectedFile = async (nextFile) => {
+    setClassifying(true);
+    manualTypeOverrideRef.current = false;
+    setTypeConfirmed(false);
+    setAutoClassified(false);
+    setClassificationConfidence(null);
+    setExtraction(null);
+    setDetectedDate("");
+    setDocumentDate("");
+    try {
+      const result = await classifyDocument(nextFile);
+      applyClassification(result);
+    } catch {
+      setClassificationConfidence("low");
+      if (!manualTypeOverrideRef.current) {
+        setTypeConfirmed(false);
+        setAutoClassified(false);
+      }
+    } finally {
+      setClassifying(false);
+    }
   };
 
   const handleFileChange = (event) => {
@@ -58,10 +108,27 @@ export default function PatientHistoricalDocuments({
     setSuggestedType(guessed);
     setDocumentType(guessed);
     setTypeConfirmed(false);
+    setAutoClassified(false);
+    setClassifying(true);
+    setClassificationConfidence(null);
     setDocumentDate("");
     setDetectedDate("");
     setExtraction(null);
     setError("");
+    classifySelectedFile(nextFile);
+  };
+
+  const openDetail = () => {
+    scrollRestoreRef.current = window.scrollY;
+    setShowDetail(true);
+  };
+
+  const closeDetail = () => {
+    setShowDetail(false);
+    const scrollY = scrollRestoreRef.current;
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: scrollY, left: 0, behavior: "instant" });
+    });
   };
 
   const handleExtract = async () => {
@@ -142,8 +209,38 @@ export default function PatientHistoricalDocuments({
     }
   };
 
+  const updateDocumentType = (_id, nextType) => {
+    manualTypeOverrideRef.current = true;
+    setDocumentType(nextType);
+    setTypeConfirmed(false);
+    setAutoClassified(false);
+    setExtraction(null);
+    setDetectedDate("");
+    setDocumentDate("");
+  };
+
+  const confirmDocumentType = () => {
+    manualTypeOverrideRef.current = true;
+    setTypeConfirmed(true);
+    setAutoClassified(false);
+  };
+
+  const detailDocument = file
+    ? {
+        id: "historical-upload",
+        file,
+        documentType,
+        suggestedType,
+        typeConfirmed,
+        autoClassified,
+        classifying,
+        classificationConfidence,
+      }
+    : null;
+
   const HeadingTag = embedded ? "h3" : "h2";
-  const busy = extracting || uploading;
+  const extractionBusy = extracting || uploading;
+  const isAutoClassified = autoClassified && typeConfirmed;
 
   return (
     <section
@@ -164,29 +261,54 @@ export default function PatientHistoricalDocuments({
             type="file"
             accept={DEFAULT_FILE_ACCEPT}
             onChange={handleFileChange}
-            disabled={disabled || busy}
+            disabled={disabled || extractionBusy}
           />
         </label>
 
         {file && (
-          <div className="document-upload-preview-panel">
-            <DocumentFilePreview file={file} />
+          <div
+            className={`document-upload-preview-panel ${
+              isAutoClassified
+                ? "document-bundle-item-auto"
+                : typeConfirmed
+                  ? "document-bundle-item-confirmed"
+                  : "document-bundle-item-unconfirmed"
+            }`}
+          >
+            <DocumentFilePreview
+              file={file}
+              clickable
+              onClick={openDetail}
+              ariaLabel={`Open preview of ${file.name}`}
+            />
             <div className="document-upload-preview-details">
-              <p className="document-suggested-type">
-                Suggested: {documentTypeLabel(suggestedType)}
-              </p>
+              {classifying && (
+                <p className="document-classifying-status" role="status">
+                  Classifying document… you can choose or confirm the type below
+                  while this runs.
+                </p>
+              )}
+              {!classifying && isAutoClassified ? (
+                <p className="document-auto-classified-note">
+                  Classified by the system as{" "}
+                  <strong>{documentTypeLabel(documentType)}</strong>
+                </p>
+              ) : !classifying ? (
+                <p className="document-suggested-type">
+                  {typeConfirmed
+                    ? `Type: ${documentTypeLabel(documentType)}`
+                    : `Please confirm: suggested ${documentTypeLabel(suggestedType)}`}
+                </p>
+              ) : null}
               <label className="setting-field setting-field-full">
                 <span>Document type</span>
                 <select
+                  className={`document-type-select ${
+                    isAutoClassified ? "document-type-select-auto" : ""
+                  }`}
                   value={documentType}
-                  onChange={(event) => {
-                    setDocumentType(event.target.value);
-                    setTypeConfirmed(false);
-                    setExtraction(null);
-                    setDetectedDate("");
-                    setDocumentDate("");
-                  }}
-                  disabled={disabled || busy}
+                  onChange={(event) => updateDocumentType(null, event.target.value)}
+                  disabled={disabled}
                 >
                   {DOCUMENT_TYPES.map((type) => (
                     <option key={type.id} value={type.id}>
@@ -196,15 +318,19 @@ export default function PatientHistoricalDocuments({
                 </select>
               </label>
               {typeConfirmed ? (
-                <span className="document-type-confirmed-badge">
-                  ✓ Type confirmed
+                <span
+                  className={`document-type-confirmed-badge ${
+                    isAutoClassified ? "document-type-auto-badge" : ""
+                  }`}
+                >
+                  {isAutoClassified ? "✓ Classified by system" : "✓ Type confirmed"}
                 </span>
               ) : (
                 <button
                   type="button"
                   className="bill-editor-secondary document-type-confirm-btn"
-                  onClick={() => setTypeConfirmed(true)}
-                  disabled={disabled || busy}
+                  onClick={confirmDocumentType}
+                  disabled={disabled}
                 >
                   Confirm type
                 </button>
@@ -218,7 +344,7 @@ export default function PatientHistoricalDocuments({
             type="button"
             className="analyze-btn"
             onClick={handleExtract}
-            disabled={disabled || busy}
+            disabled={disabled || extractionBusy}
           >
             {extracting ? "Extracting..." : "Extract document"}
           </button>
@@ -232,7 +358,7 @@ export default function PatientHistoricalDocuments({
                 type="date"
                 value={normalizeToIsoDate(documentDate)}
                 onChange={(event) => setDocumentDate(event.target.value)}
-                disabled={disabled || busy}
+                disabled={disabled || extractionBusy}
                 required
               />
             </label>
@@ -251,7 +377,7 @@ export default function PatientHistoricalDocuments({
               type="button"
               className="analyze-btn"
               onClick={handleSave}
-              disabled={disabled || busy || !normalizeToIsoDate(documentDate)}
+              disabled={disabled || extractionBusy || !normalizeToIsoDate(documentDate)}
             >
               {uploading ? "Saving..." : "Save to medical history"}
             </button>
@@ -296,6 +422,16 @@ export default function PatientHistoricalDocuments({
 
       {!documents.length && (
         <p className="clinical-history-empty">No historical documents yet.</p>
+      )}
+
+      {showDetail && detailDocument && (
+        <DocumentTypeDetailView
+          document={detailDocument}
+          onClose={closeDetail}
+          onUpdateType={updateDocumentType}
+          onConfirm={confirmDocumentType}
+          disabled={disabled}
+        />
       )}
     </section>
   );

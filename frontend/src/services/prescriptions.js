@@ -92,6 +92,15 @@ export function clinicalContextToApiPayload(clinicalContext) {
   };
 }
 
+export async function classifyDocument(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  return fetchJson(`${getApiBase()}/classify-document`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
 export async function uploadPrescription(file) {
   const formData = new FormData();
   formData.append("file", file);

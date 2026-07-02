@@ -41,7 +41,33 @@ export function createBundleDocument(file, documentType = null) {
     suggestedType,
     documentType: suggestedType,
     typeConfirmed: false,
+    classifying: true,
+    autoClassified: false,
+    classificationConfidence: null,
   };
+}
+
+export function applyDocumentClassification(doc, result) {
+  const documentType = result?.document_type || doc.suggestedType || "bill";
+  const confidence = result?.confidence === "high" ? "high" : "low";
+  const autoClassified = confidence === "high";
+  return {
+    ...doc,
+    suggestedType: documentType,
+    documentType,
+    classificationConfidence: confidence,
+    autoClassified,
+    typeConfirmed: autoClassified,
+    classifying: false,
+  };
+}
+
+export function documentsNeedingConfirmation(documents) {
+  return (documents || []).filter((doc) => !doc.typeConfirmed);
+}
+
+export function bundleHasClassifyingDocuments(documents) {
+  return (documents || []).some((doc) => doc.classifying);
 }
 
 export function allBundleDocumentsConfirmed(documents) {

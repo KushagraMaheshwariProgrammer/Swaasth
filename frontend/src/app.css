@@ -1088,8 +1088,28 @@ body.capacitor-native *::-webkit-scrollbar {
   background: #fffbeb;
 }
 
+.document-bundle-item-auto {
+  border-color: rgba(37, 99, 235, 0.35);
+  background: #eff6ff;
+}
+
+.document-bundle-item-classifying {
+  border-color: rgba(100, 116, 139, 0.35);
+  background: #f8fafc;
+}
+
 .document-bundle-item-confirmed {
   border-color: rgba(16, 185, 129, 0.35);
+}
+
+.document-type-classifying-banner {
+  margin: 0.85rem 0 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid rgba(100, 116, 139, 0.25);
+  color: #475569;
+  font-size: 0.92rem;
 }
 
 .document-type-confirm-banner {
@@ -1154,6 +1174,150 @@ body.capacitor-native *::-webkit-scrollbar {
   color: #047857;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+.document-type-auto-badge {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.document-auto-classified-note {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #1d4ed8;
+}
+
+.document-needs-confirmation-note {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #92400e;
+}
+
+.document-classifying-status {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #64748b;
+}
+
+.document-type-select-auto {
+  border-color: rgba(37, 99, 235, 0.35);
+  background: #f8fbff;
+}
+
+.document-file-preview-clickable {
+  position: relative;
+  cursor: pointer;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.document-file-preview-clickable:hover,
+.document-file-preview-clickable:focus-visible {
+  border-color: rgba(37, 99, 235, 0.45);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  outline: none;
+}
+
+.document-file-preview-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0.2rem 0.35rem;
+  background: rgba(15, 23, 42, 0.72);
+  color: #ffffff;
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+.document-file-preview-clickable .document-file-preview-iframe {
+  pointer-events: none;
+}
+
+.document-type-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.55);
+  overflow-y: auto;
+}
+
+.document-type-detail-card {
+  width: min(720px, 100%);
+  margin: 0.5rem auto 1.5rem;
+  padding: 1rem;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+}
+
+.document-type-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.document-type-detail-back {
+  flex-shrink: 0;
+}
+
+.document-type-detail-filename {
+  font-size: 0.92rem;
+  color: #334155;
+  word-break: break-word;
+}
+
+.document-type-detail-preview {
+  margin-bottom: 0.9rem;
+}
+
+.document-type-detail-preview-media.document-file-preview,
+.document-type-detail-preview-media {
+  width: 100%;
+}
+
+.document-type-detail-preview-media .document-file-preview-image,
+.document-type-detail-preview-media .document-file-preview-iframe {
+  width: 100%;
+  height: auto;
+  max-height: 70vh;
+  object-fit: contain;
+}
+
+.document-type-detail-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.85rem;
+  border-radius: 12px;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  background: #f8fafc;
+}
+
+.document-type-detail-controls-auto {
+  border-color: rgba(37, 99, 235, 0.35);
+  background: #eff6ff;
+}
+
+.document-type-detail-controls-unconfirmed {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.document-type-select-detail {
+  max-width: none;
+  width: 100%;
+}
+
+.document-type-detail-confirm {
+  align-self: flex-start;
 }
 
 .clinical-history-section {

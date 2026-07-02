@@ -9,18 +9,21 @@ from pydantic import BaseModel, Field
 
 from app.restricted_medicines import build_restricted_medicine_flags
 from app.services.document_extraction import (
+    classify_document_with_groq,
     extract_discharge_summary_with_groq,
     extract_document_text,
     extract_lab_report_with_groq,
     extract_prescription_with_groq,
     merge_clinical_contexts,
     normalize_clinical_context,
+    normalize_document_classification,
     normalize_prescription_items,
     resolve_document_date,
 )
 from app.services.primary_guidelines_index import get_primary_guidelines_store
 from app.services.stg_index import get_stg_index_store
 from app.services.action_plan import build_action_plan
+from app.services.patient_errors import patient_facing_detail
 from app.services.patient_age import resolve_patient_age
 from app.services.patient_gender import gender_display_label
 from app.services.treatment_audit import analyze_treatment
@@ -182,6 +185,39 @@ def list_stg_conditions() -> dict[str, Any]:
     }
 
 
+@router.post("/classify-document")
+async def classify_document(file: UploadFile = File(...)) -> dict[str, Any]:
+    if file.content_type not in ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file type. Allowed types: pdf, jpg, jpeg, png.",
+        )
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    file_type = ALLOWED_TYPES[file.content_type]
+    extracted_text = extract_document_text(file_bytes, file_type)
+    if not extracted_text:
+        return {
+            "filename": file.filename or "unknown",
+            "file_type": file_type,
+            "document_type": "bill",
+            "confidence": "low",
+            "message": "No readable text found; manual confirmation required.",
+        }
+
+    ai_result = normalize_document_classification(
+        classify_document_with_groq(extracted_text)
+    )
+    return {
+        "filename": file.filename or "unknown",
+        "file_type": file_type,
+        **ai_result,
+    }
+
+
 @router.post("/upload-prescription")
 async def upload_prescription(file: UploadFile = File(...)) -> dict[str, Any]:
     if file.content_type not in ALLOWED_TYPES:
@@ -208,8 +244,8 @@ async def upload_prescription(file: UploadFile = File(...)) -> dict[str, Any]:
     if not ai_result.get("is_prescription", False):
         raise HTTPException(
             status_code=400,
-            detail=ai_result.get(
-                "error",
+            detail=patient_facing_detail(
+                ai_result.get("error"),
                 "Uploaded document does not appear to be a prescription.",
             ),
         )
@@ -259,8 +295,8 @@ async def upload_clinical_document(
         if not ai_result.get("is_lab_report", False):
             raise HTTPException(
                 status_code=400,
-                detail=ai_result.get(
-                    "error",
+                detail=patient_facing_detail(
+                    ai_result.get("error"),
                     "Uploaded document does not appear to be a lab report.",
                 ),
             )
@@ -281,8 +317,8 @@ async def upload_clinical_document(
         if not ai_result.get("is_discharge_summary", False):
             raise HTTPException(
                 status_code=400,
-                detail=ai_result.get(
-                    "error",
+                detail=patient_facing_detail(
+                    ai_result.get("error"),
                     "Uploaded document does not appear to be a discharge summary.",
                 ),
             )

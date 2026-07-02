@@ -2,7 +2,11 @@ import { Capacitor } from "@capacitor/core";
 import { resolveActionPlan } from "../actionPlanUtils";
 import { getApiBase } from "./apiBase";
 import { buildReportFilename, resolveReportMeta } from "../data/reportExport";
-import { backendUnreachableMessage, fetchBackend } from "./httpUtils";
+import {
+  backendUnreachableMessage,
+  extractApiErrorMessage,
+  fetchBackend,
+} from "./httpUtils";
 
 function isFirestoreTimestamp(value) {
   return (
@@ -74,22 +78,22 @@ async function postRenderPdf(payload) {
   }
 
   if (!response.ok) {
-    let detail = "";
+    let payload = null;
+    let text = "";
     try {
-      const body = await response.json();
-      detail = body?.detail;
+      text = await response.text();
+      if (text.trim()) {
+        payload = JSON.parse(text);
+      }
     } catch {
-      detail = "";
-    }
-    if (detail) {
-      throw new Error(
-        Array.isArray(detail) ? detail.map((entry) => entry.msg).join(", ") : detail
-      );
+      payload = null;
     }
     if (response.status >= 502 && response.status <= 504) {
       throw new Error(backendUnreachableMessage());
     }
-    throw new Error("Could not generate the report PDF.");
+    throw new Error(
+      extractApiErrorMessage(payload, text, response, "Could not generate the report PDF.")
+    );
   }
 
   return response.blob();
