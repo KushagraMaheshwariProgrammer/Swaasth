@@ -110,3 +110,13 @@ export function getCities(stateUtName) {
   const cities = bundle.citiesByState?.[canonical];
   return Array.isArray(cities) ? cities : [];
 }
+
+/** Resolve state/UT and city from a patient profile for bill comparison. */
+export function resolvePatientLocation(patient) {
+  const state = resolveCanonicalStateUtName(patient?.state || "");
+  let city = String(patient?.city || "").trim();
+  if (!city && state) {
+    city = getCities(state)[0] || "";
+  }
+  return { state, city };
+}

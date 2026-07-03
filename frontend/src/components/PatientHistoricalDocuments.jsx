@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DOCUMENT_TYPES,
   documentTypeLabel,
@@ -7,14 +7,21 @@ import {
 import DocumentFilePreview from "./DocumentFilePreview";
 import DocumentTypeDetailView from "./DocumentTypeDetailView";
 import { DEFAULT_FILE_ACCEPT, validateUploadFile } from "../utils/fileUpload";
-import { detectDocumentDate, normalizeToIsoDate } from "../utils/documentDates";
+import { normalizeToIsoDate } from "../utils/documentDates";
 import {
-  buildExtractedSummary,
   deleteHistoricalDocument,
   extractHistoricalDocument,
   saveHistoricalDocument,
 } from "../services/patientHistoricalDocuments";
+import { getPatientHospitals } from "../services/patientHospitals";
+import { formatHospitalLabel } from "./HospitalList";
 import { classifyDocument } from "../services/prescriptions";
+import DocumentExtractedDataEditor from "./DocumentExtractedDataEditor";
+import {
+  buildEditableExtraction,
+  detectDateFromEditable,
+  editableToExtractedSummary,
+} from "../utils/documentExtraction";
 
 export default function PatientHistoricalDocuments({
   userId,
@@ -37,16 +44,58 @@ export default function PatientHistoricalDocuments({
   const [documentDate, setDocumentDate] = useState("");
   const [detectedDate, setDetectedDate] = useState("");
   const [extraction, setExtraction] = useState(null);
+  const [editableExtraction, setEditableExtraction] = useState(null);
   const [extracting, setExtracting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState(null);
+  const [hospitals, setHospitals] = useState([]);
+  const [hospitalsLoading, setHospitalsLoading] = useState(true);
+  const [hospitalId, setHospitalId] = useState("");
+
+  const selectedHospital = hospitals.find((entry) => entry.id === hospitalId) || null;
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadHospitals = async () => {
+      if (!userId || !patientId) {
+        setHospitals([]);
+        setHospitalsLoading(false);
+        return;
+      }
+      setHospitalsLoading(true);
+      try {
+        const list = await getPatientHospitals(userId, patientId);
+        if (!cancelled) {
+          setHospitals(list);
+          setHospitalId((current) =>
+            current && list.some((entry) => entry.id === current)
+              ? current
+              : list[0]?.id || ""
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setHospitals([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setHospitalsLoading(false);
+        }
+      }
+    };
+    loadHospitals();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, patientId]);
 
   const resetUploadState = () => {
     setFile(null);
     setDocumentDate("");
     setDetectedDate("");
     setExtraction(null);
+    setEditableExtraction(null);
     setTypeConfirmed(false);
     setAutoClassified(false);
     setClassifying(false);
@@ -76,6 +125,7 @@ export default function PatientHistoricalDocuments({
     setAutoClassified(false);
     setClassificationConfidence(null);
     setExtraction(null);
+    setEditableExtraction(null);
     setDetectedDate("");
     setDocumentDate("");
     try {
@@ -114,6 +164,7 @@ export default function PatientHistoricalDocuments({
     setDocumentDate("");
     setDetectedDate("");
     setExtraction(null);
+    setEditableExtraction(null);
     setError("");
     classifySelectedFile(nextFile);
   };
@@ -136,6 +187,10 @@ export default function PatientHistoricalDocuments({
       setError("Choose a document to upload.");
       return;
     }
+    if (!selectedHospital) {
+      setError("Add and select a hospital before uploading documents.");
+      return;
+    }
     if (!typeConfirmed) {
       setError("Confirm the document type before extracting.");
       return;
@@ -144,13 +199,20 @@ export default function PatientHistoricalDocuments({
     setExtracting(true);
     setError("");
     try {
-      const result = await extractHistoricalDocument(file, documentType);
-      const foundDate = detectDocumentDate(documentType, result);
+      const result = await extractHistoricalDocument(
+        file,
+        documentType,
+        selectedHospital
+      );
+      const editable = buildEditableExtraction(documentType, result);
+      const foundDate = detectDateFromEditable(documentType, editable);
       setExtraction(result);
+      setEditableExtraction(editable);
       setDetectedDate(foundDate);
       setDocumentDate(foundDate);
     } catch (err) {
       setExtraction(null);
+      setEditableExtraction(null);
       setDetectedDate("");
       setDocumentDate("");
       setError(err.message || "Unable to extract document.");
@@ -160,7 +222,7 @@ export default function PatientHistoricalDocuments({
   };
 
   const handleSave = async () => {
-    if (!extraction) {
+    if (!editableExtraction) {
       setError("Extract the document before saving.");
       return;
     }
@@ -173,16 +235,28 @@ export default function PatientHistoricalDocuments({
       return;
     }
 
+    if (!selectedHospital) {
+      setError("Select a hospital before saving.");
+      return;
+    }
+
     setUploading(true);
     setError("");
     try {
-      const extractedSummary = buildExtractedSummary(documentType, extraction);
+      const extractedSummary = editableToExtractedSummary(
+        documentType,
+        editableExtraction
+      );
       const saved = await saveHistoricalDocument(userId, patientId, {
         file,
         filename: file.name,
         documentType,
         documentDate: normalizeToIsoDate(documentDate),
         extractedSummary,
+        hospitalId: selectedHospital.id,
+        hospitalName: selectedHospital.name,
+        hospitalCity: selectedHospital.city,
+        hospitalState: selectedHospital.state,
       });
       onChange?.([saved, ...documents]);
       resetUploadState();
@@ -215,6 +289,7 @@ export default function PatientHistoricalDocuments({
     setTypeConfirmed(false);
     setAutoClassified(false);
     setExtraction(null);
+    setEditableExtraction(null);
     setDetectedDate("");
     setDocumentDate("");
   };
@@ -250,9 +325,35 @@ export default function PatientHistoricalDocuments({
     >
       <HeadingTag>Historical documents</HeadingTag>
       <p className="clinical-history-hint">
-        Upload older reports with the date they relate to. We read dates from
-        documents when possible; otherwise you will be asked to enter them.
+        Upload older reports with the date they relate to. Select the hospital
+        where the document was issued. We read dates from documents when possible;
+        otherwise you will be asked to enter them.
       </p>
+
+      {hospitalsLoading && <p className="auth-info">Loading hospitals...</p>}
+
+      {!hospitalsLoading && !hospitals.length && (
+        <p className="clinical-history-hint">
+          Add a hospital in the Hospitals section above before uploading documents.
+        </p>
+      )}
+
+      {hospitals.length > 0 && (
+        <label className="setting-field setting-field-full">
+          <span>Hospital</span>
+          <select
+            value={hospitalId}
+            onChange={(event) => setHospitalId(event.target.value)}
+            disabled={disabled || extractionBusy}
+          >
+            {hospitals.map((hospital) => (
+              <option key={hospital.id} value={hospital.id}>
+                {formatHospitalLabel(hospital)}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <div className="patient-historical-upload">
         <label className="setting-field setting-field-full">
@@ -261,7 +362,7 @@ export default function PatientHistoricalDocuments({
             type="file"
             accept={DEFAULT_FILE_ACCEPT}
             onChange={handleFileChange}
-            disabled={disabled || extractionBusy}
+            disabled={disabled || extractionBusy || !selectedHospital}
           />
         </label>
 
@@ -339,7 +440,7 @@ export default function PatientHistoricalDocuments({
           </div>
         )}
 
-        {file && typeConfirmed && !extraction && (
+        {file && typeConfirmed && !editableExtraction && (
           <button
             type="button"
             className="analyze-btn"
@@ -350,8 +451,20 @@ export default function PatientHistoricalDocuments({
           </button>
         )}
 
-        {extraction && (
+        {editableExtraction && (
           <>
+            <DocumentExtractedDataEditor
+              editable={editableExtraction}
+              onChange={(nextEditable) => {
+                setEditableExtraction(nextEditable);
+                const nextDate = detectDateFromEditable(documentType, nextEditable);
+                if (nextDate) {
+                  setDocumentDate(nextDate);
+                  setDetectedDate(nextDate);
+                }
+              }}
+              disabled={disabled || extractionBusy}
+            />
             <label className="setting-field setting-field-full">
               <span>Document date</span>
               <input
@@ -401,6 +514,7 @@ export default function PatientHistoricalDocuments({
               <strong>{doc.filename}</strong>
               <p>
                 {documentTypeLabel(doc.documentType)} · {doc.documentDate}
+                {doc.hospitalName ? ` · ${doc.hospitalName}` : ""}
               </p>
               {doc.extractedSummary?.diagnosis && (
                 <p className="clinical-history-hint">

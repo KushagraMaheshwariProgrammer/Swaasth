@@ -12,6 +12,7 @@ import { ensureFirebaseWebAuth } from "../auth/ensureFirebaseWebAuth";
 import { auth, awaitFirestoreReady, db } from "../firebase";
 import { deleteBillsForPatientIds, getBillsForPatientIds } from "./bills";
 import { deleteHistoricalDocumentsForPatientIds } from "./patientHistoricalDocuments";
+import { deleteHospitalsForPatientIds } from "./patientHospitals";
 import { normalizeClinicalHistory } from "../utils/clinicalHistory";
 import { validateBirthYearInput } from "../utils/patientAge";
 import {
@@ -71,11 +72,19 @@ export function validatePatientInput(patientData) {
   }
   const birthYear = validateBirthYearInput(patientData?.birthYear);
   const state = patientData?.state?.trim() || "";
+  const city = patientData?.city?.trim() || "";
+  if (!state) {
+    throw new Error("Please select a state/UT.");
+  }
+  if (!city) {
+    throw new Error("Please select a city.");
+  }
   return {
     name,
     gender,
     birthYear,
     state,
+    city,
     savePastBills: patientData?.savePastBills === true,
     clinicalHistory: normalizeClinicalHistory(patientData?.clinicalHistory),
   };
@@ -109,6 +118,7 @@ function buildFirestorePayload(patientData) {
     birthYear: validated.birthYear,
     gender: validated.gender,
     state: validated.state,
+    city: validated.city,
     savePastBills: validated.savePastBills,
     clinicalHistory: validated.clinicalHistory,
     updatedAt: serverTimestamp(),
@@ -343,6 +353,7 @@ export async function deletePatient(userId, patientId) {
   const patientIds = collectPatientIdVariants(userId, patientId);
   await deleteBillsForPatientIds(userId, patientIds);
   await deleteHistoricalDocumentsForPatientIds(userId, patientIds);
+  await deleteHospitalsForPatientIds(userId, patientIds);
 
   const localEntries = getLocalPatients(userId);
   const localMatch = localEntries.find(

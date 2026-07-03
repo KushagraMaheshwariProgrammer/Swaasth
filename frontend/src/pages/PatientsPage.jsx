@@ -6,6 +6,7 @@ import PatientForm, {
   genderLabel,
   patientToFormFields,
 } from "../components/PatientForm";
+import PatientHospitalsSection from "../components/PatientHospitalsSection";
 import PatientMedicalHistorySection from "../components/PatientMedicalHistorySection";
 import PatientList from "../components/PatientList";
 import {
@@ -398,6 +399,8 @@ export default function PatientsPage() {
                     <h1>{selectedPatient.name}</h1>
                     <p>
                       {formatPatientAge(selectedPatient)} · {genderLabel(selectedPatient.gender)}
+                      {selectedPatient.state &&
+                        ` · ${selectedPatient.city ? `${selectedPatient.city}, ` : ""}${selectedPatient.state}`}
                     </p>
                     <p className="patient-history-summary">
                       {clinicalHistorySummary(selectedPatient.clinicalHistory)}
@@ -451,6 +454,12 @@ export default function PatientsPage() {
                     />
                   </section>
                 ) : null}
+
+                <PatientHospitalsSection
+                  userId={user.uid}
+                  patientId={selectedPatient.id}
+                  disabled={saving}
+                />
 
                 <PatientMedicalHistorySection
                   userId={user.uid}

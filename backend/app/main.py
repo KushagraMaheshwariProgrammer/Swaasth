@@ -25,6 +25,7 @@ from app.services.document_extraction import (
     extract_json_from_text,
     extract_preauth_with_groq,
     normalize_clinical_context,
+    normalize_detected_document_type,
     resolve_document_date,
 )
 from app.restricted_medicines import build_restricted_medicine_flags, get_restricted_medicines_store
@@ -33,7 +34,7 @@ from app.services.audit_advocacy import ADVOCACY_SCOPE_CHECKED, ADVOCACY_SCOPE_N
 from app.services.preauth_audit import analyze_preauth_mismatches
 from app.services.patient_age import resolve_patient_age
 from app.services.patient_gender import gender_display_label
-from app.services.patient_errors import patient_facing_detail
+from app.services.patient_errors import document_mismatch_detail
 from app.services.treatment_audit import analyze_treatment
 
 
@@ -784,9 +785,14 @@ async def upload_bill(
     if not is_medical_bill:
         raise HTTPException(
             status_code=400,
-            detail=patient_facing_detail(
-                ai_result.get("error"),
-                "Uploaded document does not appear to be a medical bill.",
+            detail=document_mismatch_detail(
+                filename=file.filename,
+                assigned_type="bill",
+                message=ai_result.get("error"),
+                fallback="Uploaded document does not appear to be a medical bill.",
+                suggested_type=normalize_detected_document_type(
+                    ai_result.get("detected_document_type")
+                ),
             ),
         )
 
@@ -861,9 +867,17 @@ async def upload_preauth(file: UploadFile = File(...)) -> dict[str, Any]:
     if not payload.get("is_preauth"):
         raise HTTPException(
             status_code=400,
-            detail=patient_facing_detail(
-                payload.get("error"),
-                "Uploaded document does not appear to be a pre-authorization or claim approval letter.",
+            detail=document_mismatch_detail(
+                filename=file.filename,
+                assigned_type="preauth_letter",
+                message=payload.get("error"),
+                fallback=(
+                    "Uploaded document does not appear to be a pre-authorization "
+                    "or claim approval letter."
+                ),
+                suggested_type=normalize_detected_document_type(
+                    payload.get("detected_document_type")
+                ),
             ),
         )
 

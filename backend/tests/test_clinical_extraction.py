@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.services.document_extraction import (
     merge_clinical_contexts,
     normalize_clinical_context,
+    normalize_lab_report_extraction,
 )
 
 
@@ -64,3 +65,23 @@ def test_normalize_clinical_context_normalizes_test_result_labels() -> None:
     assert ctx["test_results"][0]["test_name"] == "Dengue NS1"
     assert ctx["test_results"][0]["result"] == "positive"
     assert ctx["test_results"][0]["value"] == "reactive"
+
+
+def test_normalize_lab_report_extraction_accepts_urology_results() -> None:
+    payload = normalize_lab_report_extraction(
+        {
+            "is_lab_report": False,
+            "error": "This appears to be a urology test report, not a standard test report.",
+            "test_results": [
+                {
+                    "test_name": "PSA",
+                    "value": "4.2",
+                    "unit": "ng/mL",
+                    "reference_range": "0-4.0",
+                }
+            ],
+        }
+    )
+    assert payload["is_lab_report"] is True
+    assert payload["error"] is None
+    assert payload["test_results"][0]["test_name"] == "PSA"

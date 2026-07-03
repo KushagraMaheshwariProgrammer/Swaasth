@@ -354,6 +354,7 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
 
     patient = report.get("patient") or {}
     hospital = report.get("hospital") or {}
+    hospital_profile = report.get("hospital_profile") or {}
     line_items = report.get("line_items") or []
     audit_flags = (report.get("audit_flags") or {}).get("flags") or []
     jan_aushadhi = report.get("jan_aushadhi") or {}
@@ -395,8 +396,17 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
         )
 
     location_bits: list[str] = []
-    if settings.get("city") and settings.get("state_name"):
+    profile_city = str(hospital_profile.get("city") or "").strip()
+    profile_state = str(hospital_profile.get("state") or "").strip()
+    if profile_city and profile_state:
+        location_bits.append(f"{profile_city}, {profile_state}")
+    elif settings.get("city") and settings.get("state_name"):
         location_bits.append(f"{settings['city']}, {settings['state_name']}")
+    hospital_name = (
+        str(hospital_profile.get("name") or "").strip()
+        or str(hospital.get("name_from_bill") or "").strip()
+        or "—"
+    )
     hospital_type = _HOSPITAL_TYPE_LABELS.get(
         settings.get("hospital_type", ""), settings.get("hospital_type", "—")
     )
@@ -484,7 +494,7 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
       {f" · {escape(str(patient.get('age')))} yrs" if patient.get('age') is not None else ''}
       {f" · {escape(str(patient.get('gender')))}" if patient.get('gender') else ''}
     </p>
-    <p><b>Hospital (from bill):</b> {escape(str(hospital.get('name_from_bill', '—')))}
+    <p><b>Hospital:</b> {escape(hospital_name)}
     </p>
     <p><b>Location:</b> {escape(', '.join(location_bits) if location_bits else '—')}</p>
     <p><b>Hospital type:</b> {escape(str(hospital_type))}</p>
@@ -778,6 +788,13 @@ def render_medical_history_html(report: dict[str, Any]) -> str:
     for entry in timeline:
         date_label = escape(str(entry.get("date") or "Date unknown"))
         kind = str(entry.get("kind") or "")
+        hospital_name = escape(str(entry.get("hospital") or ""))
+        hospital_city = escape(str(entry.get("hospital_city") or ""))
+        hospital_state = escape(str(entry.get("hospital_state") or ""))
+        hospital_bits = [bit for bit in [hospital_name, hospital_city, hospital_state] if bit]
+        hospital_line = (
+            f"<p><b>Hospital:</b> {', '.join(hospital_bits)}</p>" if hospital_bits else ""
+        )
         if kind == "swaasth_report":
             title = escape(str(entry.get("title") or "Swaasth report"))
             report_label = escape(str(entry.get("report_kind_label") or "Report"))
@@ -791,6 +808,7 @@ def render_medical_history_html(report: dict[str, Any]) -> str:
                 f"<div class='history-entry'>"
                 f"<h3>{date_label} — Swaasth {report_label}</h3>"
                 f"<p><b>{title}</b></p>"
+                f"{hospital_line}"
                 f"{f'<p><b>Diagnosis:</b> {diagnosis}</p>' if diagnosis else ''}"
                 f"{f'<p><b>Medicines:</b> {med_list}</p>' if med_list else ''}"
                 f"{f'<p><b>Symptoms:</b> {symptom_list}</p>' if symptom_list else ''}"
@@ -805,6 +823,7 @@ def render_medical_history_html(report: dict[str, Any]) -> str:
                 f"<div class='history-entry'>"
                 f"<h3>{date_label} — {doc_type}</h3>"
                 f"<p><b>{title}</b></p>"
+                f"{hospital_line}"
                 f"{f'<p><b>Diagnosis:</b> {diagnosis}</p>' if diagnosis else ''}"
                 f"</div>"
             )

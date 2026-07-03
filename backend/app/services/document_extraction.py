@@ -29,9 +29,21 @@ else:
 pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
 
 _AI_ERROR_HINT = (
-    " If the document is the wrong type, set error to a short patient-friendly "
-    "explanation (for example, 'This looks like a prescription, not a hospital bill.'). "
-    "Never use HTTP status phrases like 'Bad Request'."
+    " If the document is the wrong type, set the is_* flag to false, set "
+    "detected_document_type to the best matching type from: bill, prescription, "
+    "lab_report, discharge_summary, preauth_letter, and set error to a short "
+    "patient-friendly explanation (for example, 'This looks like a prescription, "
+    "not a hospital bill.'). Never use HTTP status phrases like 'Bad Request'."
+)
+
+_LAB_REPORT_SCOPE = (
+    "A lab report is any diagnostic test-results document that lists test names with "
+    "measured values, units, reference ranges, or qualitative results (positive, "
+    "negative, reactive, detected, etc.). This includes pathology, biochemistry, "
+    "hematology, microbiology, serology, urine routine and microscopy, PSA, semen "
+    "analysis, kidney function panels, and urology or other specialty clinic lab "
+    "printouts. Do not reject a report because it is from urology, nephrology, or "
+    "another specialty—if it contains test results, treat it as a lab report."
 )
 
 
@@ -173,13 +185,20 @@ def extract_prescription_with_groq(extracted_text: str) -> dict[str, Any]:
 
 def extract_lab_report_with_groq(extracted_text: str) -> dict[str, Any]:
     system = (
-        "You are helping extract laboratory test results for Indian patients. "
+        "You are helping extract laboratory and diagnostic test results for Indian "
+        "patients. "
+        f"{_LAB_REPORT_SCOPE} "
         "Return ONLY valid JSON with keys: is_lab_report, error, lab_name, report_date, "
-        "test_results. Use result=positive/negative for antigen/antibody/microscopy results."
+        "test_results. Each test_results entry has test_name, value, unit, "
+        "reference_range, and result (positive/negative/normal/abnormal/high/low when "
+        "applicable). Set is_lab_report=true whenever the document primarily contains "
+        "extractable test results. Only set is_lab_report=false when the document is "
+        "clearly not a test-results report (for example a prescription, bill, discharge "
+        "summary, or pre-authorization letter)."
         f"{_AI_ERROR_HINT}"
     )
     user = f"Lab report text:\n{extracted_text}"
-    return _groq_chat(system, user)
+    return normalize_lab_report_extraction(_groq_chat(system, user))
 
 
 def extract_discharge_summary_with_groq(extracted_text: str) -> dict[str, Any]:
@@ -214,7 +233,8 @@ def classify_document_with_groq(extracted_text: str) -> dict[str, Any]:
         "discharge_summary, preauth_letter. "
         "bill = hospital invoice or receipt with charges and line items. "
         "prescription = doctor prescription with medicines, tests, or procedures ordered. "
-        "lab_report = pathology or diagnostic laboratory test results. "
+        "lab_report = pathology, diagnostic laboratory, or specialty clinic test results "
+        "(including urology urine analysis, PSA, semen analysis, and similar reports). "
         "discharge_summary = hospital inpatient discharge note with admission or discharge details. "
         "preauth_letter = insurance, TPA, or government scheme pre-authorization or "
         "cashless approval letter. "
@@ -224,6 +244,11 @@ def classify_document_with_groq(extracted_text: str) -> dict[str, Any]:
     )
     user = f"Document text:\n{extracted_text[:8000]}"
     return _groq_chat(system, user, max_tokens=300)
+
+
+def normalize_detected_document_type(value: Any) -> str | None:
+    doc_type = str(value or "").strip().lower()
+    return doc_type if doc_type in VALID_DOCUMENT_TYPES else None
 
 
 def normalize_document_classification(payload: dict[str, Any]) -> dict[str, Any]:
@@ -264,6 +289,20 @@ VALID_TEST_RESULTS = {
     "low",
     None,
 }
+
+
+def normalize_lab_report_extraction(payload: dict[str, Any]) -> dict[str, Any]:
+    """Accept lab reports when Groq extracted test results but misclassified the type."""
+    test_results = _normalize_test_results(payload.get("test_results") or [])
+    is_lab_report = bool(payload.get("is_lab_report", False))
+    if not is_lab_report and test_results:
+        return {
+            **payload,
+            "is_lab_report": True,
+            "error": None,
+            "test_results": test_results,
+        }
+    return {**payload, "test_results": test_results}
 
 
 def _normalize_symptoms(items: list[Any]) -> list[dict[str, str]]:

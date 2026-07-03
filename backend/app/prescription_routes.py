@@ -16,6 +16,7 @@ from app.services.document_extraction import (
     extract_prescription_with_groq,
     merge_clinical_contexts,
     normalize_clinical_context,
+    normalize_detected_document_type,
     normalize_document_classification,
     normalize_prescription_items,
     resolve_document_date,
@@ -23,7 +24,7 @@ from app.services.document_extraction import (
 from app.services.primary_guidelines_index import get_primary_guidelines_store
 from app.services.stg_index import get_stg_index_store
 from app.services.action_plan import build_action_plan
-from app.services.patient_errors import patient_facing_detail
+from app.services.patient_errors import document_mismatch_detail
 from app.services.patient_age import resolve_patient_age
 from app.services.patient_gender import gender_display_label
 from app.services.treatment_audit import analyze_treatment
@@ -244,9 +245,14 @@ async def upload_prescription(file: UploadFile = File(...)) -> dict[str, Any]:
     if not ai_result.get("is_prescription", False):
         raise HTTPException(
             status_code=400,
-            detail=patient_facing_detail(
-                ai_result.get("error"),
-                "Uploaded document does not appear to be a prescription.",
+            detail=document_mismatch_detail(
+                filename=file.filename,
+                assigned_type="prescription",
+                message=ai_result.get("error"),
+                fallback="Uploaded document does not appear to be a prescription.",
+                suggested_type=normalize_detected_document_type(
+                    ai_result.get("detected_document_type")
+                ),
             ),
         )
 
@@ -295,9 +301,14 @@ async def upload_clinical_document(
         if not ai_result.get("is_lab_report", False):
             raise HTTPException(
                 status_code=400,
-                detail=patient_facing_detail(
-                    ai_result.get("error"),
-                    "Uploaded document does not appear to be a lab report.",
+                detail=document_mismatch_detail(
+                    filename=file.filename,
+                    assigned_type="lab_report",
+                    message=ai_result.get("error"),
+                    fallback="Uploaded document does not appear to be a lab report.",
+                    suggested_type=normalize_detected_document_type(
+                        ai_result.get("detected_document_type")
+                    ),
                 ),
             )
         clinical_context = normalize_clinical_context(
@@ -317,9 +328,16 @@ async def upload_clinical_document(
         if not ai_result.get("is_discharge_summary", False):
             raise HTTPException(
                 status_code=400,
-                detail=patient_facing_detail(
-                    ai_result.get("error"),
-                    "Uploaded document does not appear to be a discharge summary.",
+                detail=document_mismatch_detail(
+                    filename=file.filename,
+                    assigned_type="discharge_summary",
+                    message=ai_result.get("error"),
+                    fallback=(
+                        "Uploaded document does not appear to be a discharge summary."
+                    ),
+                    suggested_type=normalize_detected_document_type(
+                        ai_result.get("detected_document_type")
+                    ),
                 ),
             )
         diagnosis = ai_result.get("diagnosis")

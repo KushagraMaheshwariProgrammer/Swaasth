@@ -133,6 +133,31 @@ def test_analyze_treatment_accepts_clinical_fields(monkeypatch) -> None:
     assert payload["clinical_context"]["test_results"][0]["test_name"] == "Malaria RDT"
 
 
+def test_upload_prescription_rejects_wrong_type_with_filename(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.prescription_routes.extract_document_text",
+        lambda file_bytes, file_type: "Hospital bill with line items",
+    )
+    monkeypatch.setattr(
+        "app.prescription_routes.extract_prescription_with_groq",
+        lambda text: {
+            "is_prescription": False,
+            "error": "This looks like a hospital bill, not a prescription.",
+            "detected_document_type": "bill",
+        },
+    )
+
+    response = client.post(
+        "/upload-prescription",
+        files={"file": ("hospital-bill.pdf", b"%PDF-1.4", "application/pdf")},
+    )
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "hospital-bill.pdf" in detail
+    assert "Prescription" in detail
+    assert "Hospital bill" in detail
+
+
 def test_upload_clinical_document_lab_report(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.prescription_routes.extract_document_text",
@@ -159,3 +184,37 @@ def test_upload_clinical_document_lab_report(monkeypatch) -> None:
     payload = response.json()
     assert payload["document_type"] == "lab_report"
     assert payload["clinical_context"]["test_results"][0]["test_name"] == "Malaria RDT"
+
+
+def test_upload_clinical_document_urology_lab_report(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.prescription_routes.extract_document_text",
+        lambda file_bytes, file_type: "Urology lab report text",
+    )
+    monkeypatch.setattr(
+        "app.prescription_routes.extract_lab_report_with_groq",
+        lambda text: {
+            "is_lab_report": True,
+            "test_results": [
+                {
+                    "test_name": "Urine Routine Microscopy",
+                    "value": "pus cells 2-3/HPF",
+                }
+            ],
+            "lab_name": "Urology Clinic",
+            "report_date": "2026-01-15",
+        },
+    )
+
+    response = client.post(
+        "/upload-clinical-document",
+        data={"document_type": "lab_report"},
+        files={"file": ("urology-report.pdf", b"%PDF-1.4", "application/pdf")},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["document_type"] == "lab_report"
+    assert (
+        payload["clinical_context"]["test_results"][0]["test_name"]
+        == "Urine Routine Microscopy"
+    )

@@ -66,6 +66,23 @@ export function documentsNeedingConfirmation(documents) {
   return (documents || []).filter((doc) => !doc.typeConfirmed);
 }
 
+export function unconfirmedDocumentNames(documents) {
+  return documentsNeedingConfirmation(documents).map(
+    (doc) => doc.file?.name?.trim() || "Unnamed document"
+  );
+}
+
+export function formatUnconfirmedDocumentsMessage(documents) {
+  const names = unconfirmedDocumentNames(documents);
+  if (!names.length) {
+    return "";
+  }
+  if (names.length === 1) {
+    return `Confirm the document type for "${names[0]}" before analyzing.`;
+  }
+  return `Confirm the document type for these files before analyzing: ${names.join(", ")}.`;
+}
+
 export function bundleHasClassifyingDocuments(documents) {
   return (documents || []).some((doc) => doc.classifying);
 }
@@ -80,6 +97,28 @@ export function allBundleDocumentsConfirmed(documents) {
 
 export function documentTypeLabel(typeId) {
   return DOCUMENT_TYPES.find((type) => type.id === typeId)?.label || typeId;
+}
+
+/** Add filename context when an upload error does not already name the file. */
+export function enrichDocumentUploadError(error, doc) {
+  if (!error || !doc) {
+    return error;
+  }
+  const message = String(error.message || "").trim();
+  const filename = doc.file?.name?.trim();
+  if (!message || !filename || message.includes(filename)) {
+    return error;
+  }
+  const label = documentTypeLabel(doc.documentType);
+  return new Error(`"${filename}" (${label}): ${message}`);
+}
+
+async function uploadBundleDocument(doc, uploadFn) {
+  try {
+    return await uploadFn(doc.file);
+  } catch (error) {
+    throw enrichDocumentUploadError(error, doc);
+  }
 }
 
 export function guessDocumentType(filename) {
@@ -248,6 +287,81 @@ export function bundleHasBills(documents) {
   return documents.some((doc) => doc.documentType === "bill");
 }
 
+function formatExtractionFailure(_doc, error) {
+  return error instanceof Error && error.message
+    ? error.message
+    : "We could not extract data from this file.";
+}
+
+async function extractDocumentGroup(documents, uploadFn) {
+  const outcomes = await Promise.all(
+    documents.map(async (doc) => {
+      try {
+        const result = await uploadBundleDocument(doc, uploadFn);
+        return { ok: true, doc, result };
+      } catch (error) {
+        return {
+          ok: false,
+          doc,
+          warning: formatExtractionFailure(doc, error),
+        };
+      }
+    })
+  );
+
+  return {
+    successful: outcomes
+      .filter((outcome) => outcome.ok)
+      .map((outcome) => ({ doc: outcome.doc, result: outcome.result })),
+    failed: outcomes
+      .filter((outcome) => !outcome.ok)
+      .map((outcome) => ({
+        doc: outcome.doc,
+        warning: outcome.warning,
+      })),
+    warnings: outcomes
+      .filter((outcome) => !outcome.ok)
+      .map((outcome) => outcome.warning),
+  };
+}
+
+export function bundleHasExtractedData(merged) {
+  if (merged.lineItems?.length > 0) {
+    return true;
+  }
+  if (
+    merged.medicines?.length ||
+    merged.tests?.length ||
+    merged.procedures?.length
+  ) {
+    return true;
+  }
+  if (String(merged.diagnosis || "").trim()) {
+    return true;
+  }
+  const clinicalContext = merged.clinicalContext || emptyClinicalContext();
+  if (
+    clinicalContext.symptoms?.length > 0 ||
+    clinicalContext.test_results?.length > 0
+  ) {
+    return true;
+  }
+  return (merged.preauthDocuments || []).some(
+    (doc) => (doc.approved_items || []).length > 0
+  );
+}
+
+function buildNoExtractedDataError(documents, extractionWarnings) {
+  const baseMessage =
+    extractionWarnings.length === documents.length
+      ? "We could not extract data from any uploaded document."
+      : "No bill items, prescription items, or clinical data were detected from the readable documents.";
+  if (!extractionWarnings.length) {
+    return `${baseMessage} Check your documents and try again.`;
+  }
+  return `${baseMessage} ${extractionWarnings.join(" ")}`.trim();
+}
+
 export function applyDocumentDatesToBundle(documents, confirmedDates) {
   const dateMap = new Map(
     (confirmedDates || []).map((item) => [item.id, normalizeToIsoDate(item.documentDate)])
@@ -319,30 +433,64 @@ export async function processDocumentBundle(documents, location) {
 
   if (bills.length && (!location?.state || !location?.city)) {
     throw new Error(
-      "Please select the state/UT and city where the hospital is located."
+      "Please select a hospital with state/UT and city before analyzing bills."
     );
   }
 
   const [
-    billResults,
-    prescriptionResults,
-    labResults,
-    dischargeResults,
-    preauthResults,
-  ] =
-    await Promise.all([
-      Promise.all(bills.map((doc) => uploadBill(doc.file, location))),
-      Promise.all(prescriptions.map((doc) => uploadPrescription(doc.file))),
-      Promise.all(
-        labReports.map((doc) => uploadClinicalDocument(doc.file, "lab_report"))
-      ),
-      Promise.all(
-        dischargeSummaries.map((doc) =>
-          uploadClinicalDocument(doc.file, "discharge_summary")
-        )
-      ),
-      Promise.all(preauthLetters.map((doc) => uploadPreauthDocument(doc.file))),
-    ]);
+    billGroup,
+    prescriptionGroup,
+    labGroup,
+    dischargeGroup,
+    preauthGroup,
+  ] = await Promise.all([
+    extractDocumentGroup(bills, (file) => uploadBill(file, location)),
+    extractDocumentGroup(prescriptions, (file) => uploadPrescription(file)),
+    extractDocumentGroup(labReports, (file) =>
+      uploadClinicalDocument(file, "lab_report")
+    ),
+    extractDocumentGroup(dischargeSummaries, (file) =>
+      uploadClinicalDocument(file, "discharge_summary")
+    ),
+    extractDocumentGroup(preauthLetters, (file) => uploadPreauthDocument(file)),
+  ]);
+
+  const extractionWarnings = [
+    ...billGroup.warnings,
+    ...prescriptionGroup.warnings,
+    ...labGroup.warnings,
+    ...dischargeGroup.warnings,
+    ...preauthGroup.warnings,
+  ];
+
+  const billResults = billGroup.successful.map((item) => item.result);
+  const prescriptionResults = prescriptionGroup.successful.map(
+    (item) => item.result
+  );
+  const labResults = labGroup.successful.map((item) => item.result);
+  const dischargeResults = dischargeGroup.successful.map((item) => item.result);
+  const preauthResults = preauthGroup.successful.map((item) => item.result);
+
+  const extractionByDocId = {};
+  const extractionErrorsByDocId = {};
+  for (const { doc, result } of [
+    ...billGroup.successful,
+    ...prescriptionGroup.successful,
+    ...labGroup.successful,
+    ...dischargeGroup.successful,
+    ...preauthGroup.successful,
+  ]) {
+    extractionByDocId[doc.id] = result;
+  }
+  for (const { doc, warning } of [
+    ...billGroup.failed,
+    ...prescriptionGroup.failed,
+    ...labGroup.failed,
+    ...dischargeGroup.failed,
+    ...preauthGroup.failed,
+  ]) {
+    extractionErrorsByDocId[doc.id] = warning;
+  }
 
   const { lineItems, scanMeta } = mergeBillResponses(billResults);
   const prescriptionMerged = mergePrescriptionResponses(prescriptionResults);
@@ -363,52 +511,49 @@ export async function processDocumentBundle(documents, location) {
   }));
 
   const perDocumentDates = [
-    ...bills.map((doc, index) =>
+    ...billGroup.successful.map(({ doc, result }) =>
       buildDatePromptItem({
         id: doc.id,
         filename: doc.file?.name,
         documentType: "bill",
-        detectedDate: detectDocumentDate("bill", billResults[index]),
+        detectedDate: detectDocumentDate("bill", result),
       })
     ),
-    ...prescriptions.map((doc, index) =>
+    ...prescriptionGroup.successful.map(({ doc, result }) =>
       buildDatePromptItem({
         id: doc.id,
         filename: doc.file?.name,
         documentType: "prescription",
-        detectedDate: detectDocumentDate("prescription", prescriptionResults[index]),
+        detectedDate: detectDocumentDate("prescription", result),
       })
     ),
-    ...labReports.map((doc, index) =>
+    ...labGroup.successful.map(({ doc, result }) =>
       buildDatePromptItem({
         id: doc.id,
         filename: doc.file?.name,
         documentType: "lab_report",
-        detectedDate: detectDocumentDate("lab_report", labResults[index]),
+        detectedDate: detectDocumentDate("lab_report", result),
       })
     ),
-    ...dischargeSummaries.map((doc, index) =>
+    ...dischargeGroup.successful.map(({ doc, result }) =>
       buildDatePromptItem({
         id: doc.id,
         filename: doc.file?.name,
         documentType: "discharge_summary",
-        detectedDate: detectDocumentDate(
-          "discharge_summary",
-          dischargeResults[index]
-        ),
+        detectedDate: detectDocumentDate("discharge_summary", result),
       })
     ),
-    ...preauthLetters.map((doc, index) =>
+    ...preauthGroup.successful.map(({ doc, result }) =>
       buildDatePromptItem({
         id: doc.id,
         filename: doc.file?.name,
         documentType: "preauth_letter",
-        detectedDate: detectDocumentDate("preauth_letter", preauthResults[index]),
+        detectedDate: detectDocumentDate("preauth_letter", result),
       })
     ),
   ];
 
-  return {
+  const merged = {
     lineItems,
     scanMeta,
     prescriptionMeta: prescriptionMerged.prescriptionMeta,
@@ -425,5 +570,14 @@ export async function processDocumentBundle(documents, location) {
     hasPrescriptions: prescriptions.length > 0,
     hasClinicalDocs: labReports.length + dischargeSummaries.length > 0,
     hasPreauth: preauthLetters.length > 0,
+    extractionWarnings,
+    extractionByDocId,
+    extractionErrorsByDocId,
   };
+
+  if (Object.keys(extractionByDocId).length === 0) {
+    throw new Error(buildNoExtractedDataError(documents, extractionWarnings));
+  }
+
+  return merged;
 }

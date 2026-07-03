@@ -6,6 +6,7 @@ import {
   DOCUMENT_TYPES,
   documentTypeLabel,
   documentsNeedingConfirmation,
+  unconfirmedDocumentNames,
 } from "../utils/documentBundle";
 import DocumentFilePreview from "./DocumentFilePreview";
 import DocumentTypeDetailView from "./DocumentTypeDetailView";
@@ -102,6 +103,7 @@ export default function MultiDocumentUpload({
   }, [documents]);
 
   const needsConfirmation = documentsNeedingConfirmation(documents);
+  const unconfirmedNames = unconfirmedDocumentNames(documents);
   const hasUnconfirmed = needsConfirmation.length > 0;
   const isClassifying = bundleHasClassifyingDocuments(documents);
   const activeDocument = documents.find((doc) => doc.id === activeDocId) || null;
@@ -329,8 +331,8 @@ export default function MultiDocumentUpload({
       {showTypeConfirmBanner && !isClassifying && hasUnconfirmed && (
         <p className="document-type-confirm-banner" role="status">
           {needsConfirmation.length === 1
-            ? "1 document needs your confirmation before analyzing."
-            : `${needsConfirmation.length} documents need your confirmation before analyzing.`}
+            ? `Confirm the document type for "${unconfirmedNames[0]}" before analyzing.`
+            : `Confirm the document type for these files before analyzing: ${unconfirmedNames.join(", ")}.`}
         </p>
       )}
 

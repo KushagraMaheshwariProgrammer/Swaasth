@@ -46,6 +46,7 @@ export function persistLocalPatient(userId, patientData, localId = null) {
       birthYear: Number(patientData.birthYear) || null,
       gender: patientData.gender || "",
       state: patientData.state?.trim() || "",
+      city: patientData.city?.trim() || "",
       savePastBills: patientData?.savePastBills === true,
       clinicalHistory: normalizeClinicalHistory(patientData?.clinicalHistory),
     },

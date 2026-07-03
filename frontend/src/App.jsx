@@ -22,13 +22,14 @@ import VerifyEmailPage from "./pages/VerifyEmailPage";
 import TermsDevPreview from "./pages/TermsDevPreview";
 import UserNav from "./components/UserNav";
 import PatientList from "./components/PatientList";
-import LocationSearchPicker from "./components/LocationSearchPicker";
+import HospitalList from "./components/HospitalList";
 import ClinicalContextForm from "./components/ClinicalContextForm";
 import DiagnosisPrompt from "./components/DiagnosisPrompt";
 import PrescriptionResults from "./components/PrescriptionResults";
 import TermsAndConditionsModal from "./components/TermsAndConditionsModal";
 import MedicalHistoryConsentModal from "./components/MedicalHistoryConsentModal";
 import MultiDocumentUpload from "./components/MultiDocumentUpload";
+import BundleExtractionReview from "./components/BundleExtractionReview";
 import DocumentDatePrompt from "./components/DocumentDatePrompt";
 import MedicalHistoryConsentPage from "./pages/MedicalHistoryConsentPage";
 import AppBackground from "./components/AppBackground";
@@ -47,19 +48,70 @@ import {
   emptyClinicalContext,
 } from "./services/prescriptions";
 import {
-  getCities,
-  getStateOptions,
   resolveCanonicalStateUtName,
 } from "./services/locations";
 import {
+  getLocalHospitalsSnapshot,
+  getPatientHospitals,
+  resolveHospitalLocation,
+} from "./services/patientHospitals";
+import {
   allBundleDocumentsConfirmed,
   bundleHasBills,
+  bundleHasExtractedData,
   createBundleSession,
+  formatUnconfirmedDocumentsMessage,
   mergeConfirmedDatesIntoBundle,
   processDocumentBundle,
 } from "./utils/documentBundle";
 import { itemsMissingDates } from "./utils/documentDates";
+import {
+  attachExtractionsToDocuments,
+  mergeEditedExtractionsToBundle,
+} from "./utils/documentExtraction";
 import { buildPatientHistoryPayload } from "./utils/patientClinicalHistory";
+
+function formatExtractionWarnings(warnings) {
+  if (!warnings?.length) {
+    return "";
+  }
+  if (warnings.length === 1) {
+    return `We could not use one document (${warnings[0]}). Analysis will continue with the other uploaded data.`;
+  }
+  return `We could not use ${warnings.length} document(s): ${warnings.join(" ")} Analysis will continue with the available data.`;
+}
+
+function buildBundleExtractionInfo(merged) {
+  const hasBillLineItems = merged.lineItems?.length > 0;
+  const hasRxItems =
+    merged.medicines?.length ||
+    merged.tests?.length ||
+    merged.procedures?.length;
+  const messages = [];
+
+  if (hasBillLineItems) {
+    messages.push(
+      `Extracted ${merged.lineItems.length} bill item${
+        merged.lineItems.length === 1 ? "" : "s"
+      } from your upload.`
+    );
+  } else if (hasRxItems) {
+    messages.push(
+      `Extracted ${merged.medicines?.length || 0} medicine(s), ${
+        merged.tests?.length || 0
+      } test(s), and ${merged.procedures?.length || 0} procedure(s).`
+    );
+  } else if (bundleHasExtractedData(merged)) {
+    messages.push("Extracted clinical data from your upload.");
+  }
+
+  const warningMessage = formatExtractionWarnings(merged.extractionWarnings);
+  if (warningMessage) {
+    messages.push(warningMessage);
+  }
+
+  return messages.join(" ");
+}
 
 function formatFetchError(err, fallback) {
   if (err?.message === "Failed to fetch") {
@@ -534,15 +586,8 @@ function CheckPage() {
   const [pendingBundleMerge, setPendingBundleMerge] = useState(null);
   const [datePromptItems, setDatePromptItems] = useState(null);
   const [preauthDocuments, setPreauthDocuments] = useState([]);
-  const [states] = useState(() => getStateOptions());
-  const [cities, setCities] = useState([]);
-  const [stateUtName, setStateUtName] = useState("");
-  const [city, setCity] = useState("");
   const [hospitalType, setHospitalType] = useState("general");
   const [isLoading, setIsLoading] = useState(false);
-  const locationError = states.length
-    ? ""
-    : "Location directory is missing. Run npm run build to regenerate it.";
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
   const [scanMeta, setScanMeta] = useState(null);
@@ -556,6 +601,9 @@ function CheckPage() {
   const [saveMessage, setSaveMessage] = useState("");
   const [patients, setPatients] = useState([]);
   const [selectedPatientId, setSelectedPatientId] = useState("");
+  const [hospitals, setHospitals] = useState([]);
+  const [selectedHospitalId, setSelectedHospitalId] = useState("");
+  const [hospitalsLoading, setHospitalsLoading] = useState(false);
   const [patientsLoading, setPatientsLoading] = useState(false);
   const [billStep, setBillStep] = useState("patient");
   const [patientInfo, setPatientInfo] = useState("");
@@ -567,6 +615,8 @@ function CheckPage() {
   const [diagnosisUserProvided, setDiagnosisUserProvided] = useState(false);
   const [clinicalStep, setClinicalStep] = useState(null);
   const [clinicalContext, setClinicalContext] = useState(emptyClinicalContext);
+  const [extractionReviewActive, setExtractionReviewActive] = useState(false);
+  const [extractionWarnings, setExtractionWarnings] = useState([]);
 
   const reloadPatients = useCallback(async () => {
     if (!user) {
@@ -587,10 +637,13 @@ function CheckPage() {
   useEffect(() => {
     if (selectedPatientId && patients.some((p) => p.id === selectedPatientId)) {
       if (location.state?.patientId === selectedPatientId) {
-        setBillStep("bill");
+        setBillStep(location.state?.hospitalId ? "bill" : "hospital");
+        if (location.state?.hospitalId) {
+          setSelectedHospitalId(location.state.hospitalId);
+        }
       }
     }
-  }, [selectedPatientId, patients, location.state?.patientId]);
+  }, [selectedPatientId, patients, location.state?.patientId, location.state?.hospitalId]);
 
   useEffect(() => {
     if (!user) {
@@ -629,6 +682,51 @@ function CheckPage() {
   }, [user, reloadPatients]);
 
   const selectedPatient = patients.find((p) => p.id === selectedPatientId);
+  const selectedHospital =
+    hospitals.find((hospital) => hospital.id === selectedHospitalId) || null;
+
+  const reloadHospitals = useCallback(async (patientId) => {
+    if (!user || !patientId) {
+      setHospitals([]);
+      return [];
+    }
+    const localSnapshot = getLocalHospitalsSnapshot(user.uid, patientId);
+    if (localSnapshot.length) {
+      setHospitals(localSnapshot);
+    }
+    setHospitalsLoading(true);
+    try {
+      const list = await getPatientHospitals(user.uid, patientId);
+      setHospitals(list);
+      return list;
+    } catch (err) {
+      console.error("Failed to load hospitals:", err);
+      return localSnapshot;
+    } finally {
+      setHospitalsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!selectedPatientId) {
+      setHospitals([]);
+      setSelectedHospitalId("");
+      return;
+    }
+    reloadHospitals(selectedPatientId).then((list) => {
+      setSelectedHospitalId((current) => {
+        if (current && list.some((entry) => entry.id === current)) {
+          return current;
+        }
+        if (location.state?.hospitalId && list.some((entry) => entry.id === location.state.hospitalId)) {
+          return location.state.hospitalId;
+        }
+        return list[0]?.id || "";
+      });
+    });
+  }, [selectedPatientId, reloadHospitals, location.state?.hospitalId]);
+
+  const hospitalCompareLocation = resolveHospitalLocation(selectedHospital);
   const comparisonCopy = getComparisonSchemeCopy();
   const hasBillItems = editableItems.length > 0;
   const hasPrescriptionItems =
@@ -646,6 +744,14 @@ function CheckPage() {
     report_kind: reportKind,
     session_id: bundleSessionRef.current.sessionId,
     source_documents: bundleSourceDocumentsRef.current,
+    hospital_profile: selectedHospital
+      ? {
+          id: selectedHospital.id,
+          name: selectedHospital.name,
+          city: selectedHospital.city,
+          state: selectedHospital.state,
+        }
+      : null,
   });
 
   const getConsentSaveMessage = (outcome) => {
@@ -688,12 +794,21 @@ function CheckPage() {
 
   const handleSelectPatient = (patientId) => {
     setSelectedPatientId(patientId);
+    setSelectedHospitalId("");
+    setError("");
+    setBillStep("hospital");
+  };
+
+  const handleSelectHospital = (hospitalId) => {
+    setSelectedHospitalId(hospitalId);
     setError("");
     setBillStep("bill");
   };
 
   const handleChangePatient = () => {
     setBillStep("patient");
+    setSelectedHospitalId("");
+    setHospitals([]);
     setBundleDocuments([]);
     setPreauthDocuments([]);
     bundleSessionRef.current = createBundleSession();
@@ -713,25 +828,46 @@ function CheckPage() {
     compareLocationRef.current = { state: "", city: "" };
   };
 
+  const handleChangeHospital = () => {
+    setBillStep("hospital");
+    setBundleDocuments([]);
+    setPreauthDocuments([]);
+    bundleSessionRef.current = createBundleSession();
+    bundleSourceDocumentsRef.current = [];
+    setError("");
+    setResult(null);
+    setScanMeta(null);
+    setEditableItems([]);
+    setPrescriptionMeta(null);
+    setPrescriptionMedicines([]);
+    setPrescriptionTests([]);
+    setPrescriptionProcedures([]);
+    setDiagnosis("");
+    setDiagnosisUserProvided(false);
+    setClinicalStep(null);
+    setClinicalContext(emptyClinicalContext());
+    compareLocationRef.current = { state: "", city: "" };
+  };
+
+  const getSelectedHospitalLocation = () =>
+    resolveHospitalLocation(selectedHospital);
+
   const resolveCompareLocation = () => {
     const refLocation = compareLocationRef.current;
+    const hospitalLocation = getSelectedHospitalLocation();
     const compareState =
       resolveCanonicalStateUtName(
         refLocation.state ||
-          stateUtName ||
+          hospitalLocation.state ||
           scanMeta?.comparison_settings?.state_name ||
-          selectedPatient?.state ||
           ""
       ) || "";
-    let compareCity =
+    const compareCity =
       refLocation.city ||
-      city ||
+      hospitalLocation.city ||
       scanMeta?.comparison_settings?.city ||
       "";
-    if (!compareCity && compareState) {
-      compareCity = getCities(compareState)[0] || "";
-    }
-    return { state: compareState, city: compareCity };
+    return { state: compareState, city: compareCity, name: hospitalLocation.name };
   };
 
   const resolveReportKind = (fallback = "bill") => {
@@ -760,7 +896,9 @@ function CheckPage() {
         : resolveCompareLocation();
 
     if (!location.state || !location.city) {
-      setError("Location settings are missing. Please upload the bill again.");
+      setError(
+        "Please select a hospital with state/UT and city before comparing bills."
+      );
       return;
     }
 
@@ -787,7 +925,11 @@ function CheckPage() {
           state_ut_name: location.state,
           city: location.city,
           hospital_type: hospitalType,
-          hospital_name: (metaOverride.hospitalName ?? hospitalNameEdit).trim() || null,
+          hospital_name:
+            (metaOverride.hospitalName ?? hospitalNameEdit).trim() ||
+            location.name ||
+            selectedHospital?.name ||
+            null,
           filename: metaOverride.filename ?? scanMeta?.filename,
           file_type: metaOverride.file_type ?? scanMeta?.file_type,
           bill_date: scanMeta?.bill_date || null,
@@ -861,20 +1003,6 @@ function CheckPage() {
   };
 
   useEffect(() => {
-    if (!stateUtName) {
-      setCities([]);
-      setCity("");
-      return;
-    }
-
-    const nextCities = getCities(stateUtName);
-    setCities(nextCities);
-    setCity((current) =>
-      current && nextCities.includes(current) ? current : ""
-    );
-  }, [stateUtName]);
-
-  useEffect(() => {
     if (!isLoading && !isComparing) {
       setLoadingMessageIndex(0);
       setLoadingProgress(8);
@@ -902,6 +1030,8 @@ function CheckPage() {
     ? "loading"
     : isComparing
     ? "comparing"
+    : extractionReviewActive
+    ? "extract-review"
     : clinicalStep === "diagnosis"
     ? "diagnosis"
     : clinicalStep === "clinical"
@@ -922,34 +1052,34 @@ function CheckPage() {
       setBundleDocuments(datedDocuments);
     }
 
-    const hasBillLineItems = merged.lineItems?.length > 0;
-    const hasRxItems =
-      merged.medicines?.length ||
-      merged.tests?.length ||
-      merged.procedures?.length;
-
-    if (!hasBillLineItems && !hasRxItems && !merged.hasClinicalDocs) {
+    if (!bundleHasExtractedData(merged)) {
       setError(
         "No bill items, prescription items, or clinical data were detected. Check your documents and try again."
       );
+      setExtractionReviewActive(true);
       return;
     }
 
-    if (hasBillLineItems) {
-      setPatientInfo(
-        `Extracted ${merged.lineItems.length} bill item${
-          merged.lineItems.length === 1 ? "" : "s"
-        } from your upload.`
-      );
-    } else if (hasRxItems) {
-      setPatientInfo(
-        `Extracted ${merged.medicines?.length || 0} medicine(s), ${
-          merged.tests?.length || 0
-        } test(s), and ${merged.procedures?.length || 0} procedure(s).`
-      );
+    const infoMessage = buildBundleExtractionInfo(merged);
+    if (infoMessage) {
+      setPatientInfo(infoMessage);
     }
 
-    setClinicalStep("clinical");
+    const needsClinical =
+      merged.medicines?.length > 0 ||
+      merged.tests?.length > 0 ||
+      merged.procedures?.length > 0 ||
+      merged.hasClinicalDocs ||
+      String(merged.diagnosis || "").trim() ||
+      merged.clinicalContext?.symptoms?.length > 0 ||
+      merged.clinicalContext?.test_results?.length > 0;
+
+    setClinicalStep(needsClinical ? "clinical" : null);
+  };
+
+  const finishBundleAfterDates = (merged, datedDocuments) => {
+    setExtractionReviewActive(false);
+    proceedAfterBundleExtraction(merged, datedDocuments);
   };
 
   const handleBundleDateConfirm = (confirmedDates) => {
@@ -963,13 +1093,66 @@ function CheckPage() {
     );
     setPendingBundleMerge(null);
     setDatePromptItems(null);
-    proceedAfterBundleExtraction(merged, merged.datedDocuments);
+    finishBundleAfterDates(merged, merged.datedDocuments);
   };
 
   const handleBundleDateCancel = () => {
     setPendingBundleMerge(null);
     setDatePromptItems(null);
+    setExtractionReviewActive(true);
     setIsLoading(false);
+  };
+
+  const handleExtractionReviewContinue = () => {
+    const docsWithData = bundleDocuments.filter((doc) => doc.editableExtraction);
+    if (!docsWithData.length) {
+      setError("No extracted data to continue with. Check your documents and try again.");
+      return;
+    }
+
+    setError("");
+    const merged = mergeEditedExtractionsToBundle(docsWithData, {
+      state: hospitalCompareLocation.state,
+      city: hospitalCompareLocation.city,
+      hospitalType,
+    });
+
+    const promptItems = (merged.perDocumentDates || []).map((item) => ({
+      ...item,
+      documentDate: item.detectedDate || item.documentDate || "",
+    }));
+
+    if (itemsMissingDates(promptItems).length) {
+      setPendingBundleMerge(merged);
+      setDatePromptItems(promptItems);
+      setExtractionReviewActive(false);
+      return;
+    }
+
+    const datedMerge = mergeConfirmedDatesIntoBundle(
+      merged,
+      bundleDocuments,
+      promptItems
+    );
+    finishBundleAfterDates(datedMerge, datedMerge.datedDocuments);
+  };
+
+  const handleExtractionReviewBack = () => {
+    setExtractionReviewActive(false);
+    setExtractionWarnings([]);
+    setBundleDocuments((documents) =>
+      documents.map((doc) => {
+        const {
+          editableExtraction,
+          rawExtraction,
+          extractionError,
+          ...rest
+        } = doc;
+        return rest;
+      })
+    );
+    setError("");
+    setPatientInfo("");
   };
 
   const handleAnalyzeBundle = async () => {
@@ -978,17 +1161,25 @@ function CheckPage() {
       setBillStep("patient");
       return;
     }
+    if (!selectedHospital) {
+      setError("Add a hospital for this patient before uploading documents.");
+      setBillStep("hospital");
+      return;
+    }
     if (!bundleDocuments.length) {
       setError("Add at least one document to analyze.");
       return;
     }
     if (!allBundleDocumentsConfirmed(bundleDocuments)) {
-      setError("Confirm the document type for every file before analyzing.");
+      setError(formatUnconfirmedDocumentsMessage(bundleDocuments));
       return;
     }
-    if (bundleHasBills(bundleDocuments) && (!stateUtName || !city)) {
+    if (
+      bundleHasBills(bundleDocuments) &&
+      (!hospitalCompareLocation.state || !hospitalCompareLocation.city)
+    ) {
       setError(
-        "Please select the state/UT and city where the hospital is located."
+        "The selected hospital must have a state/UT and city before analyzing bills."
       );
       return;
     }
@@ -1010,31 +1201,25 @@ function CheckPage() {
 
     try {
       const merged = await processDocumentBundle(bundleDocuments, {
-        state: stateUtName,
-        city,
+        state: hospitalCompareLocation.state,
+        city: hospitalCompareLocation.city,
         hospitalType,
       });
       setLoadingProgress(100);
 
-      const promptItems = (merged.perDocumentDates || []).map((item) => ({
-        ...item,
-        documentDate: item.detectedDate || item.documentDate || "",
+      const docsWithExtraction = attachExtractionsToDocuments(
+        bundleDocuments,
+        merged.extractionByDocId || {}
+      ).map((doc) => ({
+        ...doc,
+        extractionError: merged.extractionErrorsByDocId?.[doc.id] || null,
       }));
 
-      if (itemsMissingDates(promptItems).length) {
-        setPendingBundleMerge(merged);
-        setDatePromptItems(promptItems);
-        return;
-      }
-
-      const datedMerge = mergeConfirmedDatesIntoBundle(
-        merged,
-        bundleDocuments,
-        promptItems
-      );
-      proceedAfterBundleExtraction(datedMerge, datedMerge.datedDocuments);
+      setBundleDocuments(docsWithExtraction);
+      setExtractionWarnings(merged.extractionWarnings || []);
+      setExtractionReviewActive(true);
     } catch (err) {
-      setError(formatFetchError(err, "Something went wrong during analysis."));
+      setError(formatFetchError(err, "Something went wrong during extraction."));
     } finally {
       setTimeout(() => setIsLoading(false), 250);
     }
@@ -1095,6 +1280,10 @@ function CheckPage() {
     setDiagnosisUserProvided(false);
     setClinicalStep(null);
     setClinicalContext(emptyClinicalContext());
+    setExtractionReviewActive(false);
+    setExtractionWarnings([]);
+    setPendingBundleMerge(null);
+    setDatePromptItems(null);
     compareLocationRef.current = { state: "", city: "" };
     setError("");
   };
@@ -1123,6 +1312,9 @@ function CheckPage() {
     setDiagnosis("");
     setDiagnosisUserProvided(false);
     setError("");
+    if (bundleDocuments.some((doc) => doc.editableExtraction)) {
+      setExtractionReviewActive(true);
+    }
   };
 
   const updateLineItem = (index, field, value) => {
@@ -1261,11 +1453,21 @@ function CheckPage() {
 
         <header className="check-header">
           <h1>
-            {billStep === "patient" ? "Select patient" : "Upload your documents"}
+            {billStep === "patient"
+              ? "Select patient"
+              : billStep === "hospital"
+              ? "Select hospital"
+              : "Upload your documents"}
           </h1>
           <p>
             {billStep === "patient"
               ? "Choose who these documents are for."
+              : billStep === "hospital"
+              ? selectedPatient
+                ? `Choose the hospital for ${selectedPatient.name}.`
+                : "Choose the hospital for these documents."
+              : selectedPatient && selectedHospital
+              ? `Checking documents for ${selectedPatient.name} at ${selectedHospital.name}.`
               : selectedPatient
               ? `Checking documents for ${selectedPatient.name}.`
               : "We'll analyze them in seconds."}
@@ -1322,10 +1524,10 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {uiState === "upload" && billStep === "bill" && (
+          {uiState === "upload" && billStep === "hospital" && (
             <motion.section
-              key="upload"
-              className="upload-card"
+              key="hospital-step"
+              className="upload-card patient-step-card"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -1347,6 +1549,88 @@ function CheckPage() {
                 </div>
               )}
 
+              <p className="comparison-settings-title">Select hospital</p>
+
+              {hospitalsLoading && (
+                <p className="auth-info">Loading hospitals...</p>
+              )}
+
+              {hospitals.length > 0 && (
+                <HospitalList
+                  hospitals={hospitals}
+                  selectedId={selectedHospitalId}
+                  mode="select"
+                  onSelect={handleSelectHospital}
+                />
+              )}
+
+              {!hospitalsLoading && !hospitals.length && (
+                <>
+                  <p className="auth-info">
+                    No hospitals yet for this patient. Add a hospital before
+                    uploading documents.
+                  </p>
+                  <Link
+                    to={`/patients/${selectedPatient?.id || ""}`}
+                    className="analyze-btn patients-add-btn"
+                  >
+                    Add hospital
+                  </Link>
+                </>
+              )}
+
+              {hospitals.length > 0 && (
+                <Link
+                  to={`/patients/${selectedPatient?.id || ""}`}
+                  className="patients-manage-link"
+                >
+                  Manage hospitals
+                </Link>
+              )}
+
+              {error && <p className="error-text">{error}</p>}
+            </motion.section>
+          )}
+
+          {uiState === "upload" && billStep === "bill" && (
+            <motion.section
+              key="upload"
+              className="upload-card"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25 }}
+            >
+              {selectedPatient && selectedHospital && (
+                <div className="patient-selected-banner patient-selected-banner-compact">
+                  <p>
+                    Patient: <strong>{selectedPatient.name}</strong> ·{" "}
+                    {formatPatientAge(selectedPatient)}
+                  </p>
+                  <p>
+                    Hospital: <strong>{selectedHospital.name}</strong>
+                    {selectedHospital.city ? ` · ${selectedHospital.city}` : ""}
+                    {selectedHospital.state ? `, ${selectedHospital.state}` : ""}
+                  </p>
+                  <div className="patient-detail-actions">
+                    <button
+                      type="button"
+                      className="bill-editor-secondary patient-change-btn"
+                      onClick={handleChangeHospital}
+                    >
+                      Change hospital
+                    </button>
+                    <button
+                      type="button"
+                      className="bill-editor-secondary patient-change-btn"
+                      onClick={handleChangePatient}
+                    >
+                      Change patient
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <p className="comparison-settings-title">Upload documents</p>
 
               <MultiDocumentUpload
@@ -1362,40 +1646,20 @@ function CheckPage() {
                 }}
               />
 
+              {bundleHasBills(bundleDocuments) &&
+                (!hospitalCompareLocation.state || !hospitalCompareLocation.city) && (
+                  <p className="error-text">
+                    The selected hospital must include a state/UT and city before
+                    analyzing bills.{" "}
+                    <Link to={`/patients/${selectedPatient?.id || ""}`}>
+                      Edit hospitals
+                    </Link>
+                  </p>
+                )}
+
               {bundleHasBills(bundleDocuments) && (
                 <div className="comparison-settings">
-                  <p className="comparison-settings-title">Hospital location</p>
-                  <div className="comparison-settings-grid">
-                    <LocationSearchPicker
-                      label="State/UT"
-                      items={states}
-                      value={stateUtName}
-                      onSelect={setStateUtName}
-                      disabled={!states.length && !locationError}
-                      isLoading={!states.length && !locationError}
-                      loadingLabel="Loading states..."
-                      placeholder="Select state/UT"
-                      emptyLabel={
-                        locationError
-                          ? "Could not load states"
-                          : "No states available"
-                      }
-                    />
-                    <LocationSearchPicker
-                      label="City"
-                      items={cities}
-                      value={city}
-                      onSelect={setCity}
-                      disabled={!stateUtName}
-                      loadingLabel="Loading cities..."
-                      placeholder="Select city"
-                      emptyLabel={
-                        stateUtName
-                          ? "No cities available"
-                          : "Select state/UT first"
-                      }
-                    />
-                  </div>
+                  <p className="comparison-settings-title">Hospital type</p>
                   <label className="setting-field setting-field-full">
                     <span>Hospital type</span>
                     <select
@@ -1413,12 +1677,6 @@ function CheckPage() {
                     Hospital name from your bill is matched against the NABH registry
                     when available.
                   </p>
-                  <p className="comparison-settings-hint">
-                    Hospital location helps contextualize audit checks on your bill.
-                  </p>
-                  {locationError && (
-                    <p className="error-text">{locationError}</p>
-                  )}
                 </div>
               )}
 
@@ -1431,12 +1689,15 @@ function CheckPage() {
                 disabled={
                   isLoading ||
                   isComparing ||
+                  !selectedHospital ||
                   !bundleDocuments.length ||
                   !allBundleDocumentsConfirmed(bundleDocuments) ||
-                  (bundleHasBills(bundleDocuments) && (!stateUtName || !city))
+                  (bundleHasBills(bundleDocuments) &&
+                    (!hospitalCompareLocation.state ||
+                      !hospitalCompareLocation.city))
                 }
               >
-                {isLoading ? "Analyzing documents..." : "Analyze Documents"}
+                {isLoading ? "Extracting documents..." : "Extract documents"}
               </button>
               {error && <p className="error-text">{error}</p>}
             </motion.section>

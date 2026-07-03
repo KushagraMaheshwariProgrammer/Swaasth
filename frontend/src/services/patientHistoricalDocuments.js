@@ -15,6 +15,7 @@ import {
   uploadPrescription,
 } from "./prescriptions";
 import { sanitizeForFirestore } from "./bills";
+import { enrichDocumentUploadError } from "../utils/documentBundle";
 
 import { canSaveMedicalHistory } from "../utils/medicalHistoryConsent";
 
@@ -147,13 +148,17 @@ export async function getPatientHistoricalDocuments(userId, patientId) {
   return mergeHistoricalDocumentLists(cloudDocs, localEntries);
 }
 
-async function uploadBillWithoutLocation(file) {
+async function uploadBillWithLocation(file, { state, city, hospitalName }) {
   const formData = new FormData();
   formData.append("file", file);
   const params = new URLSearchParams({
-    city: "Unknown",
+    state_ut_name: state || "Unknown",
+    city: city || "Unknown",
     hospital_type: "general",
   });
+  if (hospitalName) {
+    params.set("hospital_name", hospitalName);
+  }
   const response = await fetchBackend(
     `${getApiBase()}/upload-bill?${params}`,
     {
@@ -200,14 +205,23 @@ export function buildExtractedSummary(documentType, payload) {
   };
 }
 
-export async function extractHistoricalDocument(file, documentType) {
-  if (documentType === "prescription") {
-    return uploadPrescription(file);
+export async function extractHistoricalDocument(file, documentType, hospital = null) {
+  const doc = { file, documentType };
+  try {
+    if (documentType === "prescription") {
+      return uploadPrescription(file);
+    }
+    if (documentType === "bill") {
+      return uploadBillWithLocation(file, {
+        state: hospital?.state || "Unknown",
+        city: hospital?.city || "Unknown",
+        hospitalName: hospital?.name || "",
+      });
+    }
+    return uploadClinicalDocument(file, documentType);
+  } catch (error) {
+    throw enrichDocumentUploadError(error, doc);
   }
-  if (documentType === "bill") {
-    return uploadBillWithoutLocation(file);
-  }
-  return uploadClinicalDocument(file, documentType);
 }
 
 function persistLocalHistoricalDocument(userId, documentData) {
@@ -278,10 +292,17 @@ export async function saveHistoricalDocument(userId, patientId, documentInput, o
     documentDate,
     extractedSummary,
     filename,
+    hospitalId,
+    hospitalName,
+    hospitalCity,
+    hospitalState,
   } = documentInput;
 
   if (!documentType || !documentDate) {
     throw new Error("Document type and date are required.");
+  }
+  if (!hospitalId) {
+    throw new Error("Select a hospital before saving this document.");
   }
 
   const documentData = {
@@ -290,6 +311,10 @@ export async function saveHistoricalDocument(userId, patientId, documentInput, o
     documentType,
     documentDate,
     extractedSummary: extractedSummary || {},
+    hospitalId,
+    hospitalName: hospitalName || "",
+    hospitalCity: hospitalCity || "",
+    hospitalState: hospitalState || "",
   };
 
   const localId = persistLocalHistoricalDocument(userId, documentData);

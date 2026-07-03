@@ -43,7 +43,18 @@ function summarizeSwaasthReport(bill) {
     report_kind: bill?.report_kind,
     report_kind_label: reportKindLabel(bill),
     flags_count: flagsCount,
-    hospital: bill?.hospital?.name_from_bill || bill?.comparison_settings?.city || "",
+    hospital:
+      bill?.hospital_profile?.name ||
+      bill?.hospital?.name_from_bill ||
+      bill?.comparison_settings?.city ||
+      "",
+    hospital_city:
+      bill?.hospital_profile?.city || bill?.comparison_settings?.city || "",
+    hospital_state:
+      bill?.hospital_profile?.state ||
+      bill?.comparison_settings?.state_name ||
+      bill?.comparison_settings?.state_ut_name ||
+      "",
     filename: bill?.filename || "Swaasth report",
   };
 }
@@ -59,6 +70,9 @@ function summarizeLegacyDocument(doc) {
     test_results: summary.test_results || [],
     medicines: (summary.medicines || []).map((item) => item?.name || item).filter(Boolean),
     line_items: summary.line_items || [],
+    hospital: doc.hospitalName || "",
+    hospital_city: doc.hospitalCity || "",
+    hospital_state: doc.hospitalState || "",
   };
 }
 

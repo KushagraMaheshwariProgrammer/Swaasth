@@ -1,4 +1,6 @@
-import { getStateOptions } from "../services/locations";
+import { useEffect, useState } from "react";
+import LocationSearchPicker from "./LocationSearchPicker";
+import { getCities, getStateOptions } from "../services/locations";
 import {
   emptyClinicalHistory,
   normalizeClinicalHistory,
@@ -23,6 +25,7 @@ export const emptyPatientForm = () => ({
   birthYear: "",
   gender: "",
   state: "",
+  city: "",
   savePastBills: false,
   clinicalHistory: emptyClinicalHistory(),
 });
@@ -40,6 +43,7 @@ export function patientToFormFields(patient) {
     birthYear,
     gender: patient?.gender || "",
     state: patient?.state || "",
+    city: patient?.city || "",
     savePastBills: Boolean(patient?.savePastBills),
     clinicalHistory: {
       conditions: (history.conditions || []).map((item) => ({
@@ -80,6 +84,20 @@ export default function PatientForm({
 }) {
   const derivedAge = deriveAgeFromBirthYear(form.birthYear);
   const currentYear = getCurrentYear();
+  const [cities, setCities] = useState(() => getCities(form.state));
+
+  useEffect(() => {
+    if (!form.state) {
+      setCities([]);
+      setForm((prev) => (prev.city ? { ...prev, city: "" } : prev));
+      return;
+    }
+    const nextCities = getCities(form.state);
+    setCities(nextCities);
+    setForm((prev) =>
+      prev.city && nextCities.includes(prev.city) ? prev : { ...prev, city: "" }
+    );
+  }, [form.state]);
 
   return (
     <form className="patient-form" onSubmit={onSubmit}>
@@ -133,22 +151,36 @@ export default function PatientForm({
           </select>
         </label>
       </div>
-      <label className="setting-field setting-field-full">
-        <span>State</span>
-        <select
-          value={form.state}
-          onChange={(event) =>
-            setForm((prev) => ({ ...prev, state: event.target.value }))
+      <div className="comparison-settings-grid">
+        <label className="setting-field">
+          <span>State/UT</span>
+          <select
+            required
+            value={form.state}
+            onChange={(event) =>
+              setForm((prev) => ({ ...prev, state: event.target.value }))
+            }
+          >
+            <option value="">Select state/UT</option>
+            {STATE_OPTIONS.map((stateName) => (
+              <option key={stateName} value={stateName}>
+                {stateName}
+              </option>
+            ))}
+          </select>
+        </label>
+        <LocationSearchPicker
+          label="City"
+          items={cities}
+          value={form.city}
+          onSelect={(city) => setForm((prev) => ({ ...prev, city }))}
+          disabled={!form.state}
+          placeholder="Select city"
+          emptyLabel={
+            form.state ? "No cities available" : "Select state/UT first"
           }
-        >
-          <option value="">Select state</option>
-          {STATE_OPTIONS.map((stateName) => (
-            <option key={stateName} value={stateName}>
-              {stateName}
-            </option>
-          ))}
-        </select>
-      </label>
+        />
+      </div>
 
       {showClinicalHistory && (
         <section className="clinical-history-section">
