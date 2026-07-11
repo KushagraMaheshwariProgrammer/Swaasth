@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { getAccountErrorMessage } from "../auth/accountSecurity";
+import BackLink from "../components/BackLink";
 import { useAuth } from "../context/AuthContext";
 
 const pageTransition = {
@@ -103,9 +104,7 @@ export default function AccountSettingsPage() {
     <motion.div className="check-page" {...pageTransition}>
       <main className="check-wrap account-wrap">
         <div className="history-nav">
-          <Link to="/check" className="back-link">
-            ← Back
-          </Link>
+          <BackLink fallback="/check" />
         </div>
 
         <header className="check-header">

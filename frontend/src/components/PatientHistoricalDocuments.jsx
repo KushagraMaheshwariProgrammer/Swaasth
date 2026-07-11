@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   DOCUMENT_TYPES,
+  documentShowsTypeSuggestion,
   documentTypeLabel,
   guessDocumentType,
 } from "../utils/documentBundle";
@@ -34,8 +35,8 @@ export default function PatientHistoricalDocuments({
   const scrollRestoreRef = useRef(0);
   const manualTypeOverrideRef = useRef(false);
   const [file, setFile] = useState(null);
-  const [documentType, setDocumentType] = useState("lab_report");
-  const [suggestedType, setSuggestedType] = useState("lab_report");
+  const [documentType, setDocumentType] = useState("");
+  const [suggestedType, setSuggestedType] = useState(null);
   const [typeConfirmed, setTypeConfirmed] = useState(false);
   const [autoClassified, setAutoClassified] = useState(false);
   const [classifying, setClassifying] = useState(false);
@@ -108,10 +109,11 @@ export default function PatientHistoricalDocuments({
     if (manualTypeOverrideRef.current) {
       return;
     }
-    const nextType = result?.document_type || suggestedType;
+    const classifiedType = result?.document_type || null;
+    const nextType = classifiedType || suggestedType || documentType || "";
     const confidence = result?.confidence === "high" ? "high" : "low";
-    const isAuto = confidence === "high";
-    setSuggestedType(nextType);
+    const isAuto = Boolean(classifiedType) && confidence === "high";
+    setSuggestedType(classifiedType || suggestedType);
     setDocumentType(nextType);
     setClassificationConfidence(confidence);
     setAutoClassified(isAuto);
@@ -155,8 +157,8 @@ export default function PatientHistoricalDocuments({
     }
     const guessed = guessDocumentType(nextFile.name);
     setFile(nextFile);
-    setSuggestedType(guessed);
-    setDocumentType(guessed);
+    setSuggestedType(guessed || null);
+    setDocumentType(guessed || "");
     setTypeConfirmed(false);
     setAutoClassified(false);
     setClassifying(true);
@@ -398,7 +400,13 @@ export default function PatientHistoricalDocuments({
                 <p className="document-suggested-type">
                   {typeConfirmed
                     ? `Type: ${documentTypeLabel(documentType)}`
-                    : `Please confirm: suggested ${documentTypeLabel(suggestedType)}`}
+                    : documentShowsTypeSuggestion({
+                        suggestedType,
+                        documentType,
+                        typeConfirmed,
+                      })
+                      ? `Please confirm: suggested ${documentTypeLabel(suggestedType)}`
+                      : "Please select a document type."}
                 </p>
               ) : null}
               <label className="setting-field setting-field-full">
@@ -411,6 +419,9 @@ export default function PatientHistoricalDocuments({
                   onChange={(event) => updateDocumentType(null, event.target.value)}
                   disabled={disabled}
                 >
+                  <option value="" disabled>
+                    Select document type
+                  </option>
                   {DOCUMENT_TYPES.map((type) => (
                     <option key={type.id} value={type.id}>
                       {type.label}
@@ -431,7 +442,7 @@ export default function PatientHistoricalDocuments({
                   type="button"
                   className="bill-editor-secondary document-type-confirm-btn"
                   onClick={confirmDocumentType}
-                  disabled={disabled}
+                  disabled={disabled || !documentType}
                 >
                   Confirm type
                 </button>

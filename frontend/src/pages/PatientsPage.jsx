@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import BackLink from "../components/BackLink";
 import PatientForm, {
   emptyPatientForm,
   genderLabel,
@@ -33,7 +34,7 @@ import { getPatientHistoricalDocuments } from "../services/patientHistoricalDocu
 import {
   clinicalHistorySummary,
 } from "../utils/clinicalHistory";
-import { canViewMedicalHistory, patientAllowsHistory } from "../utils/medicalHistoryConsent";
+import { canViewMedicalHistory, patientAllowsHistory, resolveAccountConsent } from "../utils/medicalHistoryConsent";
 
 const pageTransition = {
   initial: { opacity: 0, y: 12 },
@@ -44,7 +45,7 @@ const pageTransition = {
 
 export default function PatientsPage() {
   const { patientId } = useParams();
-  const { user, medicalHistoryConsentAccepted } = useAuth();
+  const { user, medicalHistoryConsentAccepted, medicalHistoryConsentLoading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [patients, setPatients] = useState([]);
@@ -62,9 +63,11 @@ export default function PatientsPage() {
   const [deletingPatientId, setDeletingPatientId] = useState(null);
   const [historicalDocuments, setHistoricalDocuments] = useState([]);
 
-  const historyAllowed = canViewMedicalHistory({
-    accepted: Boolean(medicalHistoryConsentAccepted),
-  });
+  const historyAllowed = canViewMedicalHistory(
+    resolveAccountConsent(user?.uid, medicalHistoryConsentAccepted, {
+      loading: medicalHistoryConsentLoading,
+    })
+  );
   const patientHistoryAllowed =
     historyAllowed && patientAllowsHistory(selectedPatient);
 
@@ -309,12 +312,13 @@ export default function PatientsPage() {
     <motion.div className="check-page" {...pageTransition}>
       <main className="check-wrap patients-wrap">
         <div className="check-topbar">
-          <Link
-            to={patientId ? "/patients" : "/"}
-            className="back-link"
-          >
-            ← {patientId ? "All patients" : "Back"}
-          </Link>
+          {patientId ? (
+            <Link to="/patients" className="back-link">
+              ← All patients
+            </Link>
+          ) : (
+            <BackLink fallback="/check" />
+          )}
           <UserNav />
         </div>
 
@@ -472,7 +476,11 @@ export default function PatientsPage() {
                   }}
                   documentsEnabled={patientHistoryAllowed}
                   accountHistoryAllowed={historyAllowed}
-                  accountConsent={{ accepted: Boolean(medicalHistoryConsentAccepted) }}
+                  accountConsent={resolveAccountConsent(
+                    user?.uid,
+                    medicalHistoryConsentAccepted,
+                    { loading: medicalHistoryConsentLoading }
+                  )}
                   disabled={saving}
                 />
 

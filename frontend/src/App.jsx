@@ -10,6 +10,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import BillResults from "./components/BillResults";
+import BackLink from "./components/BackLink";
 import { patientAgeApiPayload, formatPatientAge } from "./utils/patientAge";
 import { getComparisonSchemeCopy, HOSPITAL_TYPE_OPTIONS } from "./billUtils";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -41,6 +42,7 @@ import {
   parseJsonResponse,
 } from "./services/httpUtils";
 import { getPatients, getPatientsLocalSnapshot } from "./services/patients";
+import { resolveResultsView } from "./data/reportExport";
 import { saveReportToAccount } from "./services/bills";
 import {
   analyzeTreatment,
@@ -70,6 +72,7 @@ import {
   mergeEditedExtractionsToBundle,
 } from "./utils/documentExtraction";
 import { buildPatientHistoryPayload } from "./utils/patientClinicalHistory";
+import { resolveAccountConsent } from "./utils/medicalHistoryConsent";
 
 function formatExtractionWarnings(warnings) {
   if (!warnings?.length) {
@@ -576,7 +579,11 @@ function MedicalHistoryConsentGate({ children }) {
 }
 
 function CheckPage() {
-  const { user, medicalHistoryConsentAccepted } = useAuth();
+  const {
+    user,
+    medicalHistoryConsentAccepted,
+    medicalHistoryConsentLoading,
+  } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const compareLocationRef = useRef({ state: "", city: "" });
@@ -761,6 +768,16 @@ function CheckPage() {
     return null;
   };
 
+  const resolvedAccountConsent = resolveAccountConsent(
+    user?.uid,
+    medicalHistoryConsentAccepted,
+    { loading: medicalHistoryConsentLoading }
+  );
+  const historyConsentOptions = {
+    accountConsentAccepted: medicalHistoryConsentAccepted,
+    accountConsentLoading: medicalHistoryConsentLoading,
+  };
+
   const applyBundleExtraction = (merged) => {
     bundleSourceDocumentsRef.current = merged.sourceDocuments || [];
     setPreauthDocuments(merged.preauthDocuments || []);
@@ -888,7 +905,8 @@ function CheckPage() {
   const runBillComparison = async (
     validItems,
     locationOverride = null,
-    metaOverride = {}
+    metaOverride = {},
+    analysisOverrides = {}
   ) => {
     const location =
       locationOverride?.state && locationOverride?.city
@@ -914,9 +932,20 @@ function CheckPage() {
         user?.uid,
         selectedPatient,
         {
-          accountConsent: { accepted: Boolean(medicalHistoryConsentAccepted) },
+          accountConsent: resolvedAccountConsent,
         }
       );
+      const prescriptionItems =
+        analysisOverrides.prescriptionItems ?? buildPrescriptionRequestItems();
+      const clinicalPayload = clinicalContextToApiPayload(
+        analysisOverrides.clinicalContext ?? clinicalContext
+      );
+      const resolvedDiagnosis =
+        analysisOverrides.diagnosis ?? diagnosis.trim() || null;
+      const resolvedDiagnosisUserProvided =
+        analysisOverrides.diagnosisUserProvided ?? diagnosisUserProvided;
+      const resolvedPreauthDocuments =
+        analysisOverrides.preauthDocuments ?? preauthDocuments;
       const response = await fetchBackend(`${getApiBase()}/compare-bill`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -938,16 +967,17 @@ function CheckPage() {
           patient_name: selectedPatient?.name || null,
           ...patientAgeApiPayload(selectedPatient),
           patient_gender: selectedPatient?.gender || null,
-          diagnosis: diagnosis.trim() || null,
-          diagnosis_user_provided: diagnosisUserProvided,
-          prescription_medicines: buildPrescriptionRequestItems().medicines,
-          prescription_tests: buildPrescriptionRequestItems().tests,
-          prescription_procedures: buildPrescriptionRequestItems().procedures,
-          ...clinicalContextToApiPayload(clinicalContext),
+          diagnosis: resolvedDiagnosis,
+          diagnosis_user_provided: resolvedDiagnosisUserProvided,
+          prescription_medicines: prescriptionItems.medicines,
+          prescription_tests: prescriptionItems.tests,
+          prescription_procedures: prescriptionItems.procedures,
+          ...clinicalPayload,
           clinical_history: clinicalHistory,
-          preauth_documents: preauthDocuments,
+          preauth_documents: resolvedPreauthDocuments,
           ocr_text:
             [
+              metaOverride.ocr_text,
               scanMeta?.ocr_text,
               prescriptionMeta?.ocr_text,
             ]
@@ -968,9 +998,7 @@ function CheckPage() {
           user.uid,
           selectedPatient,
           payloadWithMeta,
-          {
-            accountConsent: { accepted: Boolean(medicalHistoryConsentAccepted) },
-          }
+          historyConsentOptions
         );
         if (outcome.saved) {
           setSaveMessage(
@@ -1026,6 +1054,9 @@ function CheckPage() {
     };
   }, [isLoading, isComparing, activeLoadingMessages.length]);
 
+  const hasReportResults = Boolean(resolveResultsView(result));
+  const resultsView = resolveResultsView(result);
+
   const uiState = isLoading
     ? "loading"
     : isComparing
@@ -1036,7 +1067,7 @@ function CheckPage() {
     ? "diagnosis"
     : clinicalStep === "clinical"
     ? "clinical"
-    : result?.line_items?.length || result?.treatment_audit_flags
+    : hasReportResults
     ? "results"
     : editableItems.length ||
       ((prescriptionMedicines.length ||
@@ -1046,7 +1077,70 @@ function CheckPage() {
     ? "edit"
     : "upload";
 
-  const proceedAfterBundleExtraction = (merged, datedDocuments) => {
+  const getValidBillItemsFromMerged = (merged) =>
+    (merged.lineItems || [])
+      .map(normalizeLineItem)
+      .filter((item) => item.item_name.trim());
+
+  const mergedHasPrescriptionItems = (merged) =>
+    Boolean(
+      merged.medicines?.length ||
+        merged.tests?.length ||
+        merged.procedures?.length
+    );
+
+  const buildAnalysisOverridesFromMerged = (merged) => ({
+    prescriptionItems: {
+      medicines: merged.medicines || [],
+      tests: merged.tests || [],
+      procedures: merged.procedures || [],
+    },
+    clinicalContext: merged.clinicalContext || emptyClinicalContext(),
+    diagnosis: String(merged.diagnosis || diagnosis || "").trim(),
+    diagnosisUserProvided: false,
+    preauthDocuments: merged.preauthDocuments || [],
+  });
+
+  const startAnalysisFromMerged = async (merged) => {
+    const billItems = getValidBillItemsFromMerged(merged);
+    const hasRx = mergedHasPrescriptionItems(merged);
+    const overrides = buildAnalysisOverridesFromMerged(merged);
+    const resolvedDiagnosis = overrides.diagnosis;
+
+    if (merged.diagnosis && !diagnosis.trim()) {
+      setDiagnosis(merged.diagnosis);
+      setDiagnosisUserProvided(false);
+    }
+
+    if (billItems.length) {
+      if (hasRx && !resolvedDiagnosis) {
+        setClinicalStep("diagnosis");
+        return;
+      }
+      await runBillComparison(billItems, null, {}, overrides);
+      return;
+    }
+
+    if (hasRx || merged.hasClinicalDocs) {
+      if (!resolvedDiagnosis) {
+        setClinicalStep("diagnosis");
+        return;
+      }
+      await runPrescriptionAnalysis(resolvedDiagnosis, false, {
+        medicines: merged.medicines || [],
+        tests: merged.tests || [],
+        procedures: merged.procedures || [],
+        meta: merged.prescriptionMeta,
+        clinicalContext: merged.clinicalContext,
+      });
+    }
+  };
+
+  const proceedAfterBundleExtraction = (
+    merged,
+    datedDocuments,
+    { autoAnalyze = false } = {}
+  ) => {
     applyBundleExtraction(merged);
     if (datedDocuments) {
       setBundleDocuments(datedDocuments);
@@ -1075,11 +1169,19 @@ function CheckPage() {
       merged.clinicalContext?.test_results?.length > 0;
 
     setClinicalStep(needsClinical ? "clinical" : null);
+
+    if (!needsClinical && autoAnalyze) {
+      void startAnalysisFromMerged(merged);
+    }
   };
 
-  const finishBundleAfterDates = (merged, datedDocuments) => {
+  const finishBundleAfterDates = (
+    merged,
+    datedDocuments,
+    { autoAnalyze = false } = {}
+  ) => {
     setExtractionReviewActive(false);
-    proceedAfterBundleExtraction(merged, datedDocuments);
+    proceedAfterBundleExtraction(merged, datedDocuments, { autoAnalyze });
   };
 
   const handleBundleDateConfirm = (confirmedDates) => {
@@ -1134,7 +1236,9 @@ function CheckPage() {
       bundleDocuments,
       promptItems
     );
-    finishBundleAfterDates(datedMerge, datedMerge.datedDocuments);
+    finishBundleAfterDates(datedMerge, datedMerge.datedDocuments, {
+      autoAnalyze: true,
+    });
   };
 
   const handleExtractionReviewBack = () => {
@@ -1245,9 +1349,7 @@ function CheckPage() {
       user.uid,
       selectedPatient,
       reportPayload,
-      {
-        accountConsent: { accepted: Boolean(medicalHistoryConsentAccepted) },
-      }
+      historyConsentOptions
     );
     if (outcome.saved) {
       setSaveMessage(
@@ -1297,6 +1399,24 @@ function CheckPage() {
     setClinicalStep(null);
     if (showPrescriptionFlow) {
       void runPrescriptionAnalysis(diagnosis.trim(), diagnosisUserProvided);
+      return;
+    }
+    if (hasBillItems) {
+      const validItems = editableItems
+        .map(normalizeLineItem)
+        .filter((item) => item.item_name.trim());
+      if (!validItems.length) {
+        setError("Add at least one line item with a name.");
+        return;
+      }
+      void runBillComparison(validItems);
+      return;
+    }
+    const resolvedDiagnosis = diagnosis.trim();
+    if (resolvedDiagnosis) {
+      void runPrescriptionAnalysis(resolvedDiagnosis, diagnosisUserProvided);
+    } else {
+      setClinicalStep("diagnosis");
     }
   };
 
@@ -1391,7 +1511,7 @@ function CheckPage() {
         user?.uid,
         selectedPatient,
         {
-          accountConsent: { accepted: Boolean(medicalHistoryConsentAccepted) },
+          accountConsent: resolvedAccountConsent,
         }
       );
       const payload = await analyzeTreatment({
@@ -1438,6 +1558,15 @@ function CheckPage() {
     setDiagnosisUserProvided(true);
     setClinicalStep(null);
     setError("");
+    if (hasBillItems) {
+      const validItems = editableItems
+        .map(normalizeLineItem)
+        .filter((item) => item.item_name.trim());
+      if (validItems.length) {
+        void runBillComparison(validItems);
+        return;
+      }
+    }
     void runPrescriptionAnalysis(value.trim(), true);
   };
 
@@ -1445,9 +1574,7 @@ function CheckPage() {
     <motion.div className="check-page" {...pageTransition}>
       <main className="check-wrap">
         <div className="check-topbar">
-          <Link to="/" className="back-link">
-            ← Back
-          </Link>
+          <BackLink fallback="/" />
           <UserNav />
         </div>
 
@@ -1455,12 +1582,18 @@ function CheckPage() {
           <h1>
             {uiState === "extract-review"
               ? "Review extracted data"
+              : uiState === "results"
+              ? "Your report"
               : billStep === "patient"
               ? "Select patient"
               : billStep === "hospital"
               ? "Select hospital"
               : uiState === "loading"
               ? "Reading your documents"
+              : uiState === "comparing"
+              ? "Generating your report"
+              : uiState === "edit"
+              ? "Review before analysis"
               : "Upload your documents"}
           </h1>
           <p>
@@ -1468,6 +1601,8 @@ function CheckPage() {
               ? selectedPatient && selectedHospital
                 ? `Check what we read from ${selectedPatient.name}'s documents at ${selectedHospital.name}.`
                 : "Check what we read from each document before continuing."
+              : uiState === "results"
+              ? "Review the findings below. You can download or share the full report."
               : billStep === "patient"
               ? "Choose who these documents are for."
               : billStep === "hospital"
@@ -2101,7 +2236,7 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {uiState === "results" && showBillFlow && result?.line_items?.length && (
+          {uiState === "results" && resultsView === "bill" && (
             <motion.section
               key="results"
               className="results-shell"
@@ -2133,7 +2268,7 @@ function CheckPage() {
             </motion.section>
           )}
 
-          {uiState === "results" && showPrescriptionFlow && result?.treatment_audit_flags && (
+          {uiState === "results" && resultsView === "prescription" && (
             <motion.section
               key="prescription-results"
               className="results-shell"

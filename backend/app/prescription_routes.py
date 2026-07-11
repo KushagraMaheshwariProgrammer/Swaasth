@@ -204,7 +204,7 @@ async def classify_document(file: UploadFile = File(...)) -> dict[str, Any]:
         return {
             "filename": file.filename or "unknown",
             "file_type": file_type,
-            "document_type": "bill",
+            "document_type": None,
             "confidence": "low",
             "message": "No readable text found; manual confirmation required.",
         }

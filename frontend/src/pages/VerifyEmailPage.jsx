@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { getVerificationErrorMessage } from "../auth/emailVerification";
+import BackLink from "../components/BackLink";
 import { useAuth } from "../context/AuthContext";
 
 const pageTransition = {
@@ -104,9 +105,7 @@ export default function VerifyEmailPage() {
   return (
     <motion.div className="auth-page" {...pageTransition}>
       <main className="auth-wrap">
-        <Link to="/" className="back-link">
-          ← Back
-        </Link>
+        <BackLink fallback="/" />
 
         <section className="auth-card">
           <header className="auth-header">

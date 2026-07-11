@@ -2,6 +2,7 @@ import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { canNavigateBack } from "../utils/navigationBack";
 
 const EXIT_PATHS = new Set(["/", "/login", "/verify-email", "/check"]);
 
@@ -21,14 +22,14 @@ export function useAndroidBackButton() {
     let listenerHandle;
 
     App.addListener("backButton", () => {
-      const { pathname, key } = locationRef.current;
+      const current = locationRef.current;
 
-      if (key !== "default") {
+      if (canNavigateBack(current)) {
         navigate(-1);
         return;
       }
 
-      if (EXIT_PATHS.has(pathname)) {
+      if (EXIT_PATHS.has(current.pathname)) {
         App.exitApp();
         return;
       }

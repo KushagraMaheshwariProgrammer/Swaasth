@@ -26,7 +26,7 @@ export const emptyPatientForm = () => ({
   gender: "",
   state: "",
   city: "",
-  savePastBills: false,
+  savePastBills: true,
   clinicalHistory: emptyClinicalHistory(),
 });
 

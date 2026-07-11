@@ -1,10 +1,10 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   MEDICAL_HISTORY_CONSENT_LAST_UPDATED,
   MEDICAL_HISTORY_CONSENT_SECTIONS,
 } from "../data/medicalHistoryConsent";
+import BackLink from "../components/BackLink";
 import { useAuth } from "../context/AuthContext";
 
 const pageTransition = {
@@ -94,9 +94,7 @@ export default function MedicalHistoryConsentPage() {
     <motion.div className="check-page" {...pageTransition}>
       <main className="check-wrap account-wrap">
         <div className="history-nav">
-          <Link to="/account" className="back-link">
-            ← Account settings
-          </Link>
+          <BackLink fallback="/account">← Account settings</BackLink>
         </div>
 
         <header className="check-header">

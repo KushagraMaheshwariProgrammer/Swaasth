@@ -197,8 +197,20 @@ export default function ReportActions({ report, className = "report-actions" }) 
     try {
       const loaded = await ensurePdf();
       const outcome = await downloadReportPdf(report, filename, loaded.blob);
+      if (outcome.method === "cancelled") {
+        return;
+      }
       if (outcome.method === "share") {
         showMessage("Choose an app to save the PDF.", "info");
+        return;
+      }
+      if (outcome.method === "needsPreview") {
+        setViewer({
+          blobUrl: loaded.blobUrl,
+          title: loaded.title,
+        });
+        showMessage("Opened the report preview — use Download or Share there.", "info");
+        return;
       }
     } catch (error) {
       showMessage(
@@ -226,7 +238,12 @@ export default function ReportActions({ report, className = "report-actions" }) 
           blobUrl: loaded.blobUrl,
           title: loaded.title,
         });
-        showMessage("Sharing isn't supported here — opened the report viewer instead.", "info");
+        showMessage(
+          outcome.needsPreview
+            ? "Opened the report preview — use Download or Share there."
+            : "Sharing isn't supported here — opened the report viewer instead.",
+          "info"
+        );
       } else if (outcome.method === "text") {
         showMessage("Shared report title. Use Download to save the PDF file.", "info");
       }

@@ -31,15 +31,15 @@ export function createBundleSession() {
 }
 
 export function createBundleDocument(file, documentType = null) {
-  const suggestedType = documentType || guessDocumentType(file?.name || "");
+  const filenameGuess = documentType || guessDocumentType(file?.name || "");
   return {
     id:
       typeof crypto !== "undefined" && crypto.randomUUID
         ? crypto.randomUUID()
         : `doc-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     file,
-    suggestedType,
-    documentType: suggestedType,
+    suggestedType: filenameGuess || null,
+    documentType: filenameGuess || "",
     typeConfirmed: false,
     classifying: true,
     autoClassified: false,
@@ -48,18 +48,28 @@ export function createBundleDocument(file, documentType = null) {
 }
 
 export function applyDocumentClassification(doc, result) {
-  const documentType = result?.document_type || doc.suggestedType || "bill";
+  const classifiedType = result?.document_type || null;
   const confidence = result?.confidence === "high" ? "high" : "low";
-  const autoClassified = confidence === "high";
+  const autoClassified = Boolean(classifiedType) && confidence === "high";
+  const suggestedType = classifiedType || doc.suggestedType || null;
+  const documentType = suggestedType || doc.documentType || "";
   return {
     ...doc,
-    suggestedType: documentType,
+    suggestedType,
     documentType,
-    classificationConfidence: confidence,
+    classificationConfidence: classifiedType ? confidence : doc.classificationConfidence,
     autoClassified,
     typeConfirmed: autoClassified,
     classifying: false,
   };
+}
+
+export function documentShowsTypeSuggestion(doc) {
+  return Boolean(
+    doc?.suggestedType &&
+      doc.documentType === doc.suggestedType &&
+      !doc.typeConfirmed
+  );
 }
 
 export function documentsNeedingConfirmation(documents) {
@@ -138,7 +148,7 @@ export function guessDocumentType(filename) {
   if (/bill|invoice|receipt|estimate/.test(lower)) {
     return "bill";
   }
-  return "bill";
+  return null;
 }
 
 function dedupeByName(items, nameKey = "name") {

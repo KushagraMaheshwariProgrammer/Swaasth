@@ -1,4 +1,6 @@
 import { Capacitor } from "@capacitor/core";
+import { Directory, Filesystem } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
 import { resolveActionPlan } from "../actionPlanUtils";
 import { getApiBase } from "./apiBase";
 import { buildReportFilename, resolveReportMeta } from "../data/reportExport";
@@ -133,7 +135,58 @@ function prefersNativeFileShare() {
   return Capacitor.isNativePlatform() || /Android|iPhone|iPad/i.test(navigator.userAgent);
 }
 
+function isShareCancelled(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    error?.name === "AbortError" ||
+    message.includes("cancel") ||
+    message.includes("dismiss")
+  );
+}
+
+function sanitizePdfFilename(filename) {
+  return String(filename || "report.pdf").replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+async function blobToBase64(blob) {
+  const buffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 1) {
+    binary += String.fromCharCode(bytes[index]);
+  }
+  return btoa(binary);
+}
+
+async function writePdfToNativeCache(blob, filename) {
+  const { uri } = await Filesystem.writeFile({
+    path: sanitizePdfFilename(filename),
+    data: await blobToBase64(blob),
+    directory: Directory.Cache,
+  });
+  return uri;
+}
+
+async function sharePdfViaCapacitor(blob, filename, reportTitle, dialogTitle) {
+  if (!Capacitor.isNativePlatform()) {
+    return false;
+  }
+
+  const uri = await writePdfToNativeCache(blob, filename);
+  await Share.share({
+    title: reportTitle,
+    text: reportTitle,
+    files: [uri],
+    dialogTitle,
+  });
+  return true;
+}
+
 async function sharePdfFile(blob, filename, reportTitle) {
+  if (Capacitor.isNativePlatform()) {
+    return sharePdfViaCapacitor(blob, filename, reportTitle, "Share PDF");
+  }
+
   const file = buildPdfFile(blob, filename);
   if (!file || typeof navigator.share !== "function") {
     return false;
@@ -174,14 +227,27 @@ export async function downloadReportPdf(report, filename, blobOverride = null) {
   const name = filename || buildReportFilename(report);
   const reportTitle = resolveReportMeta(report).reportTitle;
 
-  if (prefersNativeFileShare()) {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const shared = await sharePdfViaCapacitor(blob, name, reportTitle, "Save PDF");
+      if (shared) {
+        return { method: "share" };
+      }
+    } catch (error) {
+      if (isShareCancelled(error)) {
+        return { method: "cancelled" };
+      }
+      throw error;
+    }
+    return { method: "needsPreview" };
+  } else if (prefersNativeFileShare()) {
     try {
       const shared = await sharePdfFile(blob, name, reportTitle);
       if (shared) {
         return { method: "share" };
       }
     } catch (error) {
-      if (error?.name === "AbortError") {
+      if (isShareCancelled(error)) {
         return { method: "cancelled" };
       }
     }
@@ -206,14 +272,27 @@ export async function downloadDisputePackPdf(report) {
   const name = buildDisputePackFilename(report);
   const reportTitle = "Dispute Pack — Factual Summary";
 
-  if (prefersNativeFileShare()) {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const shared = await sharePdfViaCapacitor(blob, name, reportTitle, "Save PDF");
+      if (shared) {
+        return { method: "share" };
+      }
+    } catch (error) {
+      if (isShareCancelled(error)) {
+        return { method: "cancelled" };
+      }
+      throw error;
+    }
+    return { method: "needsPreview" };
+  } else if (prefersNativeFileShare()) {
     try {
       const shared = await sharePdfFile(blob, name, reportTitle);
       if (shared) {
         return { method: "share" };
       }
     } catch (error) {
-      if (error?.name === "AbortError") {
+      if (isShareCancelled(error)) {
         return { method: "cancelled" };
       }
     }
@@ -239,13 +318,13 @@ export async function shareReportPdf(report, blobOverride = null) {
       return { shared: true, method: "file" };
     }
   } catch (error) {
-    if (error?.name === "AbortError") {
+    if (isShareCancelled(error)) {
       return { shared: false, cancelled: true };
     }
     throw error;
   }
 
-  if (typeof navigator.share === "function") {
+  if (!Capacitor.isNativePlatform() && typeof navigator.share === "function") {
     const textPayload = {
       title: reportMeta.reportTitle,
       text: reportMeta.reportTitle,
@@ -256,5 +335,5 @@ export async function shareReportPdf(report, blobOverride = null) {
     }
   }
 
-  return { shared: false };
+  return { shared: false, needsPreview: true };
 }

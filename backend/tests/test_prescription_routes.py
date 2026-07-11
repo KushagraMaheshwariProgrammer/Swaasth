@@ -70,7 +70,7 @@ def test_classify_document_returns_low_confidence_without_text(monkeypatch) -> N
     assert response.status_code == 200
     payload = response.json()
     assert payload["confidence"] == "low"
-    assert payload["document_type"] == "bill"
+    assert payload["document_type"] is None
 
 
 def test_classify_document_uses_groq_result(monkeypatch) -> None:

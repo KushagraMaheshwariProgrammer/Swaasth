@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import BackLink from "../components/BackLink";
 import BillResults from "../components/BillResults";
 import PrescriptionResults from "../components/PrescriptionResults";
 import {
@@ -10,6 +11,7 @@ import {
   getBillPatientName,
 } from "../billUtils";
 import { useAuth } from "../context/AuthContext";
+import { resolveResultsView } from "../data/reportExport";
 import {
   deleteBill,
   getBill,
@@ -19,7 +21,7 @@ import {
   getUserBillsLocalSnapshot,
 } from "../services/bills";
 import { getPatients, getPatientsLocalSnapshot } from "../services/patients";
-import { canViewMedicalHistory, patientAllowsHistory } from "../utils/medicalHistoryConsent";
+import { canViewMedicalHistory, patientAllowsHistory, resolveAccountConsent } from "../utils/medicalHistoryConsent";
 
 const pageTransition = {
   initial: { opacity: 0, y: 12 },
@@ -102,7 +104,11 @@ export default function HistoryPage() {
     }
   };
 
-  const accountConsent = { accepted: Boolean(medicalHistoryConsentAccepted) };
+  const accountConsent = resolveAccountConsent(
+    user?.uid,
+    medicalHistoryConsentAccepted,
+    { loading: medicalHistoryConsentLoading }
+  );
   const historyAllowed = canViewMedicalHistory(accountConsent);
   const consentedPatientIds = new Set(
     patients.filter((patient) => patientAllowsHistory(patient)).map((p) => p.id)
@@ -185,9 +191,7 @@ export default function HistoryPage() {
     <motion.div className="check-page" {...pageTransition}>
       <main className="check-wrap history-wrap">
         <div className="history-nav">
-          <Link to="/check" className="back-link">
-            ← Check a bill
-          </Link>
+          <BackLink fallback="/check" />
           {billId ? (
             <Link to="/history" className="back-link">
               All bills
@@ -324,10 +328,14 @@ export default function HistoryPage() {
               </button>
             </div>
             <section className="results-shell">
-              {selectedBill.report_kind === "prescription" ? (
+              {resolveResultsView(selectedBill) === "prescription" ? (
                 <PrescriptionResults result={selectedBill} />
-              ) : (
+              ) : resolveResultsView(selectedBill) === "bill" ? (
                 <BillResults result={selectedBill} />
+              ) : (
+                <p className="auth-info">
+                  This saved report does not contain displayable results.
+                </p>
               )}
             </section>
           </>

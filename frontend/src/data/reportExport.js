@@ -78,14 +78,34 @@ export function reportKindLabel(report) {
   return resolveReportMeta(report).label;
 }
 
-export function canExportReport(report) {
+export function hasBillReportContent(report) {
+  return Boolean(report?.line_items?.length);
+}
+
+export function hasPrescriptionReportContent(report) {
   if (!report) {
     return false;
   }
-  if (report.report_kind === "prescription") {
-    return Boolean(report.treatment_audit_flags);
+  return Boolean(
+    report.treatment_audit_flags ||
+      report.restricted_medicine_flags?.length ||
+      (report.patient_questions || []).length
+  );
+}
+
+/** Which results panel to render for a saved or live report payload. */
+export function resolveResultsView(report) {
+  if (hasBillReportContent(report)) {
+    return "bill";
   }
-  return Boolean(report.line_items?.length);
+  if (hasPrescriptionReportContent(report)) {
+    return "prescription";
+  }
+  return null;
+}
+
+export function canExportReport(report) {
+  return Boolean(resolveResultsView(report));
 }
 
 export function buildReportFilename(report) {

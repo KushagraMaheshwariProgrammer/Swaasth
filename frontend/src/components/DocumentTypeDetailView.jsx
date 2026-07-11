@@ -88,6 +88,9 @@ export default function DocumentTypeDetailView({
               }
               disabled={disabled}
             >
+              <option value="" disabled>
+                Select document type
+              </option>
               {DOCUMENT_TYPES.map((type) => (
                 <option key={type.id} value={type.id}>
                   {type.label}
@@ -108,7 +111,7 @@ export default function DocumentTypeDetailView({
               type="button"
               className="analyze-btn document-type-detail-confirm"
               onClick={() => onConfirm(bundleDocument.id)}
-              disabled={disabled}
+              disabled={disabled || !bundleDocument.documentType}
             >
               Confirm type
             </button>

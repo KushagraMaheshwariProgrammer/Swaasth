@@ -252,9 +252,7 @@ def normalize_detected_document_type(value: Any) -> str | None:
 
 
 def normalize_document_classification(payload: dict[str, Any]) -> dict[str, Any]:
-    doc_type = str(payload.get("document_type") or "bill").strip().lower()
-    if doc_type not in VALID_DOCUMENT_TYPES:
-        doc_type = "bill"
+    doc_type = normalize_detected_document_type(payload.get("document_type"))
     confidence = str(payload.get("confidence") or "low").lower()
     if confidence not in {"high", "low"}:
         confidence = "low"

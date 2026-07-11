@@ -4,6 +4,7 @@ import {
   bundleHasClassifyingDocuments,
   createBundleDocument,
   DOCUMENT_TYPES,
+  documentShowsTypeSuggestion,
   documentTypeLabel,
   documentsNeedingConfirmation,
   unconfirmedDocumentNames,
@@ -37,10 +38,14 @@ function DocumentTypeControls({
         <p className="document-suggested-type">
           Type: {documentTypeLabel(doc.documentType)}
         </p>
-      ) : (
+      ) : documentShowsTypeSuggestion(doc) ? (
         <p className="document-needs-confirmation-note">
           Please confirm: suggested{" "}
-          {documentTypeLabel(doc.suggestedType || doc.documentType)}
+          {documentTypeLabel(doc.suggestedType)}
+        </p>
+      ) : (
+        <p className="document-needs-confirmation-note">
+          Please select a document type.
         </p>
       )}
       <div className="document-type-row">
@@ -53,6 +58,9 @@ function DocumentTypeControls({
           disabled={disabled}
           aria-label={`Document type for ${doc.file?.name}`}
         >
+          <option value="" disabled>
+            Select document type
+          </option>
           {DOCUMENT_TYPES.map((type) => (
             <option key={type.id} value={type.id}>
               {type.label}
@@ -73,7 +81,7 @@ function DocumentTypeControls({
             type="button"
             className="bill-editor-secondary document-type-confirm-btn"
             onClick={() => onConfirm(doc.id)}
-            disabled={disabled}
+            disabled={disabled || !doc.documentType}
           >
             Confirm type
           </button>

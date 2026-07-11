@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import ActionConsentModal from "../components/ActionConsentModal";
 import ActionItemsList from "../components/ActionItemsList";
+import BackLink from "../components/BackLink";
 import ComplaintTemplates from "../components/ComplaintTemplates";
 import CombinedNarrative from "../components/CombinedNarrative";
 import DischargeGuidance from "../components/DischargeGuidance";
@@ -11,6 +12,7 @@ import EscalationLadder from "../components/EscalationLadder";
 import RecoverableSummary from "../components/RecoverableSummary";
 import { resolveActionPlan } from "../actionPlanUtils";
 import { useAuth } from "../context/AuthContext";
+import { useNavigateBack } from "../hooks/useNavigateBack";
 import { getBill } from "../services/bills";
 import { downloadDisputePackPdf } from "../services/reportPdf";
 import {
@@ -28,8 +30,8 @@ const pageTransition = {
 export default function TakeActionPage() {
   const { billId } = useParams();
   const location = useLocation();
-  const navigate = useNavigate();
   const { user } = useAuth();
+  const goBack = useNavigateBack("/check");
   const stateReport = location.state?.report || null;
 
   const [consentGranted, setConsentGranted] = useState(hasActionConsent);
@@ -89,11 +91,7 @@ export default function TakeActionPage() {
   };
 
   const handleConsentDecline = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
-    navigate("/check");
+    goBack();
   };
 
   const handleDownloadPack = async () => {
@@ -132,9 +130,7 @@ export default function TakeActionPage() {
     <motion.div className="check-page" {...pageTransition}>
       <main className="check-wrap take-action-wrap">
         <div className="history-nav">
-          <Link to="/check" className="back-link">
-            ← Check a bill
-          </Link>
+          <BackLink fallback="/check" />
           <Link to="/history" className="back-link">
             Your bills
           </Link>

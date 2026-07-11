@@ -20,8 +20,10 @@ import {
   removeLocalBill,
   removeLocalBillsForPatientIds,
 } from "./localBillStore";
-import { getLocalMedicalHistoryConsent } from "./localMedicalHistoryConsentStore";
-import { canSaveMedicalHistory } from "../utils/medicalHistoryConsent";
+import {
+  canSaveMedicalHistory,
+  resolveAccountConsent,
+} from "../utils/medicalHistoryConsent";
 import { getPatientAge, getPatientBirthYear } from "../utils/patientAge";
 
 function billsCollection(userId) {
@@ -193,8 +195,12 @@ export async function saveReportToAccount(userId, patient, reportData, options =
     return { saved: false };
   }
 
-  const accountConsent =
-    options.accountConsent ?? getLocalMedicalHistoryConsent(userId);
+  const remoteAccepted =
+    options.accountConsentAccepted ??
+    (options.accountConsent ? options.accountConsent.accepted : null);
+  const accountConsent = resolveAccountConsent(userId, remoteAccepted, {
+    loading: options.accountConsentLoading ?? false,
+  });
   if (!canSaveMedicalHistory(accountConsent, patient)) {
     return { saved: false, reason: "consent_required" };
   }
@@ -285,6 +291,12 @@ export async function getUserBills(userId) {
 export async function getBillsForPatientIds(userId, patientIds) {
   if (!userId || !patientIds?.length) {
     return [];
+  }
+
+  try {
+    await syncPendingBills(userId);
+  } catch (error) {
+    console.error("Background bill sync failed:", error);
   }
 
   const ids = [...new Set(patientIds.filter(Boolean))];
