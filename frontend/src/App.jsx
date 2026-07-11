@@ -1453,23 +1453,35 @@ function CheckPage() {
 
         <header className="check-header">
           <h1>
-            {billStep === "patient"
+            {uiState === "extract-review"
+              ? "Review extracted data"
+              : billStep === "patient"
               ? "Select patient"
               : billStep === "hospital"
               ? "Select hospital"
+              : uiState === "loading"
+              ? "Reading your documents"
               : "Upload your documents"}
           </h1>
           <p>
-            {billStep === "patient"
+            {uiState === "extract-review"
+              ? selectedPatient && selectedHospital
+                ? `Check what we read from ${selectedPatient.name}'s documents at ${selectedHospital.name}.`
+                : "Check what we read from each document before continuing."
+              : billStep === "patient"
               ? "Choose who these documents are for."
               : billStep === "hospital"
               ? selectedPatient
                 ? `Choose the hospital for ${selectedPatient.name}.`
                 : "Choose the hospital for these documents."
+              : uiState === "loading"
+              ? selectedPatient && selectedHospital
+                ? `Extracting data for ${selectedPatient.name} at ${selectedHospital.name}. This can take a minute on first use.`
+                : "Extracting data from your documents. This can take a minute on first use."
               : selectedPatient && selectedHospital
-              ? `Checking documents for ${selectedPatient.name} at ${selectedHospital.name}.`
+              ? `Add documents for ${selectedPatient.name} at ${selectedHospital.name}.`
               : selectedPatient
-              ? `Checking documents for ${selectedPatient.name}.`
+              ? `Add documents for ${selectedPatient.name}.`
               : "We'll analyze them in seconds."}
           </p>
         </header>
@@ -1776,6 +1788,27 @@ function CheckPage() {
               <div className="loading-bar">
                 <div className="loading-bar-fill" style={{ width: `${loadingProgress}%` }} />
               </div>
+            </motion.section>
+          )}
+
+          {uiState === "extract-review" && (
+            <motion.section
+              key="extract-review"
+              className="upload-card"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25 }}
+            >
+              <BundleExtractionReview
+                documents={bundleDocuments}
+                onChange={setBundleDocuments}
+                onContinue={handleExtractionReviewContinue}
+                onBack={handleExtractionReviewBack}
+                disabled={isLoading || isComparing}
+                error={error}
+                extractionWarnings={extractionWarnings}
+              />
             </motion.section>
           )}
 
