@@ -10,7 +10,9 @@
     "build": "npm run build --workspace medbill-frontend",
     "cap:sync": "npm run sync:firebase --workspace medbill-frontend && cap sync android",
     "sync:android": "npm run cap:sync",
-    "deploy:firestore-rules": "npx firebase-tools deploy --only firestore:rules"
+    "deploy:firestore-rules": "npx firebase-tools deploy --only firestore:rules",
+    "build:web": "npm run sync:locations --workspace medbill-frontend && npm exec --workspace medbill-frontend vite build",
+    "deploy:hosting": "npm run build:web && npx firebase-tools deploy --only hosting"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.4.0"
