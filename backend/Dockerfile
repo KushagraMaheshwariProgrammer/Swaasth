@@ -11,9 +11,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Prefetch FastEmbed models so first /analyze-treatment request is fast
-RUN python -c "from fastembed import TextEmbedding, TextCrossEncoder; \
-    TextEmbedding('BAAI/bge-base-en-v1.5'); \
-    TextCrossEncoder('BAAI/bge-reranker-base')"
+RUN python -c "from fastembed import TextEmbedding; from fastembed.rerank.cross_encoder import TextCrossEncoder; TextEmbedding('BAAI/bge-base-en-v1.5'); TextCrossEncoder('BAAI/bge-reranker-base')"
 
 COPY . .
 
