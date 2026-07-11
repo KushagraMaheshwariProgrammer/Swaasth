@@ -21,6 +21,12 @@ const REPORT_META = {
     reportTitle: "Prescription Treatment Appropriateness Report",
     filenamePrefix: "prescription",
   },
+  clinical: {
+    id: "clinical",
+    label: "Clinical review",
+    reportTitle: "Clinical Diagnosis Support Report",
+    filenamePrefix: "clinical",
+  },
   combined: {
     id: "combined",
     label: "Bill + prescription review",
@@ -55,7 +61,9 @@ export function resolveReportMeta(report) {
   }
 
   if (report?.treatment_audit_flags && !report?.line_items?.length) {
-    return REPORT_META.prescription;
+    return report?.report_kind === "clinical"
+      ? REPORT_META.clinical
+      : REPORT_META.prescription;
   }
 
   return REPORT_META.general;
@@ -68,6 +76,9 @@ export function reportKindLabel(report) {
   }
   if (report?.report_kind === "prescription") {
     return "Prescription review";
+  }
+  if (report?.report_kind === "clinical") {
+    return "Clinical review";
   }
   if (report?.report_kind === "combined") {
     return "Bill + prescription review";

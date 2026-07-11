@@ -73,12 +73,6 @@ export function validatePatientInput(patientData) {
   const birthYear = validateBirthYearInput(patientData?.birthYear);
   const state = patientData?.state?.trim() || "";
   const city = patientData?.city?.trim() || "";
-  if (!state) {
-    throw new Error("Please select a state/UT.");
-  }
-  if (!city) {
-    throw new Error("Please select a city.");
-  }
   return {
     name,
     gender,

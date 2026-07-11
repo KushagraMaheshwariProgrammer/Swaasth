@@ -197,20 +197,8 @@ export default function ReportActions({ report, className = "report-actions" }) 
     try {
       const loaded = await ensurePdf();
       const outcome = await downloadReportPdf(report, filename, loaded.blob);
-      if (outcome.method === "cancelled") {
-        return;
-      }
-      if (outcome.method === "share") {
-        showMessage("Choose an app to save the PDF.", "info");
-        return;
-      }
-      if (outcome.method === "needsPreview") {
-        setViewer({
-          blobUrl: loaded.blobUrl,
-          title: loaded.title,
-        });
-        showMessage("Opened the report preview — use Download or Share there.", "info");
-        return;
+      if (outcome.method === "download" && outcome.path) {
+        showMessage(`Report saved to ${outcome.path}.`, "info");
       }
     } catch (error) {
       showMessage(

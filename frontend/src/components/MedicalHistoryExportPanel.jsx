@@ -87,16 +87,8 @@ export default function MedicalHistoryExportPanel({
       }
 
       const outcome = await downloadReportPdf(dossier, filename, loaded.blob);
-      if (outcome.method === "cancelled") {
-        return;
-      }
-      if (outcome.method === "share") {
-        setInfo("Choose an app to save the medical history PDF.");
-        return;
-      }
-      if (outcome.method === "needsPreview") {
-        openViewer(loaded);
-        setInfo("Opened the PDF preview — use Download or Share there.");
+      if (outcome.path) {
+        setInfo(`Medical history PDF saved to ${outcome.path}.`);
         return;
       }
       setInfo("Medical history PDF downloaded.");

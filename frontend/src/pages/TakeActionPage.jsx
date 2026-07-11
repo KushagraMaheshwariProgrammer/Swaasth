@@ -102,9 +102,12 @@ export default function TakeActionPage() {
     setPdfMessage("");
     try {
       const outcome = await downloadDisputePackPdf(report);
-      if (outcome.method === "share") {
+      if (outcome.path) {
         setPdfTone("info");
-        setPdfMessage("Choose an app to save the dispute pack.");
+        setPdfMessage(`Dispute pack saved to ${outcome.path}.`);
+      } else {
+        setPdfTone("info");
+        setPdfMessage("Dispute pack downloaded.");
       }
     } catch (err) {
       setPdfTone("error");

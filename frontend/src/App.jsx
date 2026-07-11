@@ -48,6 +48,7 @@ import {
   analyzeTreatment,
   clinicalContextToApiPayload,
   emptyClinicalContext,
+  hasClinicalData,
 } from "./services/prescriptions";
 import {
   resolveCanonicalStateUtName,
@@ -175,6 +176,12 @@ const PRESCRIPTION_LOADING_MESSAGES = [
   "Reading your prescription...",
   "Extracting medicines and tests...",
   "Checking against treatment guidelines...",
+  "Preparing your report...",
+];
+const CLINICAL_LOADING_MESSAGES = [
+  "Reading your clinical documents...",
+  "Reviewing symptoms and test results...",
+  "Checking diagnosis support against guidelines...",
   "Preparing your report...",
 ];
 const pageTransition = {
@@ -742,10 +749,12 @@ function CheckPage() {
     prescriptionProcedures.length > 0;
   const showBillFlow = hasBillItems;
   const showPrescriptionFlow = !hasBillItems && hasPrescriptionItems;
-  const activeLoadingMessages =
-    hasPrescriptionItems && !hasBillItems
-      ? PRESCRIPTION_LOADING_MESSAGES
-      : LOADING_MESSAGES;
+  const showClinicalOnlyFlow = !hasBillItems && !hasPrescriptionItems;
+  const activeLoadingMessages = showClinicalOnlyFlow
+    ? CLINICAL_LOADING_MESSAGES
+    : hasPrescriptionItems && !hasBillItems
+    ? PRESCRIPTION_LOADING_MESSAGES
+    : LOADING_MESSAGES;
 
   const buildBundleReportMeta = (reportKind) => ({
     report_kind: reportKind,
@@ -896,10 +905,17 @@ function CheckPage() {
     if (types.size > 1 || sources.length > 1) {
       return "bundle";
     }
-    if (types.has("prescription")) {
+    const [singleType] = types;
+    if (singleType === "prescription") {
       return "prescription";
     }
-    return "bill";
+    if (singleType === "lab_report" || singleType === "discharge_summary") {
+      return "clinical";
+    }
+    if (singleType === "bill") {
+      return "bill";
+    }
+    return fallback;
   };
 
   const runBillComparison = async (
@@ -941,7 +957,7 @@ function CheckPage() {
         analysisOverrides.clinicalContext ?? clinicalContext
       );
       const resolvedDiagnosis =
-        analysisOverrides.diagnosis ?? diagnosis.trim() || null;
+        analysisOverrides.diagnosis ?? (diagnosis.trim() || null);
       const resolvedDiagnosisUserProvided =
         analysisOverrides.diagnosisUserProvided ?? diagnosisUserProvided;
       const resolvedPreauthDocuments =
@@ -1089,6 +1105,17 @@ function CheckPage() {
         merged.procedures?.length
     );
 
+  const mergedHasClinicalOnlyData = (merged) => {
+    if (mergedHasPrescriptionItems(merged)) {
+      return false;
+    }
+    if (String(merged.diagnosis || "").trim()) {
+      return true;
+    }
+    const clinicalContext = merged.clinicalContext || emptyClinicalContext();
+    return hasClinicalData(clinicalContext);
+  };
+
   const buildAnalysisOverridesFromMerged = (merged) => ({
     prescriptionItems: {
       medicines: merged.medicines || [],
@@ -1121,7 +1148,7 @@ function CheckPage() {
       return;
     }
 
-    if (hasRx || merged.hasClinicalDocs) {
+    if (hasRx || merged.hasClinicalDocs || mergedHasClinicalOnlyData(merged)) {
       if (!resolvedDiagnosis) {
         setClinicalStep("diagnosis");
         return;
@@ -1484,6 +1511,12 @@ function CheckPage() {
     userProvided,
     overrides = {}
   ) => {
+    const diagnosisProvided = String(resolvedDiagnosis || "").trim();
+    if (!diagnosisProvided) {
+      setError("Enter a diagnosis before running this check.");
+      return;
+    }
+
     const items = {
       medicines:
         overrides.medicines ??
@@ -1492,19 +1525,17 @@ function CheckPage() {
       procedures:
         overrides.procedures ?? buildPrescriptionRequestItems().procedures,
     };
-    if (
-      !items.medicines.length &&
-      !items.tests.length &&
-      !items.procedures.length
-    ) {
-      setError("Add at least one medicine, test, or procedure.");
-      return;
-    }
+    const hasTreatmentItems =
+      items.medicines.length > 0 ||
+      items.tests.length > 0 ||
+      items.procedures.length > 0;
+    const ctx = overrides.clinicalContext ?? clinicalContext;
+    const clinicalOnly = !hasTreatmentItems;
+
     setError("");
     setIsComparing(true);
     setResult(null);
     const meta = overrides.meta ?? prescriptionMeta;
-    const ctx = overrides.clinicalContext ?? clinicalContext;
     const clinicalPayload = clinicalContextToApiPayload(ctx);
     try {
       const clinicalHistory = await buildPatientHistoryPayload(
@@ -1515,7 +1546,7 @@ function CheckPage() {
         }
       );
       const payload = await analyzeTreatment({
-        diagnosis: resolvedDiagnosis,
+        diagnosis: diagnosisProvided,
         diagnosisUserProvided: userProvided,
         ...items,
         symptoms: clinicalPayload.symptoms,
@@ -1524,13 +1555,15 @@ function CheckPage() {
         ocrText: meta?.ocr_text || "",
         clinicalHistory,
       });
-      const reportKind = resolveReportKind("prescription");
+      const reportKind = clinicalOnly
+        ? resolveReportKind("clinical")
+        : resolveReportKind("prescription");
       const report = {
         ...payload,
-        diagnosis: resolvedDiagnosis,
+        diagnosis: diagnosisProvided,
         diagnosis_user_provided: userProvided,
         prescription: {
-          diagnosis: resolvedDiagnosis,
+          diagnosis: diagnosisProvided,
           diagnosis_user_provided: userProvided,
           prescriber: meta?.prescriber || null,
           prescription_date: meta?.prescriptionDate || null,
@@ -1539,7 +1572,7 @@ function CheckPage() {
           procedures: items.procedures,
         },
         clinical_context: payload.clinical_context || ctx,
-        filename: meta?.filename || "prescription",
+        filename: meta?.filename || (clinicalOnly ? "clinical" : "prescription"),
         file_type: meta?.file_type || "manual",
         report_kind: reportKind,
         ...buildBundleReportMeta(reportKind),
@@ -1547,7 +1580,14 @@ function CheckPage() {
       setResult(report);
       await savePrescriptionReport(report);
     } catch (err) {
-      setError(formatFetchError(err, "Unable to analyze this prescription."));
+      setError(
+        formatFetchError(
+          err,
+          clinicalOnly
+            ? "Unable to run the clinical check."
+            : "Unable to analyze this prescription."
+        )
+      );
     } finally {
       setIsComparing(false);
     }
@@ -1865,6 +1905,8 @@ function CheckPage() {
                 continueLabel={
                   showPrescriptionFlow
                     ? "Check treatment appropriateness"
+                    : showClinicalOnlyFlow || diagnosis.trim()
+                    ? "Check diagnosis support"
                     : "Continue"
                 }
                 onDiagnosisExtracted={(value) => {
@@ -1915,7 +1957,9 @@ function CheckPage() {
               <div className="spinner-conic" aria-hidden="true" />
               <p className="loading-message">
                 {uiState === "comparing"
-                  ? showPrescriptionFlow
+                  ? showClinicalOnlyFlow
+                    ? "Checking clinical evidence against guidelines..."
+                    : showPrescriptionFlow
                     ? "Checking against treatment guidelines..."
                     : comparisonCopy.loading
                   : activeLoadingMessages[loadingMessageIndex]}
@@ -2290,7 +2334,10 @@ function CheckPage() {
                       setError("");
                     }}
                   >
-                    ← Review prescription
+                    ←{" "}
+                    {result?.report_kind === "clinical"
+                      ? "Review clinical data"
+                      : "Review prescription"}
                   </button>
                 }
               />

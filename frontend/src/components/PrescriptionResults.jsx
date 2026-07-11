@@ -14,6 +14,7 @@ export default function PrescriptionResults({ result, toolbar = null }) {
     return null;
   }
 
+  const isClinicalReview = result.report_kind === "clinical";
   const diagnosis =
     result.diagnosis || result.prescription?.diagnosis || "";
   const diagnosisUserProvided =
@@ -23,13 +24,15 @@ export default function PrescriptionResults({ result, toolbar = null }) {
   const medicines = result.prescription?.medicines || result.medicines || [];
   const tests = result.prescription?.tests || result.tests || [];
   const procedures = result.prescription?.procedures || result.procedures || [];
+  const symptoms = result.clinical_context?.symptoms || [];
+  const testResults = result.clinical_context?.test_results || [];
 
   return (
     <>
       {toolbar}
 
       <section className="prescription-summary-card">
-        <h2>Prescription review</h2>
+        <h2>{isClinicalReview ? "Clinical review" : "Prescription review"}</h2>
         {diagnosis && (
           <p className="comparison-context">
             Diagnosis: <strong>{diagnosis}</strong>
@@ -40,6 +43,34 @@ export default function PrescriptionResults({ result, toolbar = null }) {
           <p className="comparison-context">
             Prescriber: <strong>{result.prescription.prescriber}</strong>
           </p>
+        )}
+
+        {isClinicalReview && symptoms.length > 0 && (
+          <div className="prescription-item-group">
+            <h3>Symptoms reviewed</h3>
+            <ul>
+              {symptoms.map((item, index) => (
+                <li key={`symptom-${index}`}>
+                  <strong>{item.name}</strong>
+                  {[item.duration, item.severity].filter(Boolean).join(" · ")}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {isClinicalReview && testResults.length > 0 && (
+          <div className="prescription-item-group">
+            <h3>Test results reviewed</h3>
+            <ul>
+              {testResults.map((item, index) => (
+                <li key={`lab-${index}`}>
+                  <strong>{item.test_name}</strong>
+                  {[item.value, item.unit, item.result].filter(Boolean).join(" · ")}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {medicines.length > 0 && (

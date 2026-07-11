@@ -49,12 +49,17 @@ export default function TreatmentAuditSection({ treatmentAuditFlags, report = nu
   const grouped = groupFlags(flags);
   const advocacyScope =
     treatmentAuditFlags?.advocacy_scope || report?.advocacy_scope || null;
+  const isClinicalReview = report?.report_kind === "clinical";
 
   return (
     <>
       <section className="audit-section treatment-audit-section">
         <div className="audit-section-header">
-          <h3>Treatment appropriateness check</h3>
+          <h3>
+            {isClinicalReview
+              ? "Diagnosis support check"
+              : "Treatment appropriateness check"}
+          </h3>
           {treatmentAuditFlags && (
             <div className="audit-summary-badges">
               <span

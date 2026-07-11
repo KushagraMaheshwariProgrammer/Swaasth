@@ -92,6 +92,11 @@ export function clinicalContextToApiPayload(clinicalContext) {
   };
 }
 
+export function hasClinicalData(clinicalContext) {
+  const payload = clinicalContextToApiPayload(clinicalContext);
+  return payload.symptoms.length > 0 || payload.test_results.length > 0;
+}
+
 export async function classifyDocument(file) {
   const formData = new FormData();
   formData.append("file", file);

@@ -53,6 +53,9 @@ function reportKindLabel(bill) {
   if (bill.report_kind === "prescription") {
     return "Prescription review";
   }
+  if (bill.report_kind === "clinical") {
+    return "Clinical review";
+  }
   if (bill.report_kind === "combined") {
     return "Bill + prescription review";
   }
@@ -281,7 +284,8 @@ export default function HistoryPage() {
                       )}
                     </p>
                     <div className="history-card-stats">
-                      {bill.report_kind === "prescription" ? (
+                      {bill.report_kind === "prescription" ||
+                      bill.report_kind === "clinical" ? (
                         <span>
                           {bill.treatment_audit_flags?.flags_count ?? 0} STG flag
                           {(bill.treatment_audit_flags?.flags_count ?? 0) === 1

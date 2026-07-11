@@ -131,10 +131,6 @@ function triggerAnchorDownload(blobUrl, filename) {
   anchor.remove();
 }
 
-function prefersNativeFileShare() {
-  return Capacitor.isNativePlatform() || /Android|iPhone|iPad/i.test(navigator.userAgent);
-}
-
 function isShareCancelled(error) {
   const message = String(error?.message || "").toLowerCase();
   return (
@@ -165,6 +161,31 @@ async function writePdfToNativeCache(blob, filename) {
     directory: Directory.Cache,
   });
   return uri;
+}
+
+async function savePdfToDevice(blob, filename) {
+  const safeName = sanitizePdfFilename(filename);
+  const base64 = await blobToBase64(blob);
+
+  if (Capacitor.getPlatform() === "android") {
+    try {
+      await Filesystem.writeFile({
+        path: `Download/${safeName}`,
+        data: base64,
+        directory: Directory.ExternalStorage,
+      });
+      return { path: `Download/${safeName}` };
+    } catch {
+      // Fall back to app Documents if external storage is unavailable.
+    }
+  }
+
+  await Filesystem.writeFile({
+    path: safeName,
+    data: base64,
+    directory: Directory.Documents,
+  });
+  return { path: safeName };
 }
 
 async function sharePdfViaCapacitor(blob, filename, reportTitle, dialogTitle) {
@@ -225,32 +246,10 @@ export function revokeReportPdfBlobUrl(blobUrl) {
 export async function downloadReportPdf(report, filename, blobOverride = null) {
   const blob = blobOverride || (await fetchReportPdfBlob(report));
   const name = filename || buildReportFilename(report);
-  const reportTitle = resolveReportMeta(report).reportTitle;
 
   if (Capacitor.isNativePlatform()) {
-    try {
-      const shared = await sharePdfViaCapacitor(blob, name, reportTitle, "Save PDF");
-      if (shared) {
-        return { method: "share" };
-      }
-    } catch (error) {
-      if (isShareCancelled(error)) {
-        return { method: "cancelled" };
-      }
-      throw error;
-    }
-    return { method: "needsPreview" };
-  } else if (prefersNativeFileShare()) {
-    try {
-      const shared = await sharePdfFile(blob, name, reportTitle);
-      if (shared) {
-        return { method: "share" };
-      }
-    } catch (error) {
-      if (isShareCancelled(error)) {
-        return { method: "cancelled" };
-      }
-    }
+    const saved = await savePdfToDevice(blob, name);
+    return { method: "download", ...saved };
   }
 
   const blobUrl = URL.createObjectURL(blob);
@@ -270,32 +269,10 @@ export function buildDisputePackFilename(report) {
 export async function downloadDisputePackPdf(report) {
   const blob = await fetchDisputePackPdfBlob(report);
   const name = buildDisputePackFilename(report);
-  const reportTitle = "Dispute Pack — Factual Summary";
 
   if (Capacitor.isNativePlatform()) {
-    try {
-      const shared = await sharePdfViaCapacitor(blob, name, reportTitle, "Save PDF");
-      if (shared) {
-        return { method: "share" };
-      }
-    } catch (error) {
-      if (isShareCancelled(error)) {
-        return { method: "cancelled" };
-      }
-      throw error;
-    }
-    return { method: "needsPreview" };
-  } else if (prefersNativeFileShare()) {
-    try {
-      const shared = await sharePdfFile(blob, name, reportTitle);
-      if (shared) {
-        return { method: "share" };
-      }
-    } catch (error) {
-      if (isShareCancelled(error)) {
-        return { method: "cancelled" };
-      }
-    }
+    const saved = await savePdfToDevice(blob, name);
+    return { method: "download", ...saved };
   }
 
   const blobUrl = URL.createObjectURL(blob);
