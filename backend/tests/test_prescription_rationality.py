@@ -38,6 +38,28 @@ def test_drug_interaction_pair() -> None:
     assert "DRUG_INTERACTION" in types
 
 
+def test_pediatric_fluoroquinolone_caution() -> None:
+    flags = analyze_prescription_rationality(
+        diagnosis="UTI",
+        prescription_items=[{"name": "Ciprofloxacin", "category": "medicine"}],
+        patient_age=10,
+        patient_gender="male",
+    )
+    types = {flag["type"] for flag in flags}
+    assert "PEDIATRIC_DOSING_CAUTION" in types
+
+
+def test_pregnancy_contraindication_for_doxycycline() -> None:
+    flags = analyze_prescription_rationality(
+        diagnosis="Acne",
+        prescription_items=[{"name": "Doxycycline", "category": "medicine"}],
+        patient_age=28,
+        patient_gender="female",
+    )
+    types = {flag["type"] for flag in flags}
+    assert "PREGNANCY_CONTRAINDICATION" in types
+
+
 def test_no_accusatory_language_in_recommendations() -> None:
     flags = analyze_prescription_rationality(
         diagnosis="Dengue",

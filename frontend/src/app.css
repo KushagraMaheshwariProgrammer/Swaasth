@@ -4581,6 +4581,51 @@ button.patient-list-card {
   margin: 0.5rem 0 0;
 }
 
+.clinician-share-panel {
+  margin-top: 1.25rem;
+  padding: 1rem 1.1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.clinician-share-header h3 {
+  margin: 0 0 0.35rem;
+}
+
+.clinician-share-header p {
+  margin: 0;
+  color: var(--text-muted, #9aa3b2);
+  font-size: 0.92rem;
+}
+
+.clinician-flag-notes {
+  margin-top: 1rem;
+}
+
+.clinician-flag-notes h4 {
+  margin: 0 0 0.75rem;
+}
+
+.clinician-share-preview {
+  margin-top: 1rem;
+}
+
+.clinician-share-preview pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.18);
+  overflow-x: auto;
+}
+
+.clinician-share-actions {
+  margin-top: 1rem;
+}
+
 .report-pdf-overlay {
   position: fixed;
   inset: 0;

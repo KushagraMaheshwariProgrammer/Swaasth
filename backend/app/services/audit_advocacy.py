@@ -31,6 +31,12 @@ CLINICAL_GROUNDED_TYPES = frozenset(
         "BROADER_SPECTRUM_ANTIBIOTIC",
         "DRUG_INTERACTION",
         "BRAND_WITHOUT_GENERIC_QUESTION",
+        "ABNORMAL_LAB_VALUE",
+        "REPEAT_INVESTIGATION",
+        "PREGNANCY_CONTRAINDICATION",
+        "PREGNANCY_CAUTION",
+        "LACTATION_CAUTION",
+        "PEDIATRIC_DOSING_CAUTION",
     }
 )
 
@@ -73,6 +79,12 @@ FLAG_DISPLAY_LABELS: dict[str, str] = {
     "BROADER_SPECTRUM_ANTIBIOTIC": "Broader-spectrum antibiotic than typical",
     "DRUG_INTERACTION": "Possible drug interaction",
     "BRAND_WITHOUT_GENERIC_QUESTION": "Branded medicine with generic alternative",
+    "ABNORMAL_LAB_VALUE": "Lab result outside expected range",
+    "REPEAT_INVESTIGATION": "Repeat test from recent visit",
+    "PREGNANCY_CONTRAINDICATION": "Medicine commonly avoided in pregnancy",
+    "PREGNANCY_CAUTION": "Medicine needs pregnancy review",
+    "LACTATION_CAUTION": "Medicine needs breastfeeding review",
+    "PEDIATRIC_DOSING_CAUTION": "Medicine needs age-appropriate review",
 }
 
 ADVOCACY_SCOPE_CHECKED = [

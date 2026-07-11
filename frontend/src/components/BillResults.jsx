@@ -15,10 +15,11 @@ import ClinicalHistoryUsedPanel from "./ClinicalHistoryUsedPanel";
 import CombinedNarrative from "./CombinedNarrative";
 import PatientQuestionsSection from "./PatientQuestionsSection";
 import ReportActions from "./ReportActions";
+import ClinicianSharePanel from "./ClinicianSharePanel";
 import TreatmentAuditSection from "./TreatmentAuditSection";
 import RestrictedMedicinesSection from "./RestrictedMedicinesSection";
 
-export default function BillResults({ result, toolbar = null }) {
+export default function BillResults({ result, toolbar = null, onReportUpdate }) {
   const displayableItems = useMemo(
     () => displayableBillLineItems(result?.line_items),
     [result?.line_items]
@@ -265,6 +266,8 @@ export default function BillResults({ result, toolbar = null }) {
       <RestrictedMedicinesSection
         restrictedMedicineFlags={result?.restricted_medicine_flags}
       />
+
+      <ClinicianSharePanel report={result} onReportUpdate={onReportUpdate} />
 
       <ReportActions report={result} />
     </>

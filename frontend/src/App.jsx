@@ -43,7 +43,7 @@ import {
 } from "./services/httpUtils";
 import { getPatients, getPatientsLocalSnapshot } from "./services/patients";
 import { resolveResultsView } from "./data/reportExport";
-import { saveReportToAccount } from "./services/bills";
+import { saveReportToAccount, mergeSavedReportIds } from "./services/bills";
 import {
   analyzeTreatment,
   clinicalContextToApiPayload,
@@ -1017,6 +1017,7 @@ function CheckPage() {
           historyConsentOptions
         );
         if (outcome.saved) {
+          setResult((prev) => mergeSavedReportIds(prev, outcome));
           setSaveMessage(
             outcome.localOnly
               ? "Comparison saved on this device. It will sync when you're back online."
@@ -1379,6 +1380,7 @@ function CheckPage() {
       historyConsentOptions
     );
     if (outcome.saved) {
+      setResult((prev) => mergeSavedReportIds(prev, outcome));
       setSaveMessage(
         outcome.localOnly
           ? "Report saved on this device. Cloud sync will retry when online."
@@ -1390,6 +1392,7 @@ function CheckPage() {
         setSaveMessage(consentMessage);
       }
     }
+    return outcome;
   };
 
   const resetToUpload = () => {
@@ -1578,7 +1581,10 @@ function CheckPage() {
         ...buildBundleReportMeta(reportKind),
       };
       setResult(report);
-      await savePrescriptionReport(report);
+      const saveOutcome = await savePrescriptionReport(report);
+      if (saveOutcome?.saved) {
+        setResult((prev) => mergeSavedReportIds(prev, saveOutcome));
+      }
     } catch (err) {
       setError(
         formatFetchError(
@@ -2292,6 +2298,7 @@ function CheckPage() {
               {saveMessage && <p className="save-message">{saveMessage}</p>}
               <BillResults
                 result={result}
+                onReportUpdate={setResult}
                 toolbar={
                   <button
                     type="button"
@@ -2324,6 +2331,7 @@ function CheckPage() {
               {saveMessage && <p className="save-message">{saveMessage}</p>}
               <PrescriptionResults
                 result={result}
+                onReportUpdate={setResult}
                 toolbar={
                   <button
                     type="button"

@@ -13,6 +13,8 @@ from app.services.audit_advocacy import build_advocacy_payload, finalize_audit_f
 from app.services.clinical_history_relevance import filter_relevant_clinical_history
 from app.services.groq_client import groq_json_chat
 from app.services.investigation_audit import analyze_investigations
+from app.services.investigation_history_audit import analyze_repeat_investigations
+from app.services.lab_interpretation import analyze_lab_results
 from app.services.prescription_rationality import analyze_prescription_rationality
 from app.services.rag_pipeline import (
     _find_supporting_chunk,
@@ -722,12 +724,22 @@ def analyze_treatment(
             filtered_history=filtered_history,
         )
     )
+    flags.extend(analyze_lab_results(test_results))
+    flags.extend(
+        analyze_repeat_investigations(
+            prescription_items=prescription_items,
+            bill_items=bill_items,
+            clinical_context=clinical_context,
+            filtered_history=filtered_history,
+        )
+    )
 
     flags.extend(
         analyze_prescription_rationality(
             diagnosis=diagnosis,
             prescription_items=prescription_items,
             patient_age=patient_age,
+            patient_gender=patient_gender,
         )
     )
 

@@ -7,6 +7,7 @@ import {
   getDocs,
   query,
   serverTimestamp,
+  updateDoc,
   where,
 } from "firebase/firestore";
 import { awaitFirestoreReady, db } from "../firebase";
@@ -19,6 +20,7 @@ import {
   persistLocalBill,
   removeLocalBill,
   removeLocalBillsForPatientIds,
+  updateLocalBillData,
 } from "./localBillStore";
 import {
   canSaveMedicalHistory,
@@ -221,6 +223,18 @@ export async function saveReportToAccount(userId, patient, reportData, options =
   }
 }
 
+export function mergeSavedReportIds(report, outcome) {
+  if (!report || !outcome?.saved) {
+    return report;
+  }
+  return {
+    ...report,
+    id: outcome.firestoreId || outcome.localId || report.id,
+    localId: outcome.localId || report.localId,
+    firestoreId: outcome.firestoreId || report.firestoreId,
+  };
+}
+
 export async function saveBill(userId, billData, options = {}) {
   const payload = sanitizeForFirestore({
     ...billData,
@@ -396,6 +410,41 @@ export async function deleteBill(userId, billId) {
   if (cloudId && cloudId !== billId) {
     removeLocalBill(userId, cloudId);
   }
+}
+
+export async function updateReportAnnotations(userId, reportId, clinicianAnnotations) {
+  if (!userId || !reportId) {
+    throw new Error("Report not found.");
+  }
+
+  const payload = sanitizeForFirestore({
+    clinician_annotations: clinicianAnnotations,
+    annotations_updated_at: new Date().toISOString(),
+  });
+
+  updateLocalBillData(userId, reportId, payload);
+
+  const localBill = getLocalBillById(userId, reportId);
+  const firestoreId = localBill?.firestoreId || reportId;
+
+  try {
+    await awaitFirestoreReady();
+    const docRef = doc(db, "users", userId, "bills", firestoreId);
+    const snapshot = await getDoc(docRef);
+    if (snapshot.exists()) {
+      await updateDoc(docRef, payload);
+    }
+  } catch (error) {
+    console.error("Failed to sync report annotations to Firebase:", error);
+    if (!localBill) {
+      throw error;
+    }
+  }
+
+  return {
+    reportId: firestoreId || reportId,
+    clinician_annotations: clinicianAnnotations,
+  };
 }
 
 export { markLocalBillSynced, persistLocalBill } from "./localBillStore";

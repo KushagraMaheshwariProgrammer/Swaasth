@@ -71,6 +71,26 @@ export function markLocalBillSynced(userId, localId, firestoreId) {
   writeStore(store);
 }
 
+export function updateLocalBillData(userId, billId, patch) {
+  if (!userId || !billId || !patch || typeof patch !== "object") {
+    return false;
+  }
+  const store = readStore();
+  const entries = store.users[userId] || [];
+  const entry = entries.find(
+    (item) => item.localId === billId || item.firestoreId === billId
+  );
+  if (!entry) {
+    return false;
+  }
+  entry.billData = {
+    ...entry.billData,
+    ...patch,
+  };
+  writeStore(store);
+  return true;
+}
+
 export function localBillToHistoryEntry(entry) {
   return {
     id: entry.firestoreId || entry.localId,

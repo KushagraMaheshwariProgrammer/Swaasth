@@ -228,6 +228,23 @@ export default function ClinicalContextForm({
                     ))}
                   </select>
                 </label>
+                <label className="bill-editor-field">
+                  <span>Reference range (optional)</span>
+                  <input
+                    type="text"
+                    value={item.reference_range || ""}
+                    placeholder="e.g. 12 - 15"
+                    onChange={(event) => {
+                      updateTestResults(
+                        testResults.map((entry, entryIndex) =>
+                          entryIndex === index
+                            ? { ...entry, reference_range: event.target.value }
+                            : entry
+                        )
+                      );
+                    }}
+                  />
+                </label>
                 <button
                   type="button"
                   className="bill-editor-remove"

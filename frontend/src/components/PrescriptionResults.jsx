@@ -4,8 +4,9 @@ import CombinedNarrative from "./CombinedNarrative";
 import PatientQuestionsSection from "./PatientQuestionsSection";
 import RestrictedMedicinesSection from "./RestrictedMedicinesSection";
 import ReportActions from "./ReportActions";
+import ClinicianSharePanel from "./ClinicianSharePanel";
 
-export default function PrescriptionResults({ result, toolbar = null }) {
+export default function PrescriptionResults({ result, toolbar = null, onReportUpdate }) {
   if (
     !result?.treatment_audit_flags &&
     !result?.restricted_medicine_flags &&
@@ -66,7 +67,9 @@ export default function PrescriptionResults({ result, toolbar = null }) {
               {testResults.map((item, index) => (
                 <li key={`lab-${index}`}>
                   <strong>{item.test_name}</strong>
-                  {[item.value, item.unit, item.result].filter(Boolean).join(" · ")}
+                  {[item.value, item.unit, item.result, item.reference_range ? `ref ${item.reference_range}` : ""]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </li>
               ))}
             </ul>
@@ -131,6 +134,8 @@ export default function PrescriptionResults({ result, toolbar = null }) {
       <RestrictedMedicinesSection
         restrictedMedicineFlags={result?.restricted_medicine_flags}
       />
+
+      <ClinicianSharePanel report={result} onReportUpdate={onReportUpdate} />
 
       <ReportActions report={result} />
     </>

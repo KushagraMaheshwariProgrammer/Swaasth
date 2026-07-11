@@ -333,9 +333,15 @@ export default function HistoryPage() {
             </div>
             <section className="results-shell">
               {resolveResultsView(selectedBill) === "prescription" ? (
-                <PrescriptionResults result={selectedBill} />
+                <PrescriptionResults
+                  result={selectedBill}
+                  onReportUpdate={setSelectedBill}
+                />
               ) : resolveResultsView(selectedBill) === "bill" ? (
-                <BillResults result={selectedBill} />
+                <BillResults
+                  result={selectedBill}
+                  onReportUpdate={setSelectedBill}
+                />
               ) : (
                 <p className="auth-info">
                   This saved report does not contain displayable results.

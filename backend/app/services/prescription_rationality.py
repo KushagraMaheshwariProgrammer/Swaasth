@@ -11,6 +11,7 @@ from typing import Any
 from app.jan_aushadhi_rates import enrich_line_items_with_jan_aushadhi
 from app.item_normalization import normalize_item_name
 from app.pharma_rates import get_pharma_store
+from app.services.patient_gender import resolve_patient_gender
 
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
 DRUG_RATIONALITY_PATH = _BACKEND_ROOT / "data" / "medicines" / "drug_rationality.json"
@@ -235,13 +236,134 @@ def _brand_generic_flags(medicine_names: list[str]) -> list[dict[str, Any]]:
     return flags
 
 
+def _population_safety_flags(
+    resolved: list[tuple[str, dict[str, Any]]],
+    *,
+    patient_age: int | None,
+    patient_gender: str | None,
+) -> list[dict[str, Any]]:
+    if not resolved:
+        return []
+
+    flags: list[dict[str, Any]] = []
+    gender = resolve_patient_gender(patient_gender)
+    is_female = gender == "female"
+    is_pregnant_context = is_female  # conservative: flag female-specific cautions for review
+
+    for name, entry in resolved:
+        note = str(entry.get("safety_note") or "").strip()
+        if entry.get("avoid_in_pregnancy") and is_pregnant_context:
+            flags.append(
+                {
+                    "type": "PREGNANCY_CONTRAINDICATION",
+                    "severity": "HIGH",
+                    "item": name,
+                    "category": "prescription",
+                    "reason": (
+                        f"{name} is commonly avoided during pregnancy."
+                        + (f" {note}" if note else "")
+                    ),
+                    "recommendation": (
+                        f"Ask whether {name} is safe in your pregnancy stage or if a "
+                        "pregnancy-compatible alternative is available."
+                    ),
+                    "guideline_basis": None,
+                    "stg_reference": None,
+                }
+            )
+            continue
+
+        if entry.get("caution_in_pregnancy") and is_pregnant_context:
+            flags.append(
+                {
+                    "type": "PREGNANCY_CAUTION",
+                    "severity": "MEDIUM",
+                    "item": name,
+                    "category": "prescription",
+                    "reason": (
+                        f"{name} may need extra caution during pregnancy."
+                        + (f" {note}" if note else "")
+                    ),
+                    "recommendation": (
+                        f"Ask your doctor to confirm that {name} is appropriate for "
+                        "pregnancy in your specific situation."
+                    ),
+                    "guideline_basis": None,
+                    "stg_reference": None,
+                }
+            )
+
+        if entry.get("avoid_in_lactation") and is_female:
+            flags.append(
+                {
+                    "type": "LACTATION_CAUTION",
+                    "severity": "MEDIUM",
+                    "item": name,
+                    "category": "prescription",
+                    "reason": (
+                        f"{name} may need caution while breastfeeding."
+                        + (f" {note}" if note else "")
+                    ),
+                    "recommendation": (
+                        f"If you are breastfeeding, ask whether {name} is suitable or "
+                        "whether feeding timing or an alternative should be discussed."
+                    ),
+                    "guideline_basis": None,
+                    "stg_reference": None,
+                }
+            )
+        elif entry.get("caution_in_lactation") and is_female:
+            flags.append(
+                {
+                    "type": "LACTATION_CAUTION",
+                    "severity": "MEDIUM",
+                    "item": name,
+                    "category": "prescription",
+                    "reason": (
+                        f"{name} may need extra review while breastfeeding."
+                        + (f" {note}" if note else "")
+                    ),
+                    "recommendation": (
+                        f"Ask your doctor whether {name} is appropriate while breastfeeding."
+                    ),
+                    "guideline_basis": None,
+                    "stg_reference": None,
+                }
+            )
+
+        caution_age = entry.get("caution_under_age")
+        if patient_age is not None and isinstance(caution_age, (int, float)):
+            if patient_age < int(caution_age):
+                flags.append(
+                    {
+                        "type": "PEDIATRIC_DOSING_CAUTION",
+                        "severity": "HIGH" if patient_age < max(int(caution_age) - 4, 0) else "MEDIUM",
+                        "item": name,
+                        "category": "prescription",
+                        "reason": (
+                            f"{name} is often used cautiously in patients under "
+                            f"{int(caution_age)} years (patient age recorded as {patient_age})."
+                            + (f" {note}" if note else "")
+                        ),
+                        "recommendation": (
+                            f"Ask whether the dose and choice of {name} are age-appropriate "
+                            "for a child or adolescent."
+                        ),
+                        "guideline_basis": None,
+                        "stg_reference": None,
+                    }
+                )
+
+    return flags
+
+
 def analyze_prescription_rationality(
     *,
     diagnosis: str,
     prescription_items: list[dict[str, Any]] | None = None,
     patient_age: int | None = None,
+    patient_gender: str | None = None,
 ) -> list[dict[str, Any]]:
-    _ = patient_age
     prescription_items = prescription_items or []
     medicine_names = _medicine_names(prescription_items)
     if not medicine_names:
@@ -261,4 +383,11 @@ def analyze_prescription_rationality(
     if diagnosis.strip():
         flags.extend(_broader_spectrum_flags(diagnosis, resolved))
     flags.extend(_brand_generic_flags(medicine_names))
+    flags.extend(
+        _population_safety_flags(
+            resolved,
+            patient_age=patient_age,
+            patient_gender=patient_gender,
+        )
+    )
     return flags
