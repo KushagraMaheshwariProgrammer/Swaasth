@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, Link, useLocation, useNavigate } from "react-router-dom";
 import { getVerificationErrorMessage } from "../auth/emailVerification";
 import BackLink from "../components/BackLink";
 import { useAuth } from "../context/AuthContext";

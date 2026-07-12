@@ -3,6 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { ensureApiBase } from "./services/apiBase";
 import "./app.css";
 
@@ -21,6 +22,8 @@ if (Capacitor.isNativePlatform()) {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 );

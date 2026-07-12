@@ -1,5 +1,6 @@
 import AdvocacyScopeSection from "./AdvocacyScopeSection";
 import AuditFlagCard from "./AuditFlagCard";
+import { collectPatientQuestions } from "../auditAdvocacyUtils";
 import { getAuditRiskMeta } from "../billUtils";
 
 const CATEGORY_LABELS = {
@@ -39,7 +40,7 @@ function groupFlags(flags) {
 }
 
 export default function TreatmentAuditSection({ treatmentAuditFlags, report = null }) {
-  if (!treatmentAuditFlags && !report?.patient_questions?.length) {
+  if (!treatmentAuditFlags && collectPatientQuestions(report).length === 0) {
     return null;
   }
 

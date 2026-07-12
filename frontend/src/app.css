@@ -4691,6 +4691,64 @@ button.patient-list-card {
   background: #f8fafc;
 }
 
+.report-pdf-native-fallback {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem 1.25rem;
+  text-align: center;
+  background: #f8fafc;
+}
+
+.error-boundary {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: #f8fafc;
+}
+
+.error-boundary-card {
+  width: min(480px, 100%);
+  padding: 1.5rem;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+}
+
+.error-boundary-card h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+}
+
+.error-boundary-card p {
+  margin: 0 0 1rem;
+  color: #475569;
+}
+
+.error-boundary-actions {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.error-boundary-detail {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  max-height: 12rem;
+  overflow: auto;
+  font-size: 0.75rem;
+  background: #f1f5f9;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 @media (max-width: 640px) {
   .report-pdf-overlay {
     padding: 0;

@@ -792,6 +792,11 @@ function CheckPage() {
     setPreauthDocuments(merged.preauthDocuments || []);
     setClinicalContext(merged.clinicalContext || emptyClinicalContext());
 
+    if (merged.diagnosis) {
+      setDiagnosis(merged.diagnosis);
+      setDiagnosisUserProvided(false);
+    }
+
     if (
       merged.medicines?.length ||
       merged.tests?.length ||
@@ -805,10 +810,6 @@ function CheckPage() {
       setPrescriptionProcedures(
         (merged.procedures || []).filter((item) => item.name)
       );
-      if (merged.diagnosis) {
-        setDiagnosis(merged.diagnosis);
-        setDiagnosisUserProvided(false);
-      }
     }
 
     if (merged.lineItems?.length) {
@@ -1274,12 +1275,9 @@ function CheckPage() {
     setExtractionWarnings([]);
     setBundleDocuments((documents) =>
       documents.map((doc) => {
-        const {
-          editableExtraction,
-          rawExtraction,
-          extractionError,
-          ...rest
-        } = doc;
+        // Strip transient extraction fields before returning to upload state.
+        // eslint-disable-next-line no-unused-vars
+        const { editableExtraction, rawExtraction, extractionError, ...rest } = doc;
         return rest;
       })
     );
@@ -1921,6 +1919,7 @@ function CheckPage() {
                     setDiagnosisUserProvided(false);
                   }
                 }}
+                extractedDiagnosis={diagnosis}
                 onBack={
                   editableItems.length || bundleDocuments.length
                     ? handleClinicalBack

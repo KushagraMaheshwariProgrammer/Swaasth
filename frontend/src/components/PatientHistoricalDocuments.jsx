@@ -44,7 +44,7 @@ export default function PatientHistoricalDocuments({
   const [showDetail, setShowDetail] = useState(false);
   const [documentDate, setDocumentDate] = useState("");
   const [detectedDate, setDetectedDate] = useState("");
-  const [extraction, setExtraction] = useState(null);
+  const [, setExtraction] = useState(null);
   const [editableExtraction, setEditableExtraction] = useState(null);
   const [extracting, setExtracting] = useState(false);
   const [uploading, setUploading] = useState(false);

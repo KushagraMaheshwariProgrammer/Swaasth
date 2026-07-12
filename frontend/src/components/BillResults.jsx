@@ -27,14 +27,20 @@ export default function BillResults({ result, toolbar = null, onReportUpdate }) 
   const summary = useMemo(() => computeBillSummary(result), [result]);
 
   const janAushadhiMatches = result?.jan_aushadhi?.matches ?? [];
-
-  if (!result?.line_items?.length) {
-    return null;
-  }
+  const hasLineItems = Boolean(result?.line_items?.length);
 
   return (
     <>
-      {janAushadhiMatches.length > 0 && (
+      {!hasLineItems && (
+        <>
+          {toolbar}
+          <p className="auth-info">
+            No bill line items are available for this report yet.
+          </p>
+        </>
+      )}
+
+      {hasLineItems && janAushadhiMatches.length > 0 && (
         <section className="jan-aushadhi-banner" aria-label="Jan Aushadhi advisory">
           <div className="jan-aushadhi-banner-header">
             <h3>Jan Aushadhi — subsidized medicines available</h3>
@@ -77,13 +83,13 @@ export default function BillResults({ result, toolbar = null, onReportUpdate }) 
         </section>
       )}
 
-      {result?.hospital?.name_from_bill && (
+      {hasLineItems && result?.hospital?.name_from_bill && (
         <p className="comparison-context">
           Hospital on bill: <strong>{result.hospital.name_from_bill}</strong>
         </p>
       )}
 
-      {result?.patient?.name && (
+      {hasLineItems && result?.patient?.name && (
         <p className="comparison-context">
           Patient: <strong>{result.patient.name}</strong>
           {getPatientAge(result.patient) != null && (
@@ -93,7 +99,7 @@ export default function BillResults({ result, toolbar = null, onReportUpdate }) 
         </p>
       )}
 
-      {result?.comparison_settings && (
+      {hasLineItems && result?.comparison_settings && (
         <p className="comparison-context">
           {result.comparison_settings.state_name &&
             result.comparison_settings.city && (
@@ -114,9 +120,9 @@ export default function BillResults({ result, toolbar = null, onReportUpdate }) 
         </p>
       )}
 
-      {toolbar && <div className="results-toolbar">{toolbar}</div>}
+      {hasLineItems && toolbar && <div className="results-toolbar">{toolbar}</div>}
 
-      {displayableItems.length > 0 && (
+      {hasLineItems && displayableItems.length > 0 && (
         <>
           <article className="summary-banner">
             <div className="summary-stat">

@@ -154,13 +154,32 @@ async function blobToBase64(blob) {
   return btoa(binary);
 }
 
-async function writePdfToNativeCache(blob, filename) {
+export async function writePdfToNativeCache(blob, filename) {
   const { uri } = await Filesystem.writeFile({
     path: sanitizePdfFilename(filename),
     data: await blobToBase64(blob),
     directory: Directory.Cache,
   });
   return uri;
+}
+
+/** Open a PDF on native via cache URI + system share/viewer (Android WebView cannot iframe blobs). */
+export async function openNativePdfViewer(blob, filename, reportTitle) {
+  const uri = await writePdfToNativeCache(blob, filename);
+  try {
+    await Share.share({
+      title: reportTitle,
+      text: reportTitle,
+      files: [uri],
+      dialogTitle: "Open report",
+    });
+    return { opened: true, method: "share" };
+  } catch (error) {
+    if (isShareCancelled(error)) {
+      return { opened: false, cancelled: true };
+    }
+    throw error;
+  }
 }
 
 async function savePdfToDevice(blob, filename) {

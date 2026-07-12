@@ -7,6 +7,7 @@ export default function ReportPdfViewer({
   onDownload,
   onShare,
   busyAction = "",
+  nativeFallback = false,
 }) {
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -50,11 +51,16 @@ export default function ReportPdfViewer({
             </button>
           </div>
         </header>
-        <iframe
-          src={blobUrl}
-          title={title}
-          className="report-pdf-frame"
-        />
+        {nativeFallback ? (
+          <div className="report-pdf-native-fallback">
+            <p>PDF opened in your viewer.</p>
+            <p className="comparison-settings-hint">
+              If it did not open automatically, use Download or Share below.
+            </p>
+          </div>
+        ) : (
+          <iframe src={blobUrl} title={title} className="report-pdf-frame" />
+        )}
       </div>
     </div>
   );

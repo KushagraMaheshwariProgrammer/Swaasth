@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { canExportReport, buildReportFilename } from "../data/reportExport";
@@ -6,6 +7,7 @@ import { hasActionablePlan } from "../actionPlanUtils";
 import {
   downloadReportPdf,
   loadReportPdfBlobUrl,
+  openNativePdfViewer,
   revokeReportPdfBlobUrl,
   shareReportPdf,
 } from "../services/reportPdf";
@@ -175,6 +177,28 @@ export default function ReportActions({ report, className = "report-actions" }) 
     showMessage("");
     try {
       const loaded = await ensurePdf();
+      if (Capacitor.isNativePlatform()) {
+        const outcome = await openNativePdfViewer(
+          loaded.blob,
+          loaded.filename,
+          loaded.title
+        );
+        if (outcome.cancelled) {
+          return;
+        }
+        setViewer({
+          blobUrl: loaded.blobUrl,
+          title: loaded.title,
+          nativeFallback: true,
+        });
+        showMessage(
+          outcome.opened
+            ? "PDF opened in your viewer. Use Download or Share below if needed."
+            : "Use Download or Share below to open the report.",
+          "info"
+        );
+        return;
+      }
       setViewer({
         blobUrl: loaded.blobUrl,
         title: loaded.title,
@@ -225,6 +249,7 @@ export default function ReportActions({ report, className = "report-actions" }) 
         setViewer({
           blobUrl: loaded.blobUrl,
           title: loaded.title,
+          nativeFallback: Capacitor.isNativePlatform(),
         });
         showMessage(
           outcome.needsPreview
@@ -356,6 +381,7 @@ export default function ReportActions({ report, className = "report-actions" }) 
           onDownload={handleDownload}
           onShare={handleShare}
           busyAction={busy}
+          nativeFallback={Boolean(viewer.nativeFallback)}
         />
       )}
 

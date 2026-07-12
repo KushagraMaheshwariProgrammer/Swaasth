@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 const SYMPTOM_SUGGESTIONS = [
   "fever",
@@ -40,12 +40,34 @@ export default function ClinicalContextForm({
   onContinue,
   onBack,
   onDiagnosisExtracted,
+  extractedDiagnosis = "",
   isUploading = false,
   error = "",
   continueLabel = "Continue",
 }) {
   const symptoms = clinicalContext?.symptoms || [];
   const testResults = clinicalContext?.test_results || [];
+  const diagnosisExtractedRef = useRef(false);
+
+  useEffect(() => {
+    if (diagnosisExtractedRef.current || !onDiagnosisExtracted) {
+      return;
+    }
+    const diagnosis = String(extractedDiagnosis || "").trim();
+    if (!diagnosis) {
+      return;
+    }
+    const hasPrefilledClinical =
+      (clinicalContext?.symptoms || []).some((item) => item.name?.trim()) ||
+      (clinicalContext?.test_results || []).some((item) => item.test_name?.trim()) ||
+      clinicalContext?.symptoms_source === "extracted" ||
+      clinicalContext?.test_results_source === "extracted";
+    if (!hasPrefilledClinical) {
+      return;
+    }
+    diagnosisExtractedRef.current = true;
+    onDiagnosisExtracted(diagnosis);
+  }, [clinicalContext, extractedDiagnosis, onDiagnosisExtracted]);
 
   const updateSymptoms = (next) => {
     onChange({ ...clinicalContext, symptoms: next });
