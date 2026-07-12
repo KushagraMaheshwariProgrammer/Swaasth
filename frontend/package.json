@@ -11,7 +11,8 @@
     "build:emulator": "npm run sync:locations && npm run sync:firebase && SWAASTH_BUILD_TARGET=emulator npm run native:api-url && VITE_API_BASE=http://10.0.2.2:8000 vite build && npx cap sync android",
     "preview": "vite preview",
     "native:api-url": "node scripts/sync-native-api-url.mjs",
-    "cap:sync": "npm run sync:firebase && npm run native:api-url && env -u VITE_API_BASE vite build && npx cap sync android"
+    "cap:sync": "npm run sync:firebase && npm run native:api-url && env -u VITE_API_BASE vite build && npx cap sync android",
+    "android:debug": "cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",

@@ -36,6 +36,7 @@ from app.services.patient_age import resolve_patient_age
 from app.services.patient_gender import gender_display_label
 from app.services.patient_errors import document_mismatch_detail
 from app.services.treatment_audit import analyze_treatment
+from app.startup_warmup import is_warmup_complete, start_background_warmup, warmup_status
 
 
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent
@@ -98,56 +99,34 @@ def load_reference_data() -> None:
     except Exception as exc:
         print(f"WARNING: Location directories failed to load: {exc}")
 
-    try:
-        from app.pharma_rates import get_pharma_store
-
-        pharma = get_pharma_store()
-        az_count = len(pharma.az.rows) if pharma.az else 0
-        print(
-            f"Loaded {len(pharma.nppa.rows)} NPPA ceiling prices "
-            f"from {pharma.nppa.csv_path}"
-        )
-        if az_count:
-            print(
-                f"Loaded {az_count} brand-to-generic mappings "
-                f"from {pharma.az.csv_path}"
-            )
-        else:
-            print(
-                "WARNING: AZ brand dataset not loaded (brand resolution disabled). "
-                "Run: python backend/scripts/download_pharma_backup_dataset.py"
-            )
-    except Exception as exc:
-        print(f"WARNING: NPPA price dataset failed to load: {exc}")
-
-    try:
-        jan_aushadhi = get_jan_aushadhi_store()
-        print(
-            f"Loaded {len(jan_aushadhi.rows)} Jan Aushadhi products "
-            f"from {jan_aushadhi.csv_path}"
-        )
-    except Exception as exc:
-        print(f"WARNING: Jan Aushadhi product list failed to load: {exc}")
-
-    try:
-        restricted = get_restricted_medicines_store()
-        if restricted.is_available():
-            print(
-                f"Loaded {len(restricted.rows)} restricted medicines "
-                f"from {restricted.csv_path}"
-            )
-        else:
-            print(
-                f"WARNING: Restricted medicines CSV not loaded "
-                f"(expected at {restricted.csv_path})"
-            )
-    except Exception as exc:
-        print(f"WARNING: Restricted medicines catalog failed to load: {exc}")
+    start_background_warmup()
 
 
 @app.get("/health", response_class=PlainTextResponse)
 def health_check() -> str:
     return "Backend is running"
+
+
+@app.get("/ready")
+def readiness_check() -> dict[str, object]:
+    status = warmup_status()
+    if not status["complete"]:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "message": "Backend is still warming up guideline indexes and datasets.",
+                **status,
+            },
+        )
+    if status["error"]:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "message": "Backend warmup failed.",
+                **status,
+            },
+        )
+    return {"ready": True, **status}
 
 
 @app.get("/api/locations/states")

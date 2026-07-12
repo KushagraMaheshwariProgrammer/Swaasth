@@ -2,7 +2,7 @@ import { Capacitor } from "@capacitor/core";
 
 const STORAGE_KEY = "swaasth_api_base";
 const BACKEND_PORT = 8000;
-const PROBE_TIMEOUT_MS = 3500;
+const PROBE_TIMEOUT_MS = 15000;
 
 let resolvedApiBase = "";
 let probePromise = null;
@@ -115,13 +115,32 @@ async function probeBackend(base) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {
-    const response = await fetch(`${base}/health`, {
+    const response = await fetch(`${base}/ready`, {
       method: "GET",
       signal: controller.signal,
     });
-    return response.ok;
+    if (response.ok) {
+      return true;
+    }
+    // Warmup in progress — API is reachable even while indexes load.
+    if (response.status === 503) {
+      return true;
+    }
+    const health = await fetch(`${base}/health`, {
+      method: "GET",
+      signal: controller.signal,
+    });
+    return health.ok;
   } catch {
-    return false;
+    try {
+      const health = await fetch(`${base}/health`, {
+        method: "GET",
+        signal: controller.signal,
+      });
+      return health.ok;
+    } catch {
+      return false;
+    }
   } finally {
     window.clearTimeout(timer);
   }
@@ -268,6 +287,13 @@ export function backendConnectionHint() {
       `Could not reach ${base}. ` +
       "Ensure ./run_dev.sh is running on your Mac (0.0.0.0:8000) and the phone is on the same Wi‑Fi. " +
       "Then run: cd frontend && npm run native:api-url && npm run build"
+    );
+  }
+  if (base.startsWith("https://")) {
+    return (
+      `Could not reach ${base || "the deployed API"}. ` +
+      "Check that your phone has internet access. If you are developing locally, set " +
+      "VITE_API_BASE to your Mac's LAN IP in frontend/.env, run ./run_dev.sh, rebuild, and reinstall the app."
     );
   }
   return (
