@@ -6,13 +6,41 @@ import RestrictedMedicinesSection from "./RestrictedMedicinesSection";
 import ReportActions from "./ReportActions";
 import ClinicianSharePanel from "./ClinicianSharePanel";
 
+function hasDisplayablePrescriptionContent(result) {
+  if (!result) {
+    return false;
+  }
+  if (result.report_kind === "clinical" || result.report_kind === "prescription") {
+    return true;
+  }
+  const clinical = result.clinical_context || {};
+  return Boolean(
+    result.treatment_audit_flags ||
+      result.restricted_medicine_flags?.length ||
+      (result.patient_questions || []).length ||
+      result.treatment_audit_flags?.patient_questions?.length ||
+      result.action_plan?.combined_narrative ||
+      clinical.symptoms?.length ||
+      clinical.test_results?.length ||
+      result.diagnosis ||
+      result.prescription?.diagnosis ||
+      result.prescription?.medicines?.length ||
+      result.medicines?.length ||
+      result.prescription?.tests?.length ||
+      result.tests?.length ||
+      result.prescription?.procedures?.length ||
+      result.procedures?.length
+  );
+}
+
 export default function PrescriptionResults({ result, toolbar = null, onReportUpdate }) {
-  if (
-    !result?.treatment_audit_flags &&
-    !result?.restricted_medicine_flags &&
-    !(result?.patient_questions || []).length
-  ) {
-    return null;
+  if (!hasDisplayablePrescriptionContent(result)) {
+    return (
+      <>
+        {toolbar}
+        <p className="auth-info">No review findings are available for this report yet.</p>
+      </>
+    );
   }
 
   const isClinicalReview = result.report_kind === "clinical";

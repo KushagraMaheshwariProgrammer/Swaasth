@@ -2,7 +2,10 @@ import { useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { updateReportAnnotations } from "../services/bills";
 import {
-  buildFlagKey,
+  buildClinicianShareText,
+  shareClinicianSummary,
+} from "../utils/clinicianShare";
+import {
   collectAllFlags,
   getFlagAnnotation,
   normalizeClinicianAnnotations,

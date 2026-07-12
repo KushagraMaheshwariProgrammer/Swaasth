@@ -93,14 +93,41 @@ export function hasBillReportContent(report) {
   return Boolean(report?.line_items?.length);
 }
 
+function hasClinicalContext(report) {
+  const clinical = report?.clinical_context || {};
+  return Boolean(
+    clinical.symptoms?.length || clinical.test_results?.length
+  );
+}
+
+function hasPrescriptionItems(report) {
+  return Boolean(
+    report?.prescription?.medicines?.length ||
+      report?.medicines?.length ||
+      report?.prescription?.tests?.length ||
+      report?.tests?.length ||
+      report?.prescription?.procedures?.length ||
+      report?.procedures?.length
+  );
+}
+
 export function hasPrescriptionReportContent(report) {
   if (!report) {
     return false;
   }
+  if (report.report_kind === "clinical" || report.report_kind === "prescription") {
+    return true;
+  }
   return Boolean(
     report.treatment_audit_flags ||
       report.restricted_medicine_flags?.length ||
-      (report.patient_questions || []).length
+      (report.patient_questions || []).length ||
+      report.treatment_audit_flags?.patient_questions?.length ||
+      report.action_plan?.combined_narrative ||
+      hasClinicalContext(report) ||
+      hasPrescriptionItems(report) ||
+      report.diagnosis ||
+      report.prescription?.diagnosis
   );
 }
 
