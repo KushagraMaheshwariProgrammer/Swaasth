@@ -4,7 +4,11 @@ import {
   normalizeToIsoDate,
 } from "./documentDates";
 import { getApiBase } from "../services/apiBase";
-import { fetchBackend, parseJsonResponse } from "../services/httpUtils";
+import {
+  fetchBackend,
+  parseJsonResponse,
+  LONG_FETCH_TIMEOUT_MS,
+} from "../services/httpUtils";
 import {
   mergeClinicalContext,
   emptyClinicalContext,
@@ -179,7 +183,7 @@ async function uploadBill(file, location) {
   });
   const response = await fetchBackend(
     `${getApiBase()}/upload-bill?${params}`,
-    { method: "POST", body: formData }
+    { method: "POST", body: formData, timeoutMs: LONG_FETCH_TIMEOUT_MS }
   );
   return parseJsonResponse(response);
 }

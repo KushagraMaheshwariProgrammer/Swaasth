@@ -39,6 +39,7 @@ import { getApiBase } from "./services/apiBase";
 import {
   backendUnreachableMessage,
   fetchBackend,
+  LONG_FETCH_TIMEOUT_MS,
   parseJsonResponse,
 } from "./services/httpUtils";
 import { getPatients, getPatientsLocalSnapshot } from "./services/patients";
@@ -966,6 +967,7 @@ function CheckPage() {
       const response = await fetchBackend(`${getApiBase()}/compare-bill`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        timeoutMs: LONG_FETCH_TIMEOUT_MS,
         body: JSON.stringify({
           line_items: validItems,
           state_ut_name: location.state,
@@ -1592,6 +1594,13 @@ function CheckPage() {
             : "Unable to analyze this prescription."
         )
       );
+      // Clinical-only flows have no edit page to fall back to, so without a
+      // result the UI would bounce to the documents page. Return to the
+      // clinical step instead: the error is visible there and the continue
+      // button acts as a retry.
+      if (clinicalOnly && !editableItems.length) {
+        setClinicalStep("clinical");
+      }
     } finally {
       setIsComparing(false);
     }

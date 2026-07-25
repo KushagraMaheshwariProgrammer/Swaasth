@@ -2,6 +2,10 @@ import { backendConnectionHint, clearStoredApiBase, ensureApiBase, getApiBase } 
 import { Capacitor } from "@capacitor/core";
 
 const DEFAULT_FETCH_TIMEOUT_MS = 120000;
+// Document uploads (OCR + LLM extraction) and LLM analysis can be slow,
+// especially on mobile networks. Azure Container Apps ingress allows up to
+// 240s per request.
+export const LONG_FETCH_TIMEOUT_MS = 240000;
 
 const GENERIC_HTTP_PHRASES = new Set([
   "bad request",
@@ -129,16 +133,21 @@ export function backendUnreachableMessage() {
   return `Could not reach the backend. ${backendConnectionHint()}`;
 }
 
-async function fetchWithTimeout(url, options, timeoutMs = DEFAULT_FETCH_TIMEOUT_MS) {
+async function fetchWithTimeout(url, options = {}) {
+  const { timeoutMs = DEFAULT_FETCH_TIMEOUT_MS, ...fetchOptions } = options;
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    return await fetch(url, { ...fetchOptions, signal: controller.signal });
   } catch (error) {
     if (error?.name === "AbortError") {
-      throw new Error(
-        `Request timed out after ${Math.round(timeoutMs / 1000)}s. ${backendConnectionHint()}`
+      const timeoutError = new Error(
+        `The request timed out after ${Math.round(timeoutMs / 1000)}s. ` +
+          "The server may still be processing — check your connection and try again, " +
+          "or retry with a smaller/clearer photo."
       );
+      timeoutError.isTimeout = true;
+      throw timeoutError;
     }
     throw error;
   } finally {
@@ -150,6 +159,11 @@ async function fetchWithNativeRetry(url, options) {
   try {
     return await fetchWithTimeout(url, options);
   } catch (error) {
+    // A timeout means the backend was reached but slow — re-probing the base
+    // URL or retrying against another host would not help.
+    if (error?.isTimeout) {
+      throw error;
+    }
     if (!Capacitor.isNativePlatform()) {
       const base = getApiBase();
       if (import.meta.env.DEV && base) {
@@ -175,7 +189,10 @@ export async function fetchBackend(url, options) {
   }
   try {
     return await fetchWithNativeRetry(url, options);
-  } catch {
+  } catch (error) {
+    if (error?.isTimeout) {
+      throw error;
+    }
     throw new Error(backendUnreachableMessage());
   }
 }
@@ -221,7 +238,10 @@ export async function fetchJson(url, options) {
       await ensureApiBase();
     }
     response = await fetchWithNativeRetry(url, options);
-  } catch {
+  } catch (error) {
+    if (error?.isTimeout) {
+      throw error;
+    }
     throw new Error(backendUnreachableMessage());
   }
   return parseJsonResponse(response);

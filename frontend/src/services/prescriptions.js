@@ -1,5 +1,5 @@
 import { getApiBase } from "./apiBase";
-import { fetchJson } from "./httpUtils";
+import { fetchJson, LONG_FETCH_TIMEOUT_MS } from "./httpUtils";
 import { getPatientAge, getPatientBirthYear } from "../utils/patientAge";
 
 export function emptyClinicalContext() {
@@ -112,6 +112,7 @@ export async function uploadPrescription(file) {
   return fetchJson(`${getApiBase()}/upload-prescription`, {
     method: "POST",
     body: formData,
+    timeoutMs: LONG_FETCH_TIMEOUT_MS,
   });
 }
 
@@ -122,6 +123,7 @@ export async function uploadClinicalDocument(file, documentType) {
   return fetchJson(`${getApiBase()}/upload-clinical-document`, {
     method: "POST",
     body: formData,
+    timeoutMs: LONG_FETCH_TIMEOUT_MS,
   });
 }
 
@@ -131,6 +133,7 @@ export async function uploadPreauthDocument(file) {
   return fetchJson(`${getApiBase()}/upload-preauth`, {
     method: "POST",
     body: formData,
+    timeoutMs: LONG_FETCH_TIMEOUT_MS,
   });
 }
 
@@ -156,6 +159,7 @@ export async function analyzeTreatment({
   return fetchJson(`${getApiBase()}/analyze-treatment`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    timeoutMs: LONG_FETCH_TIMEOUT_MS,
     body: JSON.stringify({
       diagnosis,
       diagnosis_user_provided: diagnosisUserProvided,

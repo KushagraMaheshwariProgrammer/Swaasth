@@ -8,7 +8,7 @@ import {
 } from "firebase/firestore";
 import { awaitFirestoreReady, db } from "../firebase";
 import { getApiBase } from "./apiBase";
-import { fetchBackend, parseJsonResponse } from "./httpUtils";
+import { fetchBackend, parseJsonResponse, LONG_FETCH_TIMEOUT_MS } from "./httpUtils";
 import {
   normalizePrescriptionPayload,
   uploadClinicalDocument,
@@ -164,6 +164,7 @@ async function uploadBillWithLocation(file, { state, city, hospitalName }) {
     {
       method: "POST",
       body: formData,
+      timeoutMs: LONG_FETCH_TIMEOUT_MS,
     }
   );
   return parseJsonResponse(response);

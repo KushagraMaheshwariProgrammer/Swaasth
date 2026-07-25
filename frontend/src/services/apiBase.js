@@ -284,20 +284,15 @@ export function backendConnectionHint() {
   }
   if (isPrivateLanHost(host)) {
     return (
-      `Could not reach ${base}. ` +
       "Ensure ./run_dev.sh is running on your Mac (0.0.0.0:8000) and the phone is on the same Wi‑Fi. " +
       "Then run: cd frontend && npm run native:api-url && npm run build"
     );
   }
   if (base.startsWith("https://")) {
     return (
-      `Could not reach ${base || "the deployed API"}. ` +
-      "Check that your phone has internet access. If you are developing locally, set " +
+      "Check that your phone has internet access and try again. If you are developing locally, set " +
       "VITE_API_BASE to your Mac's LAN IP in frontend/.env, run ./run_dev.sh, rebuild, and reinstall the app."
     );
   }
-  return (
-    `Could not reach ${base || "the backend"}. ` +
-    "Ensure ./run_dev.sh is running on your Mac (0.0.0.0:8000)."
-  );
+  return "Ensure ./run_dev.sh is running on your Mac (0.0.0.0:8000).";
 }
