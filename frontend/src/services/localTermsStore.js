@@ -1,22 +1,15 @@
 import { TERMS_VERSION } from "../data/termsAndConditions.js";
+import { getSecureJson, setSecureJson } from "./secureLocalStore";
 
 const STORAGE_KEY = "swaasth_terms_acceptance_v1";
 
 function readStore() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return { users: {} };
-    }
-    const parsed = JSON.parse(raw);
-    return parsed?.users ? parsed : { users: {} };
-  } catch {
-    return { users: {} };
-  }
+  const parsed = getSecureJson(STORAGE_KEY, { users: {} });
+  return parsed?.users ? parsed : { users: {} };
 }
 
 function writeStore(store) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  setSecureJson(STORAGE_KEY, store);
 }
 
 export function getLocalTermsAcceptance(userId) {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { collectPatientQuestions, getAuditConfidenceMeta } from "../auditAdvocacyUtils";
+import { getSecureJson, setSecureJson } from "../services/secureLocalStore";
 
 const STORAGE_PREFIX = "swaasth_question_responses_";
 
@@ -26,9 +27,11 @@ export default function PatientQuestionsSection({
       return;
     }
     try {
-      const saved = window.localStorage.getItem(reportStorageKey(report));
-      if (saved) {
-        setResponses(JSON.parse(saved));
+      const saved = getSecureJson(reportStorageKey(report), null);
+      if (saved && typeof saved === "object") {
+        setResponses(saved);
+      } else {
+        setResponses({});
       }
     } catch {
       setResponses({});
@@ -39,7 +42,7 @@ export default function PatientQuestionsSection({
     const next = { ...responses, [index]: value };
     setResponses(next);
     try {
-      window.localStorage.setItem(reportStorageKey(report), JSON.stringify(next));
+      setSecureJson(reportStorageKey(report), next);
     } catch {
       // ignore storage errors
     }

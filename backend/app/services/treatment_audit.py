@@ -10,8 +10,8 @@ from typing import Any
 from fastapi import HTTPException
 
 from app.services.audit_advocacy import build_advocacy_payload, finalize_audit_flags
+from app.services.azure_openai_client import azure_openai_json_chat
 from app.services.clinical_history_relevance import filter_relevant_clinical_history
-from app.services.groq_client import groq_json_chat
 from app.services.investigation_audit import analyze_investigations
 from app.services.investigation_history_audit import analyze_repeat_investigations
 from app.services.lab_interpretation import analyze_lab_results
@@ -584,7 +584,7 @@ Rules:
 """.strip()
 
 
-def _groq_triangle_audit(
+def _ai_triangle_audit(
     *,
     diagnosis: str,
     diagnosis_user_provided: bool,
@@ -648,7 +648,7 @@ Government guideline excerpts (ICMR / Clinical Establishments / CRC STG fallback
 {context_text}
 """.strip()
 
-    parsed = groq_json_chat(_TRIANGLE_AUDIT_SYSTEM, user, max_tokens=3000)
+    parsed = azure_openai_json_chat(_TRIANGLE_AUDIT_SYSTEM, user, max_tokens=3000)
     flags = parsed.get("flags") or []
     if not isinstance(flags, list):
         flags = []
@@ -790,7 +790,7 @@ def analyze_treatment(
         )
 
     if context_text:
-        audit_result = _groq_triangle_audit(
+        audit_result = _ai_triangle_audit(
             diagnosis=diagnosis,
             diagnosis_user_provided=diagnosis_user_provided,
             symptoms=symptoms,

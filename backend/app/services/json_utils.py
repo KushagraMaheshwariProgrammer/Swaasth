@@ -18,12 +18,12 @@ def extract_json_from_text(raw_text: str) -> dict[str, Any]:
         if not match:
             raise HTTPException(
                 status_code=500,
-                detail="Groq returned an invalid response format.",
+                detail="The AI service returned an invalid response format.",
             )
         try:
             return json.loads(match.group(0))
         except json.JSONDecodeError as exc:
             raise HTTPException(
                 status_code=500,
-                detail="Groq returned malformed JSON.",
+                detail="The AI service returned malformed JSON.",
             ) from exc

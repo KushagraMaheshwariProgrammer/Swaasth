@@ -5,6 +5,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ensureApiBase } from "./services/apiBase";
+import { initSecureLocalStore } from "./services/secureLocalStore";
 import "./app.css";
 
 if (Capacitor.isNativePlatform()) {
@@ -20,10 +21,21 @@ if (Capacitor.isNativePlatform()) {
   });
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </React.StrictMode>
-);
+async function bootstrap() {
+  try {
+    await initSecureLocalStore();
+  } catch (error) {
+    console.error("Secure local store failed to initialize:", error);
+  }
+
+  ReactDOM.createRoot(document.getElementById("root")).render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </React.StrictMode>
+  );
+}
+
+bootstrap();
+

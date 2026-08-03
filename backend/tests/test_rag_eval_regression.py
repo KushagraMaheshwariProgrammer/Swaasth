@@ -70,7 +70,7 @@ def test_rule_based_gold_cases(case: dict, monkeypatch) -> None:
         },
     )
     monkeypatch.setattr(
-        "app.services.treatment_audit._groq_triangle_audit",
+        "app.services.treatment_audit._ai_triangle_audit",
         lambda **kwargs: {"flags": [], "clinical_alignment": {}},
     )
 

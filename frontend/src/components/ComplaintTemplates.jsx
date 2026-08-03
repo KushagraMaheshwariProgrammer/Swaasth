@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { confirmPhiExport } from "../utils/confirmPhiExport";
 
 function TemplateCard({ template }) {
   const [body, setBody] = useState(template.body || "");
@@ -6,6 +7,13 @@ function TemplateCard({ template }) {
 
   const handleCopy = async () => {
     if (!confirmed) {
+      return;
+    }
+    if (
+      !confirmPhiExport(
+        "This will copy medical information to the clipboard (outside the app). Continue?"
+      )
+    ) {
       return;
     }
     const text = `Subject: ${template.subject}\n\n${body}`;

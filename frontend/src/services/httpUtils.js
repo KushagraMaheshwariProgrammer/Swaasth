@@ -1,5 +1,6 @@
-import { backendConnectionHint, clearStoredApiBase, ensureApiBase, getApiBase } from "./apiBase";
 import { Capacitor } from "@capacitor/core";
+import { auth } from "../firebase";
+import { backendConnectionHint, clearStoredApiBase, ensureApiBase, getApiBase } from "./apiBase";
 
 const DEFAULT_FETCH_TIMEOUT_MS = 120000;
 // Document uploads (OCR + LLM extraction) and LLM analysis can be slow,
@@ -133,6 +134,34 @@ export function backendUnreachableMessage() {
   return `Could not reach the backend. ${backendConnectionHint()}`;
 }
 
+async function getAuthHeaders() {
+  const user = auth.currentUser;
+  if (!user) {
+    return {};
+  }
+  try {
+    const token = await user.getIdToken();
+    if (!token) {
+      return {};
+    }
+    return { Authorization: `Bearer ${token}` };
+  } catch {
+    return {};
+  }
+}
+
+async function withAuthHeaders(options = {}) {
+  const { headers: customHeaders, ...rest } = options;
+  const authHeaders = await getAuthHeaders();
+  return {
+    ...rest,
+    headers: {
+      ...authHeaders,
+      ...(customHeaders || {}),
+    },
+  };
+}
+
 async function fetchWithTimeout(url, options = {}) {
   const { timeoutMs = DEFAULT_FETCH_TIMEOUT_MS, ...fetchOptions } = options;
   const controller = new AbortController();
@@ -183,12 +212,13 @@ async function fetchWithNativeRetry(url, options) {
   }
 }
 
-export async function fetchBackend(url, options) {
+export async function fetchBackend(url, options = {}) {
   if (Capacitor.isNativePlatform()) {
     await ensureApiBase();
   }
+  const authedOptions = await withAuthHeaders(options);
   try {
-    return await fetchWithNativeRetry(url, options);
+    return await fetchWithNativeRetry(url, authedOptions);
   } catch (error) {
     if (error?.isTimeout) {
       throw error;
@@ -212,6 +242,9 @@ export async function parseJsonResponse(response) {
       payload = JSON.parse(text);
     } catch {
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Sign in required to continue.");
+        }
         if (response.status >= 502 && response.status <= 504) {
           throw new Error(backendUnreachableMessage());
         }
@@ -222,6 +255,16 @@ export async function parseJsonResponse(response) {
   }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error(
+        extractApiErrorMessage(
+          payload,
+          text,
+          response,
+          "Sign in required to continue."
+        )
+      );
+    }
     if (response.status >= 502 && response.status <= 504) {
       throw new Error(backendUnreachableMessage());
     }
@@ -231,13 +274,14 @@ export async function parseJsonResponse(response) {
   return payload ?? {};
 }
 
-export async function fetchJson(url, options) {
+export async function fetchJson(url, options = {}) {
   let response;
   try {
     if (Capacitor.isNativePlatform()) {
       await ensureApiBase();
     }
-    response = await fetchWithNativeRetry(url, options);
+    const authedOptions = await withAuthHeaders(options);
+    response = await fetchWithNativeRetry(url, authedOptions);
   } catch (error) {
     if (error?.isTimeout) {
       throw error;

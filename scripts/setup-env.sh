@@ -23,7 +23,7 @@ copy_if_missing "$ROOT/frontend/.env.example" "$ROOT/frontend/.env"
 
 echo ""
 echo "Next steps:"
-echo "  1. Add your GROQ_API_KEY to backend/.env"
+echo "  1. Add your Azure OpenAI credentials to backend/.env"
 echo "  2. Firebase config is already in frontend/google-services.json"
 echo "  3. Start backend:  cd backend && ./run_dev.sh"
 echo "  4. Start frontend: npm run dev"

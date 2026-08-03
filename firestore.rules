@@ -2,20 +2,164 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isOptionalNumber(value) {
+      return value == null || value is number || value is int || value is float;
+    }
+
+    function shortString(value, maxLen) {
+      return value is string && value.size() <= maxLen;
+    }
+
+    function optionalShortString(value, maxLen) {
+      return value == null || shortString(value, maxLen);
+    }
+
+    function boundedList(value, maxSize) {
+      return value is list && value.size() <= maxSize;
+    }
+
+    function isTimestampOrString(value) {
+      return value is timestamp || value is string;
+    }
+
+    function clinicalHistoryValid(history) {
+      return history is map
+        && history.keys().hasOnly(['conditions', 'surgeries', 'allergies'])
+        && boundedList(history.conditions, 50)
+        && boundedList(history.surgeries, 50)
+        && boundedList(history.allergies, 50);
+    }
+
+    function patientDataValid() {
+      let data = request.resource.data;
+      return data.keys().hasOnly([
+          'name', 'birthYear', 'gender', 'state', 'city',
+          'savePastBills', 'clinicalHistory', 'createdAt', 'updatedAt'
+        ])
+        && shortString(data.name, 200)
+        && isOptionalNumber(data.birthYear)
+        && shortString(data.gender, 40)
+        && optionalShortString(data.state, 100)
+        && optionalShortString(data.city, 100)
+        && data.savePastBills is bool
+        && clinicalHistoryValid(data.clinicalHistory)
+        && (!('createdAt' in data) || isTimestampOrString(data.createdAt))
+        && (!('updatedAt' in data) || isTimestampOrString(data.updatedAt));
+    }
+
+    function hospitalDataValid() {
+      let data = request.resource.data;
+      return data.keys().hasOnly([
+          'patientId', 'name', 'city', 'state', 'createdAt', 'updatedAt'
+        ])
+        && shortString(data.patientId, 128)
+        && shortString(data.name, 200)
+        && optionalShortString(data.city, 100)
+        && optionalShortString(data.state, 100)
+        && (!('createdAt' in data) || isTimestampOrString(data.createdAt))
+        && (!('updatedAt' in data) || isTimestampOrString(data.updatedAt));
+    }
+
+    function historicalDocumentValid() {
+      let data = request.resource.data;
+      return data.keys().hasOnly([
+          'patientId', 'filename', 'documentType', 'documentDate',
+          'extractedSummary', 'hospitalId', 'hospitalName', 'hospitalCity',
+          'hospitalState', 'createdAt', 'updatedAt'
+        ])
+        && shortString(data.patientId, 128)
+        && shortString(data.filename, 500)
+        && shortString(data.documentType, 64)
+        && shortString(data.documentDate, 40)
+        && data.extractedSummary is map
+        // Block persisting raw OCR free text under any key name.
+        && !('ocr_text' in data.extractedSummary)
+        && !('ocrText' in data.extractedSummary)
+        && shortString(data.hospitalId, 128)
+        && optionalShortString(data.hospitalName, 200)
+        && optionalShortString(data.hospitalCity, 100)
+        && optionalShortString(data.hospitalState, 100)
+        && (!('createdAt' in data) || isTimestampOrString(data.createdAt))
+        && (!('updatedAt' in data) || isTimestampOrString(data.updatedAt));
+    }
+
+    function billDataValid() {
+      let data = request.resource.data;
+      // Bills are large variable analysis payloads. Enforce ownership-adjacent
+      // invariants and size guards rather than a full schema.
+      return data.keys().size() <= 80
+        && (!('patientId' in data) || optionalShortString(data.patientId, 128))
+        && (!('filename' in data) || optionalShortString(data.filename, 500))
+        && (!('reportKind' in data) || optionalShortString(data.reportKind, 64))
+        && (!('comparedAt' in data) || optionalShortString(data.comparedAt, 64))
+        && (!('clientId' in data) || optionalShortString(data.clientId, 128))
+        && (!('diagnosis' in data) || optionalShortString(data.diagnosis, 2000))
+        && (!('ocr_text' in data))
+        && (!('ocrText' in data))
+        && (!('line_items' in data) || boundedList(data.line_items, 500))
+        && (!('lineItems' in data) || boundedList(data.lineItems, 500))
+        && (!('createdAt' in data) || isTimestampOrString(data.createdAt))
+        && (!('updatedAt' in data) || isTimestampOrString(data.updatedAt));
+    }
+
+    function userProfileKeysAllowed() {
+      return request.resource.data.keys().hasOnly([
+        'termsAcceptedAt',
+        'termsVersion',
+        'medicalHistoryConsentAt',
+        'medicalHistoryConsentDeclinedAt',
+        'medicalHistoryConsentVersion'
+      ]);
+    }
+
+    function userProfileValid() {
+      let data = request.resource.data;
+      return userProfileKeysAllowed()
+        && (!('termsVersion' in data) || shortString(data.termsVersion, 40))
+        && (!('medicalHistoryConsentVersion' in data)
+            || shortString(data.medicalHistoryConsentVersion, 40))
+        && (!('termsAcceptedAt' in data)
+            || isTimestampOrString(data.termsAcceptedAt))
+        && (!('medicalHistoryConsentAt' in data)
+            || isTimestampOrString(data.medicalHistoryConsentAt))
+        && (!('medicalHistoryConsentDeclinedAt' in data)
+            || isTimestampOrString(data.medicalHistoryConsentDeclinedAt));
+    }
+
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && userProfileValid();
+      allow delete: if isOwner(userId);
 
       match /bills/{billId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && billDataValid();
+        allow delete: if isOwner(userId);
       }
+
       match /patients/{patientId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && patientDataValid();
+        allow delete: if isOwner(userId);
 
         match /historical_documents/{docId} {
-          allow read, write: if request.auth != null && request.auth.uid == userId;
+          allow read: if isOwner(userId);
+          allow create, update: if isOwner(userId) && historicalDocumentValid();
+          allow delete: if isOwner(userId);
         }
+
         match /hospitals/{hospitalId} {
-          allow read, write: if request.auth != null && request.auth.uid == userId;
+          allow read: if isOwner(userId);
+          allow create, update: if isOwner(userId) && hospitalDataValid();
+          allow delete: if isOwner(userId);
         }
       }
     }

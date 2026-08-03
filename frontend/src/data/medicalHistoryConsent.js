@@ -1,12 +1,12 @@
-export const MEDICAL_HISTORY_CONSENT_VERSION = "2026-06-30";
-export const MEDICAL_HISTORY_CONSENT_LAST_UPDATED = "30 June 2026";
+export const MEDICAL_HISTORY_CONSENT_VERSION = "2026-08-03";
+export const MEDICAL_HISTORY_CONSENT_LAST_UPDATED = "3 August 2026";
 
 export const MEDICAL_HISTORY_CONSENT_SECTIONS = [
   {
     title: "What medical history means in Swaasth",
     paragraphs: [
       "Medical history in Swaasth refers to saved analysis reports from your document checks — including line-item bill reviews, prescription audits, and clinical context you provide.",
-      "Swaasth does not store your original uploaded files. Only the analysis results and metadata (such as filenames and report summaries) are saved to your account when you opt in.",
+      "Swaasth does not store your original uploaded files or raw OCR text. Only structured analysis results and metadata (such as filenames and report summaries) are saved to your account when you opt in.",
     ],
     bullets: [],
   },
@@ -14,7 +14,7 @@ export const MEDICAL_HISTORY_CONSENT_SECTIONS = [
     title: "Where your history is stored",
     paragraphs: [
       "Saved reports are stored in your Swaasth account under your user profile and linked to the patient profile you selected during the check.",
-      "Only you can access your saved history while signed in to your account.",
+      "Only you can access your saved history while signed in to your account. Device copies are encrypted at rest on this device.",
     ],
     bullets: [],
   },
@@ -31,7 +31,7 @@ export const MEDICAL_HISTORY_CONSENT_SECTIONS = [
     title: "Deleting your data",
     paragraphs: [
       "You can delete individual saved reports from the Past bills page at any time.",
-      "If you revoke consent, new reports will not be saved. Previously saved reports remain until you delete them manually.",
+      "If you revoke consent, all previously saved reports and medical documents are permanently deleted from your account and this device, and new reports will not be saved.",
       "Deleting a patient profile will also remove reports linked to that patient.",
     ],
     bullets: [],

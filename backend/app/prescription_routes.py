@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from app.restricted_medicines import build_restricted_medicine_flags
 from app.services.document_extraction import (
-    classify_document_with_groq,
-    extract_discharge_summary_with_groq,
+    classify_document_with_ai,
+    extract_discharge_summary_with_ai,
     extract_document_text,
-    extract_lab_report_with_groq,
-    extract_prescription_with_groq,
+    extract_lab_report_with_ai,
+    extract_prescription_with_ai,
     merge_clinical_contexts,
     normalize_clinical_context,
     normalize_detected_document_type,
@@ -21,6 +21,7 @@ from app.services.document_extraction import (
     normalize_prescription_items,
     resolve_document_date,
 )
+from app.services.firebase_auth import get_current_user
 from app.services.primary_guidelines_index import get_primary_guidelines_store
 from app.services.stg_index import get_stg_index_store
 from app.services.action_plan import build_action_plan
@@ -188,7 +189,10 @@ def list_stg_conditions() -> dict[str, Any]:
 
 
 @router.post("/classify-document")
-async def classify_document(file: UploadFile = File(...)) -> dict[str, Any]:
+async def classify_document(
+    file: UploadFile = File(...),
+    _user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(
             status_code=400,
@@ -211,7 +215,7 @@ async def classify_document(file: UploadFile = File(...)) -> dict[str, Any]:
         }
 
     ai_result = normalize_document_classification(
-        classify_document_with_groq(extracted_text)
+        classify_document_with_ai(extracted_text)
     )
     return {
         "filename": file.filename or "unknown",
@@ -221,7 +225,10 @@ async def classify_document(file: UploadFile = File(...)) -> dict[str, Any]:
 
 
 @router.post("/upload-prescription")
-async def upload_prescription(file: UploadFile = File(...)) -> dict[str, Any]:
+async def upload_prescription(
+    file: UploadFile = File(...),
+    _user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(
             status_code=400,
@@ -241,7 +248,7 @@ async def upload_prescription(file: UploadFile = File(...)) -> dict[str, Any]:
         )
 
     ai_result = normalize_prescription_items(
-        extract_prescription_with_groq(extracted_text)
+        extract_prescription_with_ai(extracted_text)
     )
     if not ai_result.get("is_prescription", False):
         raise HTTPException(
@@ -275,6 +282,7 @@ async def upload_prescription(file: UploadFile = File(...)) -> dict[str, Any]:
 async def upload_clinical_document(
     file: UploadFile = File(...),
     document_type: Literal["lab_report", "discharge_summary"] = Form(...),
+    _user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(
@@ -298,7 +306,7 @@ async def upload_clinical_document(
     procedures: list[dict[str, str]] = []
 
     if document_type == "lab_report":
-        ai_result = extract_lab_report_with_groq(extracted_text)
+        ai_result = extract_lab_report_with_ai(extracted_text)
         if not ai_result.get("is_lab_report", False):
             raise HTTPException(
                 status_code=400,
@@ -325,7 +333,7 @@ async def upload_clinical_document(
             ),
         }
     else:
-        ai_result = extract_discharge_summary_with_groq(extracted_text)
+        ai_result = extract_discharge_summary_with_ai(extracted_text)
         if not ai_result.get("is_discharge_summary", False):
             raise HTTPException(
                 status_code=400,
@@ -376,7 +384,10 @@ async def upload_clinical_document(
 
 
 @router.post("/analyze-treatment")
-def analyze_treatment_endpoint(body: AnalyzeTreatmentRequest) -> dict[str, Any]:
+def analyze_treatment_endpoint(
+    body: AnalyzeTreatmentRequest,
+    _user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
     if not is_warmup_complete():
         raise HTTPException(
             status_code=503,

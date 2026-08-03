@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field, model_validator
@@ -20,10 +20,10 @@ from app.pharma_rates import get_pharma_store
 from app.prescription_routes import router as prescription_router
 from app.services.claim_audit import analyze_claim_items
 from app.services.document_extraction import (
-    extract_bill_with_groq,
+    extract_bill_with_ai,
     extract_document_text,
     extract_json_from_text,
-    extract_preauth_with_groq,
+    extract_preauth_with_ai,
     normalize_clinical_context,
     normalize_detected_document_type,
     resolve_document_date,
@@ -31,6 +31,7 @@ from app.services.document_extraction import (
 from app.restricted_medicines import build_restricted_medicine_flags, get_restricted_medicines_store
 from app.services.action_plan import build_action_plan
 from app.services.audit_advocacy import ADVOCACY_SCOPE_CHECKED, ADVOCACY_SCOPE_NOT_CHECKED, merge_patient_questions
+from app.services.firebase_auth import get_current_user
 from app.services.preauth_audit import analyze_preauth_mismatches
 from app.services.patient_age import resolve_patient_age
 from app.services.patient_gender import gender_display_label
@@ -234,8 +235,8 @@ def _extract_json_from_text(raw_text: str) -> dict[str, Any]:
     return extract_json_from_text(raw_text)
 
 
-def _analyze_bill_text_with_groq(extracted_text: str) -> dict[str, Any]:
-    return extract_bill_with_groq(extracted_text)
+def _analyze_bill_text_with_ai(extracted_text: str) -> dict[str, Any]:
+    return extract_bill_with_ai(extracted_text)
 
 
 def _add_price_comparison(line_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -645,7 +646,10 @@ def _build_comparison_response(
 
 
 @app.post("/compare-bill")
-def compare_bill(body: CompareBillRequest) -> dict[str, Any]:
+def compare_bill(
+    body: CompareBillRequest,
+    _user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
     try:
         resolve_hospital_type(body.hospital_type)
     except ValueError as exc:
@@ -716,6 +720,7 @@ async def upload_bill(
         ...,
         description="Hospital type: general or speciality",
     ),
+    _user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     allowed_types = {
         "application/pdf": "pdf",
@@ -759,7 +764,7 @@ async def upload_bill(
             detail="No readable text found in the uploaded file.",
         )
 
-    ai_result = _analyze_bill_text_with_groq(extracted_text)
+    ai_result = _analyze_bill_text_with_ai(extracted_text)
     is_medical_bill = ai_result.get("is_medical_bill", False)
     if not is_medical_bill:
         raise HTTPException(
@@ -813,7 +818,10 @@ async def upload_bill(
 
 
 @app.post("/upload-preauth")
-async def upload_preauth(file: UploadFile = File(...)) -> dict[str, Any]:
+async def upload_preauth(
+    file: UploadFile = File(...),
+    _user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
     allowed_types = {
         "application/pdf": "pdf",
         "image/jpeg": "jpeg",
@@ -842,7 +850,7 @@ async def upload_preauth(file: UploadFile = File(...)) -> dict[str, Any]:
             detail="No readable text found in the uploaded file.",
         )
 
-    payload = extract_preauth_with_groq(extracted_text)
+    payload = extract_preauth_with_ai(extracted_text)
     if not payload.get("is_preauth"):
         raise HTTPException(
             status_code=400,

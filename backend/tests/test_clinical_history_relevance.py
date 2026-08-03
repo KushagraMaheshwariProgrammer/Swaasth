@@ -97,11 +97,11 @@ def test_relevance_cache_avoids_duplicate_work() -> None:
     assert len(cache) == 1
 
 
-def test_groq_classifier_can_exclude_items() -> None:
+def test_ai_classifier_can_exclude_items() -> None:
     history = _history_with_profile(
         surgeries=[{"name": "Knee arthroscopy", "year": 2018}],
     )
-    groq_response = {
+    ai_response = {
         "included": [],
         "excluded": [
             {
@@ -112,8 +112,8 @@ def test_groq_classifier_can_exclude_items() -> None:
         ],
     }
     with patch(
-        "app.services.clinical_history_relevance.groq_json_chat",
-        return_value=groq_response,
+        "app.services.clinical_history_relevance.azure_openai_json_chat",
+        return_value=ai_response,
     ):
         result = filter_relevant_clinical_history(
             "Migraine",

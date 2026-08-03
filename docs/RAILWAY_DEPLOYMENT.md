@@ -16,7 +16,7 @@ The backend is a stateless FastAPI app. Reference CSVs and pre-built Chroma vect
 ## Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for local testing)
-- A [Groq API key](https://console.groq.com/keys) (`GROQ_API_KEY`)
+- An Azure AI Foundry resource with a GPT-4o mini deployment
 - A [Railway account](https://railway.app) linked to GitHub
 - Pre-built vector indexes committed in Git:
   - `backend/data/stg_index/`
@@ -49,7 +49,7 @@ python scripts/build_stg_index.py
 
 | Route | Purpose |
 |-------|---------|
-| `POST /upload-bill` | OCR + Groq bill extraction |
+| `POST /upload-bill` | OCR + Azure OpenAI bill extraction |
 | `POST /compare-bill` | General bill review (NPPA, Jan Aushadhi, audit flags) |
 | `POST /upload-prescription` | Prescription OCR + extraction |
 | `POST /upload-clinical-document` | Lab/discharge summary upload |
@@ -64,7 +64,10 @@ Copy [`backend/.env.example`](../backend/.env.example) for local use. On Railway
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GROQ_API_KEY` | **Yes** | Groq LLM for bill/prescription parsing |
+| `AZURE_OPENAI_API_KEY` | **Yes** | Key for the Azure OpenAI resource |
+| `AZURE_OPENAI_ENDPOINT` | **Yes** | Resource endpoint, such as `https://RESOURCE.openai.azure.com/` |
+| `AZURE_OPENAI_DEPLOYMENT` | **Yes** | GPT-4o mini deployment name |
+| `AZURE_OPENAI_API_VERSION` | Optional | Defaults to `2024-10-21` |
 | `ENV` | Recommended | Set to `production` |
 | `PORT` | Auto | Railway injects this; Dockerfile defaults to `8000` locally |
 | `CORS_ORIGINS` | Optional | Comma-separated extra allowed origins |
@@ -86,7 +89,9 @@ docker build -t swaasth-api -f backend/Dockerfile backend/
 
 # Run
 docker run --rm -p 8000:8000 \
-  -e GROQ_API_KEY="your-groq-key" \
+  -e AZURE_OPENAI_API_KEY="your-azure-key" \
+  -e AZURE_OPENAI_ENDPOINT="https://YOUR-RESOURCE.openai.azure.com/" \
+  -e AZURE_OPENAI_DEPLOYMENT="gpt-4o-mini" \
   -e ENV=production \
   swaasth-api
 ```
@@ -161,7 +166,9 @@ The Chroma directories add ~184 MB to LFS storage (manifest JSON stays in Git; `
 In **Variables**, add:
 
 ```
-GROQ_API_KEY=<your-key>
+AZURE_OPENAI_API_KEY=<your-key>
+AZURE_OPENAI_ENDPOINT=https://YOUR-RESOURCE.openai.azure.com/
+AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
 ENV=production
 ```
 

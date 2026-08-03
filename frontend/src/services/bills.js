@@ -21,6 +21,7 @@ import {
   removeLocalBill,
   removeLocalBillsForPatientIds,
   updateLocalBillData,
+  clearLocalBillsForUser,
 } from "./localBillStore";
 import {
   canSaveMedicalHistory,
@@ -69,10 +70,34 @@ export function sanitizeForFirestore(value) {
 
   const cleaned = {};
   for (const [key, nested] of Object.entries(value)) {
+    if (key === "ocr_text" || key === "ocrText") {
+      continue;
+    }
     const sanitized = sanitizeForFirestore(nested);
     if (sanitized !== undefined) {
       cleaned[key] = sanitized;
     }
+  }
+  return cleaned;
+}
+
+/** Remove raw OCR free text from any nested report/document payload. */
+export function stripOcrText(value) {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => stripOcrText(item));
+  }
+  const cleaned = {};
+  for (const [key, nested] of Object.entries(value)) {
+    if (key === "ocr_text" || key === "ocrText") {
+      continue;
+    }
+    cleaned[key] = stripOcrText(nested);
   }
   return cleaned;
 }
@@ -207,7 +232,7 @@ export async function saveReportToAccount(userId, patient, reportData, options =
     return { saved: false, reason: "consent_required" };
   }
 
-  const payload = buildReportSavePayload(reportData, patient);
+  const payload = stripOcrText(buildReportSavePayload(reportData, patient));
   const localId = persistLocalBill(userId, payload);
 
   try {
@@ -381,6 +406,31 @@ export async function deleteBillsForPatientIds(userId, patientIds) {
 
   removeLocalBillsForPatientIds(userId, ids);
   return bills.length;
+}
+
+export async function deleteAllUserBills(userId) {
+  if (!userId) {
+    return 0;
+  }
+
+  let cloudCount = 0;
+  try {
+    await awaitFirestoreReady();
+    const snapshot = await getDocs(billsCollection(userId));
+    cloudCount = snapshot.docs.length;
+    await Promise.all(
+      snapshot.docs.map((entry) =>
+        deleteDoc(entry.ref).catch((error) => {
+          console.error("Failed to delete bill from Firebase:", error);
+        })
+      )
+    );
+  } catch (error) {
+    console.error("Failed to delete all user bills from Firebase:", error);
+  }
+
+  clearLocalBillsForUser(userId);
+  return cloudCount;
 }
 
 export async function deleteBill(userId, billId) {

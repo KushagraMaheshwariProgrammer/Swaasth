@@ -1,4 +1,4 @@
-"""OCR and Groq-based extraction for bills and prescriptions."""
+"""OCR and AI-based extraction for bills and prescriptions."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import pytesseract
 from fastapi import HTTPException
 from PIL import Image
 
-from app.services.groq_client import groq_json_chat
+from app.services.azure_openai_client import azure_openai_json_chat
 from app.services.json_utils import extract_json_from_text
 
 _tess = shutil.which("tesseract")
@@ -152,11 +152,11 @@ def resolve_document_date(
     return None
 
 
-def _groq_chat(system: str, user: str, *, max_tokens: int = 2000) -> dict[str, Any]:
-    return groq_json_chat(system, user, max_tokens=max_tokens)
+def _ai_json_chat(system: str, user: str, *, max_tokens: int = 2000) -> dict[str, Any]:
+    return azure_openai_json_chat(system, user, max_tokens=max_tokens)
 
 
-def extract_bill_with_groq(extracted_text: str) -> dict[str, Any]:
+def extract_bill_with_ai(extracted_text: str) -> dict[str, Any]:
     system = (
         "You are helping extract hospital bill line items for Indian patients. "
         "Return ONLY valid JSON with keys: is_medical_bill, error, hospital_name, "
@@ -167,10 +167,10 @@ def extract_bill_with_groq(extracted_text: str) -> dict[str, Any]:
         f"{_AI_ERROR_HINT}"
     )
     user = f"Bill text:\n{extracted_text}"
-    return _groq_chat(system, user)
+    return _ai_json_chat(system, user)
 
 
-def extract_prescription_with_groq(extracted_text: str) -> dict[str, Any]:
+def extract_prescription_with_ai(extracted_text: str) -> dict[str, Any]:
     system = (
         "You are helping extract prescription details for Indian patients. "
         "Return ONLY valid JSON with keys: is_prescription, error, diagnosis, "
@@ -180,10 +180,10 @@ def extract_prescription_with_groq(extracted_text: str) -> dict[str, Any]:
         f"{_AI_ERROR_HINT}"
     )
     user = f"Prescription text:\n{extracted_text}"
-    return _groq_chat(system, user)
+    return _ai_json_chat(system, user)
 
 
-def extract_lab_report_with_groq(extracted_text: str) -> dict[str, Any]:
+def extract_lab_report_with_ai(extracted_text: str) -> dict[str, Any]:
     system = (
         "You are helping extract laboratory and diagnostic test results for Indian "
         "patients. "
@@ -198,10 +198,10 @@ def extract_lab_report_with_groq(extracted_text: str) -> dict[str, Any]:
         f"{_AI_ERROR_HINT}"
     )
     user = f"Lab report text:\n{extracted_text}"
-    return normalize_lab_report_extraction(_groq_chat(system, user))
+    return normalize_lab_report_extraction(_ai_json_chat(system, user))
 
 
-def extract_discharge_summary_with_groq(extracted_text: str) -> dict[str, Any]:
+def extract_discharge_summary_with_ai(extracted_text: str) -> dict[str, Any]:
     system = (
         "You are helping extract discharge summary details for Indian patients. "
         "Return ONLY valid JSON with keys: is_discharge_summary, error, diagnosis, "
@@ -211,7 +211,7 @@ def extract_discharge_summary_with_groq(extracted_text: str) -> dict[str, Any]:
         f"{_AI_ERROR_HINT}"
     )
     user = f"Discharge summary text:\n{extracted_text}"
-    return _groq_chat(system, user)
+    return _ai_json_chat(system, user)
 
 
 VALID_DOCUMENT_TYPES = frozenset(
@@ -225,7 +225,7 @@ VALID_DOCUMENT_TYPES = frozenset(
 )
 
 
-def classify_document_with_groq(extracted_text: str) -> dict[str, Any]:
+def classify_document_with_ai(extracted_text: str) -> dict[str, Any]:
     system = (
         "You classify Indian medical documents. Return ONLY valid JSON with keys: "
         "document_type, confidence, error. "
@@ -243,7 +243,7 @@ def classify_document_with_groq(extracted_text: str) -> dict[str, Any]:
         "or could reasonably match more than one type."
     )
     user = f"Document text:\n{extracted_text[:8000]}"
-    return _groq_chat(system, user, max_tokens=300)
+    return _ai_json_chat(system, user, max_tokens=300)
 
 
 def normalize_detected_document_type(value: Any) -> str | None:
@@ -263,7 +263,7 @@ def normalize_document_classification(payload: dict[str, Any]) -> dict[str, Any]
     }
 
 
-def extract_preauth_with_groq(extracted_text: str) -> dict[str, Any]:
+def extract_preauth_with_ai(extracted_text: str) -> dict[str, Any]:
     system = (
         "You are helping extract insurance or government-scheme pre-authorization "
         "details for Indian patients. Return ONLY valid JSON with keys: "
@@ -275,7 +275,7 @@ def extract_preauth_with_groq(extracted_text: str) -> dict[str, Any]:
         f"{_AI_ERROR_HINT}"
     )
     user = f"Pre-authorization or claim approval text:\n{extracted_text}"
-    return _groq_chat(system, user)
+    return _ai_json_chat(system, user)
 
 
 VALID_TEST_RESULTS = {
@@ -290,7 +290,7 @@ VALID_TEST_RESULTS = {
 
 
 def normalize_lab_report_extraction(payload: dict[str, Any]) -> dict[str, Any]:
-    """Accept lab reports when Groq extracted test results but misclassified the type."""
+    """Accept lab reports when AI extracted test results but misclassified the type."""
     test_results = _normalize_test_results(payload.get("test_results") or [])
     is_lab_report = bool(payload.get("is_lab_report", False))
     if not is_lab_report and test_results:

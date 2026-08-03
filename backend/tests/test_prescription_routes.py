@@ -73,13 +73,13 @@ def test_classify_document_returns_low_confidence_without_text(monkeypatch) -> N
     assert payload["document_type"] is None
 
 
-def test_classify_document_uses_groq_result(monkeypatch) -> None:
+def test_classify_document_uses_ai_result(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.prescription_routes.extract_document_text",
         lambda _bytes, _ftype: "CBC report with haemoglobin results",
     )
     monkeypatch.setattr(
-        "app.prescription_routes.classify_document_with_groq",
+        "app.prescription_routes.classify_document_with_ai",
         lambda _text: {
             "document_type": "lab_report",
             "confidence": "high",
@@ -139,7 +139,7 @@ def test_upload_prescription_rejects_wrong_type_with_filename(monkeypatch) -> No
         lambda file_bytes, file_type: "Hospital bill with line items",
     )
     monkeypatch.setattr(
-        "app.prescription_routes.extract_prescription_with_groq",
+        "app.prescription_routes.extract_prescription_with_ai",
         lambda text: {
             "is_prescription": False,
             "error": "This looks like a hospital bill, not a prescription.",
@@ -164,7 +164,7 @@ def test_upload_clinical_document_lab_report(monkeypatch) -> None:
         lambda file_bytes, file_type: "Lab report text",
     )
     monkeypatch.setattr(
-        "app.prescription_routes.extract_lab_report_with_groq",
+        "app.prescription_routes.extract_lab_report_with_ai",
         lambda text: {
             "is_lab_report": True,
             "test_results": [
@@ -192,7 +192,7 @@ def test_upload_clinical_document_urology_lab_report(monkeypatch) -> None:
         lambda file_bytes, file_type: "Urology lab report text",
     )
     monkeypatch.setattr(
-        "app.prescription_routes.extract_lab_report_with_groq",
+        "app.prescription_routes.extract_lab_report_with_ai",
         lambda text: {
             "is_lab_report": True,
             "test_results": [

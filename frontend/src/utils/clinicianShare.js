@@ -6,6 +6,7 @@ import {
   normalizeClinicianAnnotations,
 } from "./reportAnnotations";
 import { resolveReportMeta } from "../data/reportExport";
+import { confirmPhiExport } from "./confirmPhiExport";
 
 function formatFlagSection(report, annotations) {
   const flags = collectAllFlags(report);
@@ -118,6 +119,14 @@ export function buildClinicianShareText(report, annotations = null) {
 }
 
 export async function shareClinicianSummary(report, annotations = null) {
+  if (
+    !confirmPhiExport(
+      "This will share medical information outside the app (share sheet or clipboard). Continue?"
+    )
+  ) {
+    return { shared: false, cancelled: true };
+  }
+
   const text = buildClinicianShareText(report, annotations);
   const title = `Swaasth summary — ${report?.patient?.name || "patient"}`;
 

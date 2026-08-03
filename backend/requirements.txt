@@ -5,7 +5,7 @@ PyMuPDF
 pymupdf-fonts
 pytesseract
 Pillow
-groq
+openai
 python-dotenv
 fastembed
 chromadb

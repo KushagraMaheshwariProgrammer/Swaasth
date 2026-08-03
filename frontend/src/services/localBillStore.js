@@ -1,20 +1,14 @@
+import { getSecureJson, setSecureJson } from "./secureLocalStore";
+
 const STORAGE_KEY = "swaasth_local_bills_v1";
 
 function readStore() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return { users: {} };
-    }
-    const parsed = JSON.parse(raw);
-    return parsed?.users ? parsed : { users: {} };
-  } catch {
-    return { users: {} };
-  }
+  const parsed = getSecureJson(STORAGE_KEY, { users: {} });
+  return parsed?.users ? parsed : { users: {} };
 }
 
 function writeStore(store) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  setSecureJson(STORAGE_KEY, store);
 }
 
 function userEntries(store, userId) {
@@ -137,4 +131,15 @@ export function removeLocalBillsForPatientIds(userId, patientIds) {
     writeStore(store);
   }
   return removed;
+}
+
+export function clearLocalBillsForUser(userId) {
+  if (!userId) {
+    return;
+  }
+  const store = readStore();
+  if (store.users[userId]) {
+    delete store.users[userId];
+    writeStore(store);
+  }
 }

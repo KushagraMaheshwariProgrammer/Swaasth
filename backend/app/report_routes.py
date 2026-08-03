@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import Response
 
 from app.report_pdf import (
@@ -13,12 +13,16 @@ from app.report_pdf import (
     resolve_report_kind,
     validate_report,
 )
+from app.services.firebase_auth import get_current_user
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 
 @router.post("/render-pdf")
-def render_pdf(report: dict[str, Any] = Body(...)) -> Response:
+def render_pdf(
+    report: dict[str, Any] = Body(...),
+    _user: dict[str, Any] = Depends(get_current_user),
+) -> Response:
     """Render a PDF from a report object supplied by the client."""
     try:
         report_kind = resolve_report_kind(report)

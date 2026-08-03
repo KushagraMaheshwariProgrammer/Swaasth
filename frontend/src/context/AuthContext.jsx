@@ -40,6 +40,7 @@ import {
   revokeMedicalHistoryConsent as persistMedicalHistoryConsentRevoke,
   getMedicalHistoryConsent,
 } from "../services/userProfile";
+import { deleteAllMedicalHistoryForUser } from "../services/medicalHistoryCleanup";
 
 const AuthContext = createContext(null);
 
@@ -319,7 +320,9 @@ export function AuthProvider({ children }) {
     if (!auth.currentUser) {
       throw new Error("You must be signed in to update medical history consent.");
     }
-    await persistMedicalHistoryConsentRevoke(auth.currentUser.uid);
+    const userId = auth.currentUser.uid;
+    await deleteAllMedicalHistoryForUser(userId);
+    await persistMedicalHistoryConsentRevoke(userId);
     setMedicalHistoryConsentAccepted(false);
     setMedicalHistoryConsentResolved(false);
   }, []);

@@ -6,7 +6,7 @@ import hashlib
 import json
 from typing import Any
 
-from app.services.groq_client import groq_json_chat
+from app.services.azure_openai_client import azure_openai_json_chat
 
 _RELEVANCE_SYSTEM = """
 You filter a patient's clinical history for biological relevance to the current visit.
@@ -319,7 +319,7 @@ Patient history items:
 
     parsed: dict[str, Any] = {}
     try:
-        parsed = groq_json_chat(_RELEVANCE_SYSTEM, user, max_tokens=1800)
+        parsed = azure_openai_json_chat(_RELEVANCE_SYSTEM, user, max_tokens=1800)
     except Exception:
         parsed = {}
 

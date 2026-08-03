@@ -69,7 +69,7 @@ export default function MedicalHistoryConsentPage() {
   const handleRevoke = async () => {
     if (
       !window.confirm(
-        "Revoke medical history consent? New reports will not be saved. Previously saved reports remain until you delete them."
+        "Revoke medical history consent? All previously saved reports and medical documents will be permanently deleted from your account and this device."
       )
     ) {
       return;
@@ -81,7 +81,7 @@ export default function MedicalHistoryConsentPage() {
       await revokeMedicalHistoryConsent();
       setAgreed(false);
       setInfo(
-        "Consent reset. Choose whether to enable or decline medical history below."
+        "Consent reset and saved medical history deleted. Choose whether to enable or decline medical history below."
       );
     } catch (err) {
       setError(err?.message || "Could not revoke consent.");

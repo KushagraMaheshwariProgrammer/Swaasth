@@ -9,6 +9,7 @@ import {
   extractApiErrorMessage,
   fetchBackend,
 } from "./httpUtils";
+import { confirmPhiExport } from "../utils/confirmPhiExport";
 
 function isFirestoreTimestamp(value) {
   return (
@@ -47,19 +48,33 @@ function normalizeForJson(value) {
   return normalized;
 }
 
-/** Strip non-JSON-safe values before POSTing the report to the PDF endpoint. */
+/** Strip non-JSON-safe values and raw OCR text before POSTing to the PDF endpoint. */
 export function prepareReportForPdf(report, exportOptions = null) {
   if (!report || typeof report !== "object") {
     throw new Error("No report data to export.");
   }
-  const cleaned = normalizeForJson(report);
+  const cleaned = stripOcrFields(normalizeForJson(report));
   const opts = exportOptions || report.export_options || {};
   cleaned.export_options = {
     include_stg_excerpts: opts.include_stg_excerpts !== false,
     include_legal_pathways: opts.include_legal_pathways !== false,
   };
-  if (typeof cleaned.ocr_text === "string" && cleaned.ocr_text.length > 100_000) {
-    cleaned.ocr_text = cleaned.ocr_text.slice(0, 100_000);
+  return cleaned;
+}
+
+function stripOcrFields(value) {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => stripOcrFields(item));
+  }
+  const cleaned = {};
+  for (const [key, nested] of Object.entries(value)) {
+    if (key === "ocr_text" || key === "ocrText") {
+      continue;
+    }
+    cleaned[key] = stripOcrFields(nested);
   }
   return cleaned;
 }
@@ -89,6 +104,16 @@ async function postRenderPdf(payload) {
       }
     } catch {
       payload = null;
+    }
+    if (response.status === 401) {
+      throw new Error(
+        extractApiErrorMessage(
+          payload,
+          text,
+          response,
+          "Sign in required to continue."
+        )
+      );
     }
     if (response.status >= 502 && response.status <= 504) {
       throw new Error(backendUnreachableMessage());
@@ -304,6 +329,14 @@ export async function downloadDisputePackPdf(report) {
 }
 
 export async function shareReportPdf(report, blobOverride = null) {
+  if (
+    !confirmPhiExport(
+      "This will share medical information outside the app. Continue?"
+    )
+  ) {
+    return { shared: false, cancelled: true };
+  }
+
   const reportMeta = resolveReportMeta(report);
   const filename = buildReportFilename(report);
   const blob = blobOverride || (await fetchReportPdfBlob(report));

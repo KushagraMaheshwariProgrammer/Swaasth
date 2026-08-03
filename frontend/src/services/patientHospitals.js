@@ -8,24 +8,17 @@ import {
 } from "firebase/firestore";
 import { awaitFirestoreReady, db } from "../firebase";
 import { resolveCanonicalStateUtName } from "./locations";
+import { getSecureJson, setSecureJson } from "./secureLocalStore";
 
 const STORAGE_KEY = "swaasth_local_hospitals_v1";
 
 function readStore() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return { users: {} };
-    }
-    const parsed = JSON.parse(raw);
-    return parsed?.users ? parsed : { users: {} };
-  } catch {
-    return { users: {} };
-  }
+  const parsed = getSecureJson(STORAGE_KEY, { users: {} });
+  return parsed?.users ? parsed : { users: {} };
 }
 
 function writeStore(store) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  setSecureJson(STORAGE_KEY, store);
 }
 
 function userEntries(store, userId) {

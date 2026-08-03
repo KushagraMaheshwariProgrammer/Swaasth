@@ -7,8 +7,8 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from app.services.azure_openai_client import azure_openai_json_chat
 from app.services.gender_guidelines import filter_chunks_by_gender, filter_conditions_by_gender
-from app.services.groq_client import groq_json_chat
 from app.services.patient_gender import gender_display_label
 from app.services.primary_guidelines_index import get_primary_guidelines_store
 from app.services.rag_pipeline import (
@@ -39,8 +39,8 @@ PRIORITY_SECTIONS = {
 }
 
 
-def _groq_json(system: str, user: str) -> dict[str, Any]:
-    parsed = groq_json_chat(system, user, max_tokens=800)
+def _ai_json(system: str, user: str) -> dict[str, Any]:
+    parsed = azure_openai_json_chat(system, user, max_tokens=800)
     if not parsed:
         return {"matched_conditions": []}
     return parsed
@@ -89,7 +89,7 @@ def map_diagnosis_to_primary_documents(
         f"Available guideline documents (subset):\n"
         f"{json.dumps(sample, ensure_ascii=False)}"
     )
-    parsed = _groq_json(system, user)
+    parsed = _ai_json(system, user)
     matched = parsed.get("matched_conditions") or []
     if not isinstance(matched, list):
         return []
@@ -137,7 +137,7 @@ def map_diagnosis_to_stg_conditions(
         f"Available STG conditions (subset):\n"
         f"{json.dumps(sample, ensure_ascii=False)}"
     )
-    parsed = _groq_json(system, user)
+    parsed = _ai_json(system, user)
     matched = parsed.get("matched_conditions") or []
     if not isinstance(matched, list):
         return []

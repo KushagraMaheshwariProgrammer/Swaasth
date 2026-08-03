@@ -4,7 +4,7 @@
 
 ```bash
 npm run setup:env
-# Edit backend/.env and set GROQ_API_KEY
+# Edit backend/.env and set the Azure OpenAI variables
 cd backend && ./run_dev.sh   # terminal 1
 npm run dev                  # terminal 2 (from repo root)
 ```
@@ -25,15 +25,17 @@ Firebase **client** API keys in `google-services.json` are designed to be bundle
 
 | File | Purpose |
 |------|---------|
-| `backend/.env` | `GROQ_API_KEY` for AI bill/prescription parsing |
+| `backend/.env` | Azure OpenAI endpoint, deployment, and API key |
 | `frontend/.env` | Optional overrides only (usually empty) |
 | `backend/firebase-service-account.json` | Firebase Admin SDK (only if added later) |
 
-Share `GROQ_API_KEY` with teammates through a password manager or secure channel — not GitHub Issues, Slack channels, or commits.
+Share `AZURE_OPENAI_API_KEY` with teammates through a password manager or secure channel — not GitHub Issues, Slack channels, or commits.
 
 ## Rotating exposed keys
 
-A `GROQ_API_KEY` was previously committed to git history and has been scrubbed. **Rotate the key** at [console.groq.com/keys](https://console.groq.com/keys), then update `backend/.env` locally and share the new key with teammates securely.
+If an Azure OpenAI key is exposed, rotate it in Azure AI Foundry, update
+`backend/.env`, and share the replacement securely. Revoke credentials for any
+previous AI provider because the application no longer uses them.
 
 ## After a history rewrite
 

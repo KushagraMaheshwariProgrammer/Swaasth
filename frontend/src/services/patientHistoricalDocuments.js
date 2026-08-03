@@ -14,28 +14,21 @@ import {
   uploadClinicalDocument,
   uploadPrescription,
 } from "./prescriptions";
-import { sanitizeForFirestore } from "./bills";
+import { sanitizeForFirestore, stripOcrText } from "./bills";
 import { enrichDocumentUploadError } from "../utils/documentBundle";
 
 import { canSaveMedicalHistory } from "../utils/medicalHistoryConsent";
+import { getSecureJson, setSecureJson } from "./secureLocalStore";
 
 const STORAGE_KEY = "swaasth_local_historical_docs_v1";
 
 function readStore() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return { users: {} };
-    }
-    const parsed = JSON.parse(raw);
-    return parsed?.users ? parsed : { users: {} };
-  } catch {
-    return { users: {} };
-  }
+  const parsed = getSecureJson(STORAGE_KEY, { users: {} });
+  return parsed?.users ? parsed : { users: {} };
 }
 
 function writeStore(store) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  setSecureJson(STORAGE_KEY, store);
 }
 
 function userEntries(store, userId) {
@@ -184,7 +177,6 @@ export function buildExtractedSummary(documentType, payload) {
       medicines: normalized.medicines || [],
       tests: normalized.tests || [],
       procedures: normalized.procedures || [],
-      ocr_text: payload.ocr_text || "",
     };
   }
 
@@ -192,7 +184,6 @@ export function buildExtractedSummary(documentType, payload) {
     return {
       diagnosis: payload.diagnosis || "",
       line_items: payload.line_items || [],
-      ocr_text: payload.ocr_text || "",
     };
   }
 
@@ -202,7 +193,6 @@ export function buildExtractedSummary(documentType, payload) {
     symptoms: payload.clinical_context?.symptoms || payload.symptoms || [],
     test_results: payload.clinical_context?.test_results || [],
     procedures: payload.procedures || [],
-    ocr_text: payload.ocr_text || "",
   };
 }
 
@@ -311,7 +301,7 @@ export async function saveHistoricalDocument(userId, patientId, documentInput, o
     filename: filename || file?.name || "document",
     documentType,
     documentDate,
-    extractedSummary: extractedSummary || {},
+    extractedSummary: stripOcrText(extractedSummary || {}),
     hospitalId,
     hospitalName: hospitalName || "",
     hospitalCity: hospitalCity || "",
@@ -361,6 +351,34 @@ export async function deleteHistoricalDocumentsForPatientIds(userId, patientIds)
   }
 
   for (const patientId of patientIds) {
+    try {
+      await awaitFirestoreReady();
+      const snapshot = await getDocs(historicalDocsCollection(userId, patientId));
+      await Promise.all(snapshot.docs.map((entry) => deleteDoc(entry.ref)));
+    } catch (error) {
+      console.error("Failed to delete cloud historical documents:", error);
+    }
+  }
+}
+
+export function clearLocalHistoricalDocumentsForUser(userId) {
+  if (!userId) {
+    return;
+  }
+  const store = readStore();
+  if (store.users[userId]) {
+    delete store.users[userId];
+    writeStore(store);
+  }
+}
+
+export async function deleteAllHistoricalDocumentsForUser(userId, patientIds = []) {
+  if (!userId) {
+    return;
+  }
+  clearLocalHistoricalDocumentsForUser(userId);
+  const ids = [...new Set(patientIds.filter(Boolean))];
+  for (const patientId of ids) {
     try {
       await awaitFirestoreReady();
       const snapshot = await getDocs(historicalDocsCollection(userId, patientId));
