@@ -290,8 +290,9 @@ export function backendConnectionHint() {
   }
   if (base.startsWith("https://")) {
     return (
-      "Check that your phone has internet access and try again. If you are developing locally, set " +
-      "VITE_API_BASE to your Mac's LAN IP in frontend/.env, run ./run_dev.sh, rebuild, and reinstall the app."
+      "Check that your phone has internet access and try again. " +
+      "If other apps work, try switching between Wi‑Fi and mobile data — " +
+      "some Wi‑Fi routers fail to resolve this server's address."
     );
   }
   return "Ensure ./run_dev.sh is running on your Mac (0.0.0.0:8000).";
