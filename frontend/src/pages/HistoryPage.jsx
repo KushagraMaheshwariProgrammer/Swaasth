@@ -11,6 +11,7 @@ import {
   getBillPatientName,
 } from "../billUtils";
 import { useAuth } from "../context/AuthContext";
+import { POSSIBLE_OVERCHARGE_LABEL } from "../data/hedgingCopy";
 import { resolveResultsView } from "../data/reportExport";
 import {
   deleteBill,
@@ -296,7 +297,8 @@ export default function HistoryPage() {
                         <>
                           <span>Charged {formatCurrency(summary.totalCharged)}</span>
                           <span className="history-overcharge">
-                            Overcharged {formatCurrency(summary.totalOvercharged)}
+                            {POSSIBLE_OVERCHARGE_LABEL}{" "}
+                            {formatCurrency(summary.totalOvercharged)}
                           </span>
                         </>
                       )}

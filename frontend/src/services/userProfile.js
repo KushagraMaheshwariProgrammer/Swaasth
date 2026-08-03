@@ -1,6 +1,7 @@
 import { deleteField, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { awaitFirestoreReady, db } from "../firebase";
 import { TERMS_VERSION } from "../data/termsAndConditions";
+import { PRIVACY_POLICY_VERSION } from "../data/privacyPolicy";
 import { MEDICAL_HISTORY_CONSENT_VERSION } from "../data/medicalHistoryConsent";
 import {
   getLocalMedicalHistoryConsent,
@@ -69,6 +70,8 @@ export async function acceptTerms(userId) {
         {
           termsAcceptedAt: serverTimestamp(),
           termsVersion: TERMS_VERSION,
+          privacyPolicyAcceptedAt: serverTimestamp(),
+          privacyPolicyVersion: PRIVACY_POLICY_VERSION,
         },
         { merge: true }
       )

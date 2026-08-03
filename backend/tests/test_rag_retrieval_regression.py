@@ -79,7 +79,9 @@ def test_hybrid_retrieval_scores_guideline_derived_cases(hybrid_primary_store, m
     )
     monkeypatch.setattr(
         "app.services.stg_retrieval.map_diagnosis_to_primary_documents",
-        lambda diagnosis, limit=4: ["Malaria"] if "malaria" in diagnosis.lower() else ["Dengue"],
+        lambda diagnosis, limit=4, patient_gender=None: (
+            ["Malaria"] if "malaria" in diagnosis.lower() else ["Dengue"]
+        ),
     )
     monkeypatch.setattr(
         "app.services.stg_retrieval.rerank_chunks",

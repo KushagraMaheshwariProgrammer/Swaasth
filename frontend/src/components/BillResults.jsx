@@ -8,6 +8,7 @@ import {
   getFlagMeta,
   HOSPITAL_TYPE_OPTIONS,
 } from "../billUtils";
+import { POSSIBLE_ISSUE_NOTICE, POSSIBLE_OVERCHARGE_LABEL } from "../data/hedgingCopy";
 import { formatPatientAge, getPatientAge } from "../utils/patientAge";
 import AdvocacyScopeSection from "./AdvocacyScopeSection";
 import AuditFlagCard from "./AuditFlagCard";
@@ -132,7 +133,7 @@ export default function BillResults({ result, toolbar = null, onReportUpdate }) 
               </h3>
             </div>
             <div className="summary-stat summary-focus">
-              <p>Overcharged By</p>
+              <p>{POSSIBLE_OVERCHARGE_LABEL}</p>
               <h3>
                 <CountUp value={summary.totalOvercharged} isCurrency />
               </h3>
@@ -144,6 +145,7 @@ export default function BillResults({ result, toolbar = null, onReportUpdate }) 
               </h3>
             </div>
           </article>
+          <p className="treatment-audit-disclaimer">{POSSIBLE_ISSUE_NOTICE}</p>
 
           <div className="results-grid">
             {displayableItems.map((item, index) => {
@@ -162,6 +164,9 @@ export default function BillResults({ result, toolbar = null, onReportUpdate }) 
                     <h4>{item.item_name || "--"}</h4>
                     <span className={meta.badgeClass}>{meta.badgeLabel}</span>
                   </div>
+                  {item.flag === "overpriced" && (
+                    <p className="treatment-audit-disclaimer">{POSSIBLE_ISSUE_NOTICE}</p>
+                  )}
                   {item.matched_reference_item && (
                     <p className="matched-reference">
                       Matched: {item.matched_reference_item}

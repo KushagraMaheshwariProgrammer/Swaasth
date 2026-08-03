@@ -8,7 +8,7 @@ from typing import Any
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, Field, model_validator
 
 from app.report_routes import router as report_router
@@ -106,6 +106,16 @@ def load_reference_data() -> None:
 @app.get("/health", response_class=PlainTextResponse)
 def health_check() -> str:
     return "Backend is running"
+
+
+SOURCE_REPO_URL = "https://github.com/KushagraMaheshwariProgrammer/Swaasth"
+
+
+@app.get("/source")
+@app.get("/api/source")
+def corresponding_source_offer() -> RedirectResponse:
+    """AGPL §13 corresponding-source offer for network users of this service."""
+    return RedirectResponse(url=SOURCE_REPO_URL, status_code=302)
 
 
 @app.get("/ready")

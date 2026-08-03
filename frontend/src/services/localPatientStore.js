@@ -1,4 +1,5 @@
 import { normalizeClinicalHistory } from "../utils/clinicalHistory";
+import { normalizeParentalConsent } from "../utils/parentalConsent";
 import { getSecureJson, setSecureJson } from "./secureLocalStore";
 
 const STORAGE_KEY = "swaasth_local_patients_v1";
@@ -42,6 +43,7 @@ export function persistLocalPatient(userId, patientData, localId = null) {
       city: patientData.city?.trim() || "",
       savePastBills: patientData?.savePastBills === true,
       clinicalHistory: normalizeClinicalHistory(patientData?.clinicalHistory),
+      parentalConsent: normalizeParentalConsent(patientData?.parentalConsent),
     },
     firestoreId: existing?.firestoreId || null,
     synced: false,

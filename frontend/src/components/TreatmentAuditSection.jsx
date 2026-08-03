@@ -2,6 +2,7 @@ import AdvocacyScopeSection from "./AdvocacyScopeSection";
 import AuditFlagCard from "./AuditFlagCard";
 import { collectPatientQuestions } from "../auditAdvocacyUtils";
 import { getAuditRiskMeta } from "../billUtils";
+import { POSSIBLE_ISSUE_NOTICE } from "../data/hedgingCopy";
 
 const CATEGORY_LABELS = {
   diagnosis: "Diagnosis",
@@ -124,9 +125,9 @@ export default function TreatmentAuditSection({ treatmentAuditFlags, report = nu
         )}
 
         <p className="treatment-audit-disclaimer">
-          Recommendations use ICMR, MoHFW Clinical Establishments Act STGs, and CRC
-          Standard Treatment Guidelines where available. This is not a substitute for
-          clinical judgment or legal advice.
+          {POSSIBLE_ISSUE_NOTICE} Recommendations use ICMR, MoHFW Clinical
+          Establishments Act STGs, and CRC Standard Treatment Guidelines where
+          available. This is not a substitute for clinical judgment or legal advice.
         </p>
 
         {flags.length ? (

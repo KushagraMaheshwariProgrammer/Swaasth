@@ -1,10 +1,11 @@
-export const TERMS_VERSION = "2026-06-10";
-export const TERMS_LAST_UPDATED = "10 June 2026";
+export const TERMS_VERSION = "2026-08-03-oss";
+export const TERMS_LAST_UPDATED = "3 August 2026";
 export const TERMS_SECTIONS = [
   {
     "title": "Introduction",
     "paragraphs": [
       "Welcome to Swaasth. These Terms and Conditions govern your access to and use of the Swaasth mobile application, website, services, tools, reports, recommendations, and related features.",
+      "Swaasth is an independently developed and operated application. In these Terms, \"Swaasth\", \"we\", \"us\", and \"our\" refer to the Swaasth application and its individual owner, developer, and operator.",
       "By creating an account, signing in, uploading any hospital bill, medical document, prescription, discharge summary, diagnostic report, estimate, insurance document, or other health-related document, or by using any feature of Swaasth, you agree to these Terms and Conditions.",
       "If you do not agree with these Terms, please do not use the application."
     ],
@@ -56,7 +57,17 @@ export const TERMS_SECTIONS = [
     ]
   },
   {
-    "title": "5. User Responsibility",
+    "title": "5. AI-Generated Output Disclaimer",
+    "paragraphs": [
+      "Swaasth uses artificial intelligence and automated systems to analyze documents and to generate reports, summaries, flags, complaint drafts, recommendations, and suggested next steps.",
+      "AI-generated output is probabilistic in nature and may be incomplete, inconsistent, outdated, or incorrect, and may vary between analyses of the same document.",
+      "All output is provided on an \"as is\" and \"as available\" basis, for informational and assistance purposes only, without warranty of any kind, whether express or implied, including any warranty of accuracy, completeness, fitness for a particular purpose, or non-infringement.",
+      "You are solely responsible for independently verifying any output before acting on or relying on it. To the maximum extent permitted by law, Swaasth shall not be liable for any decision, action, loss, or damage arising from reliance on AI-generated output."
+    ],
+    "bullets": []
+  },
+  {
+    "title": "6. User Responsibility",
     "paragraphs": [
       "You are responsible for the documents, information, and claims you submit through Swaasth.",
       "You agree that:"
@@ -73,7 +84,7 @@ export const TERMS_SECTIONS = [
     ]
   },
   {
-    "title": "6. Patient Data and Consent",
+    "title": "7. Patient Data and Consent",
     "paragraphs": [
       "By using Swaasth and uploading documents, you consent to the collection, processing, storage, review, and analysis of the information you provide, including health-related information, billing information, hospital details, patient details, insurance details, contact information, and uploaded documents, for the purpose of providing Swaasth’s services.",
       "You confirm that you have the legal right and authority to upload and share such information.",
@@ -92,15 +103,16 @@ export const TERMS_SECTIONS = [
     ]
   },
   {
-    "title": "7. Privacy Policy",
+    "title": "8. Privacy Policy",
     "paragraphs": [
       "Your use of Swaasth is also governed by our Privacy Policy, which explains how we collect, use, store, share, protect, retain, and delete personal data.",
+      "The Privacy Policy is available in the app under Account settings → Legal, on the Privacy Policy page, and is shown alongside these Terms during acceptance.",
       "Before using the application, you should carefully read the Privacy Policy. If you do not agree with the Privacy Policy, you should not use Swaasth."
     ],
     "bullets": []
   },
   {
-    "title": "8. Third-Party Services",
+    "title": "9. Third-Party Services",
     "paragraphs": [
       "Swaasth may use third-party services for authentication, cloud storage, document processing, OCR, analytics, notifications, payment processing, AI analysis, pricing comparison, communication, or other technical functions.",
       "Swaasth is not responsible for the independent acts, omissions, policies, security practices, failures, downtime, or terms of third-party service providers. Your use of such services may also be governed by their own terms and privacy policies."
@@ -108,7 +120,7 @@ export const TERMS_SECTIONS = [
     "bullets": []
   },
   {
-    "title": "9. Reports and Suggested Legal Steps",
+    "title": "10. Reports and Suggested Legal Steps",
     "paragraphs": [
       "Swaasth may generate reports, summaries, observations, complaint drafts, recommended questions to ask hospitals, legal-action pathways, authority details, procedural guidance, supporting document lists, or suggested next steps.",
       "These outputs are intended to assist users in understanding possible irregularities and available remedies. The user remains responsible for reviewing, verifying, approving, and deciding whether to use, send, file, or rely on such outputs.",
@@ -117,7 +129,7 @@ export const TERMS_SECTIONS = [
     "bullets": []
   },
   {
-    "title": "10. No Final Finding Against Hospitals or Healthcare Providers",
+    "title": "11. No Final Finding Against Hospitals or Healthcare Providers",
     "paragraphs": [
       "Swaasth does not make any final legal, medical, regulatory, or judicial finding against any hospital, doctor, clinic, diagnostic center, pharmacy, insurer, or healthcare provider.",
       "Any issue identified by Swaasth should be treated as a possible concern requiring clarification, verification, expert review, and appropriate action.",
@@ -126,7 +138,7 @@ export const TERMS_SECTIONS = [
     "bullets": []
   },
   {
-    "title": "11. Account Security",
+    "title": "12. Account Security",
     "paragraphs": [
       "You are responsible for maintaining the confidentiality of your login credentials and account activity.",
       "You agree to notify Swaasth immediately if you suspect unauthorized access, misuse, or breach of your account.",
@@ -135,7 +147,7 @@ export const TERMS_SECTIONS = [
     "bullets": []
   },
   {
-    "title": "12. Prohibited Use",
+    "title": "13. Prohibited Use",
     "paragraphs": [
       "You agree not to:"
     ],
@@ -153,7 +165,7 @@ export const TERMS_SECTIONS = [
     ]
   },
   {
-    "title": "13. Intellectual Property",
+    "title": "14. Intellectual Property",
     "paragraphs": [
       "All rights in the Swaasth name, logo, design, software, code, interface, database structure, reports, templates, workflows, technology, content, and related materials belong to Swaasth or its respective owners.",
       "You may use Swaasth only for personal and lawful purposes. You may not copy, reproduce, modify, distribute, sell, license, commercially exploit, or misuse any part of Swaasth without written permission."
@@ -161,7 +173,7 @@ export const TERMS_SECTIONS = [
     "bullets": []
   },
   {
-    "title": "14. User Content",
+    "title": "15. User Content",
     "paragraphs": [
       "You retain ownership of the documents and information you upload.",
       "However, by uploading content, you grant Swaasth a limited right to use, process, store, analyze, display, and transmit such content for providing services, improving features, ensuring security, responding to support requests, and complying with applicable law.",
@@ -170,7 +182,7 @@ export const TERMS_SECTIONS = [
     "bullets": []
   },
   {
-    "title": "15. Fees and Payments",
+    "title": "16. Fees and Payments",
     "paragraphs": [
       "Some features of Swaasth may be free, while others may require payment, subscription, or service charges.",
       "Any applicable fees, payment terms, refund rules, and cancellation policies will be shown separately within the app or website.",
@@ -179,7 +191,7 @@ export const TERMS_SECTIONS = [
     "bullets": []
   },
   {
-    "title": "16. Service Availability",
+    "title": "17. Service Availability",
     "paragraphs": [
       "Swaasth may be updated, modified, interrupted, suspended, restricted, or discontinued at any time.",
       "Swaasth does not guarantee continuous, error-free, secure, or uninterrupted availability of the application.",
@@ -188,7 +200,7 @@ export const TERMS_SECTIONS = [
     "bullets": []
   },
   {
-    "title": "17. Limitation of Liability",
+    "title": "18. Limitation of Liability",
     "paragraphs": [
       "To the maximum extent permitted by law, Swaasth, its owners, developers, employees, consultants, partners, service providers, and affiliates shall not be liable for any direct, indirect, incidental, consequential, special, punitive, financial, medical, legal, reputational, or other loss arising from:",
       "Your use of Swaasth is at your own risk."
@@ -205,7 +217,7 @@ export const TERMS_SECTIONS = [
     ]
   },
   {
-    "title": "18. Indemnity",
+    "title": "19. Indemnity",
     "paragraphs": [
       "You agree to indemnify and hold harmless Swaasth, its owners, developers, employees, consultants, partners, affiliates, and service providers from any claims, losses, damages, liabilities, costs, or expenses arising out of:"
     ],
@@ -219,7 +231,7 @@ export const TERMS_SECTIONS = [
     ]
   },
   {
-    "title": "19. Suspension or Termination",
+    "title": "20. Suspension or Termination",
     "paragraphs": [
       "Swaasth may suspend, restrict, or terminate your account if you violate these Terms, misuse the app, submit false or unlawful content, create legal risk, breach security, interfere with the platform, or engage in harmful conduct.",
       "You may stop using Swaasth at any time.",
@@ -228,7 +240,7 @@ export const TERMS_SECTIONS = [
     "bullets": []
   },
   {
-    "title": "20. Changes to These Terms",
+    "title": "21. Changes to These Terms",
     "paragraphs": [
       "Swaasth may update these Terms from time to time. Updated Terms may be shown inside the app or posted on the website.",
       "Your continued use of Swaasth after changes are made means you accept the updated Terms.",
@@ -237,15 +249,15 @@ export const TERMS_SECTIONS = [
     "bullets": []
   },
   {
-    "title": "21. Governing Law and Jurisdiction",
+    "title": "22. Governing Law and Jurisdiction",
     "paragraphs": [
       "These Terms shall be governed by the laws of India.",
-      "Subject to applicable law, courts and competent authorities at [Insert City and State, India] shall have jurisdiction over disputes arising from or relating to these Terms or your use of Swaasth."
+      "Subject to applicable law, courts and competent authorities at Hyderabad, Telangana, India shall have exclusive jurisdiction over disputes arising from or relating to these Terms or your use of Swaasth."
     ],
     "bullets": []
   },
   {
-    "title": "22. Contact and Grievance",
+    "title": "23. Contact and Grievance",
     "paragraphs": [
       "For support, complaints, data-related requests, or grievances, you may contact:",
       "Swaasth will make reasonable efforts to respond to user concerns within a reasonable time, subject to applicable law and the nature of the request."
@@ -255,9 +267,22 @@ export const TERMS_SECTIONS = [
     ]
   },
   {
-    "title": "23. Acceptance",
+    "title": "24. Open Source and Corresponding Source",
     "paragraphs": [
-      "By clicking “I Agree,” “Accept,” signing in, uploading documents, or continuing to use Swaasth, you confirm that:",
+      "Swaasth is free software licensed under the GNU Affero General Public License version 3 (AGPL-3.0).",
+      "Because Swaasth is provided as a network service and incorporates AGPL-covered components (including MuPDF / PyMuPDF for PDF processing), we offer the complete corresponding source code of this service to every user who interacts with it over a network.",
+      "You can obtain the corresponding source from our public GitHub repository and from the in-app Open source page (Account settings → Open source, or the /source route). The repository LICENSE and NOTICE files describe the license and third-party components.",
+      "If you modify Swaasth and provide it as a network service, the AGPL requires you to offer the corresponding source of your modified version to users of that service."
+    ],
+    "bullets": [
+      "Source repository: https://github.com/KushagraMaheshwariProgrammer/Swaasth",
+      "Default branch for corresponding source: galaxy-store-code",
+      "In-app source offer: /source"
+    ]
+  },
+  {
+    "title": "25. Acceptance",
+    "paragraphs": [
       "By clicking \"I Agree,\" \"Accept,\" signing in, uploading documents, or continuing to use Swaasth, you confirm that:",
       "If you do not agree, please click \"Decline\" and stop using Swaasth."
     ],

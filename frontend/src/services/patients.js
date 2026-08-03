@@ -14,7 +14,8 @@ import { deleteBillsForPatientIds, getBillsForPatientIds } from "./bills";
 import { deleteHistoricalDocumentsForPatientIds } from "./patientHistoricalDocuments";
 import { deleteHospitalsForPatientIds } from "./patientHospitals";
 import { normalizeClinicalHistory } from "../utils/clinicalHistory";
-import { validateBirthYearInput } from "../utils/patientAge";
+import { isMinorBirthYear, validateBirthYearInput } from "../utils/patientAge";
+import { normalizeParentalConsent } from "../utils/parentalConsent";
 import {
   getLocalPatientById,
   getLocalPatients,
@@ -73,6 +74,12 @@ export function validatePatientInput(patientData) {
   const birthYear = validateBirthYearInput(patientData?.birthYear);
   const state = patientData?.state?.trim() || "";
   const city = patientData?.city?.trim() || "";
+  const parentalConsent = normalizeParentalConsent(patientData?.parentalConsent);
+  if (isMinorBirthYear(birthYear) && !parentalConsent) {
+    throw new Error(
+      "Verifiable parental consent is required to save a patient below 18 years of age."
+    );
+  }
   return {
     name,
     gender,
@@ -81,6 +88,7 @@ export function validatePatientInput(patientData) {
     city,
     savePastBills: patientData?.savePastBills === true,
     clinicalHistory: normalizeClinicalHistory(patientData?.clinicalHistory),
+    parentalConsent,
   };
 }
 
@@ -115,6 +123,7 @@ function buildFirestorePayload(patientData) {
     city: validated.city,
     savePastBills: validated.savePastBills,
     clinicalHistory: validated.clinicalHistory,
+    parentalConsent: validated.parentalConsent,
     updatedAt: serverTimestamp(),
   };
 }

@@ -1,3 +1,5 @@
+import { POSSIBLE_ISSUE_NOTICE } from "../data/hedgingCopy";
+
 export default function AdvocacyScopeSection({ advocacyScope }) {
   const scope = advocacyScope || {};
   const checked = scope.checked || [];
@@ -31,8 +33,9 @@ export default function AdvocacyScopeSection({ advocacyScope }) {
         </div>
       )}
       <p className="treatment-audit-disclaimer">
-        Swaasth does not make final medical, legal, or regulatory findings against any
-        hospital or doctor. Use these questions to seek clarification.
+        {POSSIBLE_ISSUE_NOTICE} Swaasth does not make final medical, legal, or
+        regulatory findings against any hospital or doctor. Use these questions to
+        seek clarification.
       </p>
     </section>
   );

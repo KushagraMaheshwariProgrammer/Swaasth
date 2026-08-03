@@ -1,3 +1,5 @@
+import { POSSIBLE_ISSUE_NOTICE } from "../data/hedgingCopy";
+
 export default function StgCitationModal({ citation, flagLabel, onClose }) {
   if (!citation) {
     return null;
@@ -63,8 +65,9 @@ export default function StgCitationModal({ citation, flagLabel, onClose }) {
         )}
 
         <p className="treatment-audit-disclaimer stg-citation-footer">
-          Reproduce and verify against the original document before filing any complaint.
-          This excerpt supports a clarification question, not a final medical or legal finding.
+          {POSSIBLE_ISSUE_NOTICE} Reproduce and verify against the original document
+          before filing any complaint. This excerpt supports a clarification
+          question, not a final medical or legal finding.
         </p>
       </div>
     </div>

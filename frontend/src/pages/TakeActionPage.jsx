@@ -19,6 +19,7 @@ import {
   hasActionConsent,
   setActionConsentAccepted,
 } from "../services/localActionConsentStore";
+import { POSSIBLE_ISSUE_NOTICE } from "../data/hedgingCopy";
 
 const pageTransition = {
   initial: { opacity: 0, y: 12 },
@@ -142,9 +143,9 @@ export default function TakeActionPage() {
         <header className="check-header">
           <h1>Take action / Dispute</h1>
           <p>
-            A guided way to seek clarification on your bill. Everything here is
-            assistance, not a final medical or legal finding against any hospital
-            or doctor.
+            A guided way to seek clarification on your bill.{" "}
+            {POSSIBLE_ISSUE_NOTICE} Everything here is assistance, not a final
+            medical or legal finding against any hospital or doctor.
           </p>
         </header>
 

@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from app.services.investigation_history_audit import analyze_repeat_investigations
 
 
 def test_analyze_repeat_investigations_flags_recent_cbc() -> None:
-    recent = (datetime.utcnow() - timedelta(days=5)).strftime("%Y-%m-%d")
+    recent = (datetime.now(UTC) - timedelta(days=5)).strftime("%Y-%m-%d")
     flags = analyze_repeat_investigations(
         prescription_items=[{"name": "CBC", "category": "test"}],
         filtered_history={

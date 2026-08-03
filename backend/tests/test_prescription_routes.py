@@ -155,7 +155,7 @@ def test_upload_prescription_rejects_wrong_type_with_filename(monkeypatch) -> No
     detail = response.json()["detail"]
     assert "hospital-bill.pdf" in detail
     assert "Prescription" in detail
-    assert "Hospital bill" in detail
+    assert "hospital bill" in detail.lower()
 
 
 def test_upload_clinical_document_lab_report(monkeypatch) -> None:

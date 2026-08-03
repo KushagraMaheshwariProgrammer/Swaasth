@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import BackLink from "../components/BackLink";
 import { useAuth, needsEmailVerification as userNeedsEmailVerification } from "../context/AuthContext";
 
@@ -208,6 +208,14 @@ export default function LoginPage() {
 
           {info && <p className="auth-info">{info}</p>}
           {error && <p className="error-text">{error}</p>}
+
+          <p className="auth-legal-note">
+            By continuing, you agree to our{" "}
+            <Link to="/terms">Terms and Conditions</Link> and{" "}
+            <Link to="/privacy">Privacy Policy</Link>. Corresponding source is
+            available under AGPL on the{" "}
+            <Link to="/source">Open source</Link> page.
+          </p>
 
           <p className="auth-toggle">
             {mode === "signup" ? "Already have an account?" : "New to BillCheck?"}{" "}

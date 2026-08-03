@@ -14,6 +14,32 @@ if str(BACKEND_ROOT) not in sys.path:
 
 
 @pytest.fixture(autouse=True)
+def _override_firebase_auth():
+    """Bypass Firebase Bearer verification for HTTP TestClient calls."""
+    from app.main import app
+    from app.services.firebase_auth import get_current_user
+
+    async def _fake_current_user():
+        return {
+            "uid": "test-uid",
+            "email": "test@example.com",
+            "name": "Test User",
+            "picture": None,
+        }
+
+    app.dependency_overrides[get_current_user] = _fake_current_user
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.fixture(autouse=True)
+def _mark_warmup_complete(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Skip startup guideline-index warmup gate during tests."""
+    monkeypatch.setattr("app.prescription_routes.is_warmup_complete", lambda: True)
+    monkeypatch.setattr("app.startup_warmup.is_warmup_complete", lambda: True)
+
+
+@pytest.fixture(autouse=True)
 def _stub_heavy_ml_on_ci(monkeypatch: pytest.MonkeyPatch) -> None:
     """Avoid onnx/fastembed model loads on GitHub Actions Linux runners."""
     if os.getenv("GITHUB_ACTIONS") != "true":

@@ -1,0 +1,33 @@
+Swaasth
+Copyright (C) 2025–2026 Kushagra Maheshwari and contributors
+
+This product is licensed under the GNU Affero General Public License v3.0
+(AGPL-3.0). See the LICENSE file in this repository for the full license text.
+
+Corresponding source for the network service is published at:
+https://github.com/KushagraMaheshwariProgrammer/Swaasth
+(default branch: galaxy-store-code)
+
+---------------------------------------------------------------------------
+Third-party components (selected)
+
+PyMuPDF / MuPDF
+  Copyright Artifex Software, Inc. and contributors
+  License: GNU Affero General Public License v3.0 (dual-licensed commercially
+  by Artifex). Swaasth uses the AGPL-licensed edition.
+  https://github.com/pymupdf/PyMuPDF
+  https://mupdf.com/
+
+pymupdf-fonts
+  Bundled fonts for PyMuPDF PDF generation
+  Subject to the terms accompanying that package / AGPL use with PyMuPDF
+
+Other Python and JavaScript dependencies are listed in:
+  backend/requirements.txt
+  frontend/package.json / package-lock.json
+  (root) package.json / package-lock.json
+
+Consult each dependency’s upstream license for redistribution terms.
+AGPL-3.0 applies to Swaasth as a combined network application that incorporates
+AGPL-covered components such as PyMuPDF/MuPDF.
+---------------------------------------------------------------------------

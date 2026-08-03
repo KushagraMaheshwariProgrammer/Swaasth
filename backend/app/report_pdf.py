@@ -14,15 +14,17 @@ from typing import Any
 
 from app.restricted_medicines import render_restricted_medicine_flags_html
 from app.services.audit_advocacy import ADVOCACY_SCOPE_CHECKED, ADVOCACY_SCOPE_NOT_CHECKED, flag_display_label
+from app.services.legal_guardrails import POSSIBLE_ISSUE_NOTICE, POSSIBLE_OVERCHARGE_LABEL
 
 RenderHtmlFn = Callable[[dict[str, Any]], str]
 
 _REPORT_RENDERERS: dict[str, RenderHtmlFn] = {}
 
 BILL_DISCLAIMER = (
-    "This report is based on extracted bill information and reference rates "
-    "available in the application. OCR errors, package conditions, exclusions, "
-    "and uncertain item matches may require manual verification."
+    f"{POSSIBLE_ISSUE_NOTICE} This report is based on extracted bill information "
+    "and reference rates available in the application. OCR errors, package "
+    "conditions, exclusions, and uncertain item matches may require manual "
+    "verification."
 )
 
 _REPORT_TITLES: dict[str, str] = {
@@ -72,7 +74,7 @@ def _render_advocacy_scope_html(report: dict[str, Any]) -> str:
   <h2>What we checked</h2>
   <p><b>Checked</b></p><ul>{checked_html}</ul>
   <p><b>Not checked</b></p><ul>{not_checked_html}</ul>
-  <p class='disclaimer'>Swaasth does not make final medical, legal, or regulatory findings against any hospital or doctor.</p>
+  <p class='disclaimer'>{escape(POSSIBLE_ISSUE_NOTICE)} Swaasth does not make final medical, legal, or regulatory findings against any hospital or doctor.</p>
 """
 
 
@@ -153,7 +155,9 @@ def _render_stg_excerpts_html(report: dict[str, Any]) -> str:
     return (
         "<h2>Full guideline excerpts (verified citations)</h2>"
         + "".join(blocks)
-        + "<p class='disclaimer'>Excerpts are reproduced for patient review. "
+        + "<p class='disclaimer'>"
+        + escape(POSSIBLE_ISSUE_NOTICE)
+        + " Excerpts are reproduced for patient review. "
         "Verify against the original document before filing any complaint.</p>"
     )
 
@@ -185,9 +189,9 @@ def _render_legal_pathways_html(report: dict[str, Any]) -> str:
     if not blocks:
         return ""
     disclaimer = (
-        "Educational only — not legal advice. Swaasth does not accuse any hospital "
-        "or doctor. Consult a qualified advocate before alleging medical negligence, "
-        "deficiency in service, or unfair trade practice."
+        f"{POSSIBLE_ISSUE_NOTICE} Educational only — not legal advice. Swaasth does "
+        "not accuse any hospital or doctor. Consult a qualified advocate before "
+        "alleging medical negligence, deficiency in service, or unfair trade practice."
     )
     return (
         "<h2>Possible legal pathways (educational — not accusations)</h2>"
@@ -323,7 +327,7 @@ def _fmt_currency(value: Any) -> str:
 
 def _flag_label(flag: Any) -> str:
     if flag == "overpriced":
-        return "Overpriced"
+        return POSSIBLE_OVERCHARGE_LABEL
     if flag == "acceptable":
         return "Acceptable"
     return "No Data"
@@ -505,7 +509,7 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
   <h2>Summary</h2>
   <table class='summary'>
     <tr><td><b>Total charged</b></td><td class='num'>{_fmt_currency(total_charged)}</td></tr>
-    <tr><td><b>Overcharged by</b></td><td class='num'>{_fmt_currency(total_overcharged)}</td></tr>
+    <tr><td><b>{escape(POSSIBLE_OVERCHARGE_LABEL)}</b></td><td class='num'>{_fmt_currency(total_overcharged)}</td></tr>
     <tr><td><b>Items flagged</b></td><td class='num'>{items_flagged}</td></tr>
   </table>
 
@@ -537,7 +541,7 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
   {guideline_sources_html}
   {legal_pathways_html}
   {stg_excerpts_html}
-  <p class='disclaimer'>Recommendations use ICMR and CRC Standard Treatment Guidelines where available. Not a substitute for clinical judgment.</p>
+  <p class='disclaimer'>{escape(POSSIBLE_ISSUE_NOTICE)} Recommendations use ICMR and CRC Standard Treatment Guidelines where available. Not a substitute for clinical judgment.</p>
 
   <p class='disclaimer'>{escape(BILL_DISCLAIMER)}</p>
 </body>
@@ -625,7 +629,7 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
   {legal_pathways_html}
   {stg_excerpts_html}
 
-  <p class='disclaimer'>Recommendations use ICMR and CRC Standard Treatment Guidelines where available. Not a substitute for clinical judgment.</p>
+  <p class='disclaimer'>{escape(POSSIBLE_ISSUE_NOTICE)} Recommendations use ICMR and CRC Standard Treatment Guidelines where available. Not a substitute for clinical judgment.</p>
 </body>
 </html>
 """
@@ -699,7 +703,7 @@ def render_dispute_pack_html(report: dict[str, Any]) -> str:
   <p><i>{escape(str(discharge.get('emergency_note') or ''))}</i></p>
 
   <h2>Recoverable amount estimate</h2>
-  <p><b>Overpriced vs NPPA:</b> {_fmt_currency(recoverable.get('overpriced_total'))}</p>
+  <p><b>{escape(POSSIBLE_OVERCHARGE_LABEL)} vs NPPA:</b> {_fmt_currency(recoverable.get('overpriced_total'))}</p>
   <p><b>Jan Aushadhi savings potential:</b> {_fmt_currency(recoverable.get('jan_aushadhi_savings'))}</p>
   <p><b>Total estimate:</b> {_fmt_currency(recoverable.get('total'))}</p>
   <p class='disclaimer'>{escape(str(recoverable.get('disclaimer') or ''))}</p>
@@ -711,10 +715,11 @@ def render_dispute_pack_html(report: dict[str, Any]) -> str:
   {''.join(ladder_html)}
 
   <h2>Complaint draft templates</h2>
+  <p class='disclaimer'>{escape(POSSIBLE_ISSUE_NOTICE)} Confirm facts before filing.</p>
   {''.join(template_blocks) if template_blocks else "<p>No templates generated.</p>"}
 
   <p class='disclaimer'>{escape(str(action_plan.get('disclaimer') or ''))}</p>
-  <p class='disclaimer'>Swaasth does not make final medical, legal, or regulatory findings.</p>
+  <p class='disclaimer'>{escape(POSSIBLE_ISSUE_NOTICE)} Swaasth does not make final medical, legal, or regulatory findings.</p>
 </body>
 </html>
 """

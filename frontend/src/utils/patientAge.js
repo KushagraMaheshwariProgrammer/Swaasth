@@ -1,6 +1,9 @@
 const MIN_BIRTH_YEAR = 1900;
 const MAX_AGE = 150;
 
+// India's DPDP Act, 2023 defines a child as an individual below 18 years.
+export const MINOR_AGE_THRESHOLD = 18;
+
 export function getCurrentYear() {
   return new Date().getFullYear();
 }
@@ -58,6 +61,16 @@ export function getPatientAge(patient) {
     return Math.round(age);
   }
   return null;
+}
+
+export function isMinorBirthYear(birthYear) {
+  const age = deriveAgeFromBirthYear(birthYear);
+  return age != null && age < MINOR_AGE_THRESHOLD;
+}
+
+export function isMinorPatient(patient) {
+  const age = getPatientAge(patient);
+  return age != null && age < MINOR_AGE_THRESHOLD;
 }
 
 export function formatPatientAge(patient) {

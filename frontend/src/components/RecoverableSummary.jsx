@@ -1,4 +1,8 @@
 import { formatCurrency } from "../billUtils";
+import {
+  POSSIBLE_ISSUE_NOTICE,
+  POSSIBLE_OVERCHARGE_LABEL,
+} from "../data/hedgingCopy";
 
 export default function RecoverableSummary({ recoverableEstimate }) {
   const estimate = recoverableEstimate || {};
@@ -15,7 +19,8 @@ export default function RecoverableSummary({ recoverableEstimate }) {
       <p className="action-recoverable-total">{formatCurrency(total)}</p>
       <div className="action-recoverable-breakdown">
         <p>
-          Above NPPA reference: {formatCurrency(estimate.overpriced_total || 0)}
+          {POSSIBLE_OVERCHARGE_LABEL} vs NPPA:{" "}
+          {formatCurrency(estimate.overpriced_total || 0)}
         </p>
         <p>
           Jan Aushadhi savings potential:{" "}
@@ -31,7 +36,9 @@ export default function RecoverableSummary({ recoverableEstimate }) {
           ))}
         </ul>
       )}
-      <p className="treatment-audit-disclaimer">{estimate.disclaimer}</p>
+      <p className="treatment-audit-disclaimer">
+        {estimate.disclaimer || POSSIBLE_ISSUE_NOTICE}
+      </p>
     </section>
   );
 }

@@ -1,3 +1,5 @@
+import { Capacitor } from "@capacitor/core";
+import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 import {
   EmailAuthProvider,
   GoogleAuthProvider,
@@ -52,6 +54,18 @@ export async function reauthenticateCurrentUser(password) {
       throw new Error("Enter your current password to continue.");
     }
     const credential = EmailAuthProvider.credential(user.email, password);
+    await reauthenticateWithCredential(user, credential);
+    return;
+  }
+  if (Capacitor.isNativePlatform()) {
+    const result = await FirebaseAuthentication.signInWithGoogle({
+      skipNativeAuth: true,
+    });
+    const idToken = result.credential?.idToken;
+    if (!idToken) {
+      throw new Error("Google re-authentication did not return an ID token.");
+    }
+    const credential = GoogleAuthProvider.credential(idToken);
     await reauthenticateWithCredential(user, credential);
     return;
   }

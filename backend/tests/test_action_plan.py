@@ -9,6 +9,7 @@ from app.services.action_plan import build_action_plan
 from app.services.action_tiers import assign_action_tier
 from app.services.legal_guardrails import (
     LEGAL_BANNED_TERMS,
+    POSSIBLE_ISSUE_NOTICE,
     assert_safe,
     find_banned_terms,
     sanitize_text,
@@ -210,13 +211,17 @@ def test_complaint_templates_contain_zero_banned_terms() -> None:
     assert templates, "expected templates for Tier A/B flags"
     for template in templates:
         assert template["requires_confirmation"] is True
+        assert POSSIBLE_ISSUE_NOTICE in template["disclaimer"]
         assert find_banned_terms(template["subject"]) == []
         assert find_banned_terms(template["body"]) == []
+        assert "possible" in template["body"].lower()
+        assert "verif" in template["body"].lower()
         for label in template["included_flags"]:
             assert find_banned_terms(label) == []
     for item in plan["action_items"]:
         assert find_banned_terms(item["action"]) == []
     assert plan["guardrails"]["banned_terms_filtered"] is True
+    assert POSSIBLE_ISSUE_NOTICE in plan["disclaimer"]
 
 
 def test_no_templates_when_only_tier_c() -> None:
@@ -284,7 +289,25 @@ def test_compare_bill_includes_action_plan() -> None:
     assert action_plan["guardrails"]["banned_terms_filtered"] is True
 
 
-def test_analyze_treatment_includes_action_plan() -> None:
+def test_analyze_treatment_includes_action_plan(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.prescription_routes.analyze_treatment",
+        lambda **kwargs: {
+            "flags": [
+                {
+                    "type": "ANTIBIOTIC_NOT_INDICATED",
+                    "confidence": "MEDIUM",
+                    "category": "clinical",
+                    "severity": "medium",
+                    "message": "Antibiotic may not be indicated for common cold.",
+                }
+            ],
+            "flags_count": 1,
+            "risk_level": "MEDIUM",
+            "matched_stg_conditions": [],
+            "patient_questions": [],
+        },
+    )
     res = client.post(
         "/analyze-treatment",
         json={

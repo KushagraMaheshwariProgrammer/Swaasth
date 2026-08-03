@@ -3,6 +3,10 @@ import {
   TERMS_LAST_UPDATED,
   TERMS_SECTIONS,
 } from "../data/termsAndConditions";
+import {
+  PRIVACY_POLICY_LAST_UPDATED,
+  PRIVACY_POLICY_SECTIONS,
+} from "../data/privacyPolicy";
 import { hasScrolledToBottom as checkScrolledToBottom } from "../utils/termsScroll";
 
 export default function TermsAndConditionsModal({
@@ -61,8 +65,11 @@ export default function TermsAndConditionsModal({
       <div className="modal-panel terms-modal">
         <header className="modal-header">
           <div>
-            <h2 id="terms-modal-title">Terms and Conditions</h2>
-            <p className="terms-modal-updated">Last updated: {TERMS_LAST_UPDATED}</p>
+            <h2 id="terms-modal-title">Terms and Privacy Policy</h2>
+            <p className="terms-modal-updated">
+              Terms last updated: {TERMS_LAST_UPDATED} · Privacy Policy last
+              updated: {PRIVACY_POLICY_LAST_UPDATED}
+            </p>
           </div>
         </header>
 
@@ -73,12 +80,15 @@ export default function TermsAndConditionsModal({
           aria-label="Terms and conditions document"
         >
           <p className="terms-modal-lead">
-            Please read the full Terms and Conditions below. You must scroll to
-            the end and confirm your agreement before using Swaasth.
+            Please read the full Terms and Conditions and Privacy Policy below.
+            You must scroll to the end and confirm your agreement before using
+            Swaasth.
           </p>
 
+          <h2 className="terms-modal-doc-title">Terms and Conditions</h2>
+
           {TERMS_SECTIONS.map((section) => (
-            <section key={section.title} className="terms-section">
+            <section key={`terms-${section.title}`} className="terms-section">
               <h3>{section.title}</h3>
               {section.paragraphs.map((paragraph, index) => (
                 <p key={`${section.title}-p-${index}`}>{paragraph}</p>
@@ -87,6 +97,24 @@ export default function TermsAndConditionsModal({
                 <ul>
                   {section.bullets.map((item, index) => (
                     <li key={`${section.title}-b-${index}`}>{item}</li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ))}
+
+          <h2 className="terms-modal-doc-title">Privacy Policy</h2>
+
+          {PRIVACY_POLICY_SECTIONS.map((section) => (
+            <section key={`privacy-${section.title}`} className="terms-section">
+              <h3>{section.title}</h3>
+              {section.paragraphs.map((paragraph, index) => (
+                <p key={`privacy-${section.title}-p-${index}`}>{paragraph}</p>
+              ))}
+              {section.bullets.length > 0 && (
+                <ul>
+                  {section.bullets.map((item, index) => (
+                    <li key={`privacy-${section.title}-b-${index}`}>{item}</li>
                   ))}
                 </ul>
               )}
@@ -115,7 +143,8 @@ export default function TermsAndConditionsModal({
               onChange={(event) => setAgreed(event.target.checked)}
             />
             <span>
-              I have read and agree to the Terms and Conditions of Swaasth.
+              I have read and agree to the Terms and Conditions and Privacy
+              Policy of Swaasth.
             </span>
           </label>
 

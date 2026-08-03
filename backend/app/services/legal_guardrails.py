@@ -11,6 +11,10 @@ from __future__ import annotations
 
 import re
 
+# Shared hedging copy for reports, complaint drafts, and overcharge flags.
+POSSIBLE_ISSUE_NOTICE = "Possible issue — verify before acting."
+POSSIBLE_OVERCHARGE_LABEL = "Possible overcharge"
+
 # Banned term -> neutral replacement. Whole-word, case-insensitive matching.
 _REPLACEMENTS: dict[str, str] = {
     "fraud": "billing discrepancy",

@@ -1,4 +1,5 @@
 import { collectPatientQuestions } from "./auditAdvocacyUtils";
+import { POSSIBLE_ISSUE_NOTICE } from "./data/hedgingCopy";
 
 const TIER_A_TYPES = new Set([
   "DUPLICATE_ITEM",
@@ -126,8 +127,7 @@ function computeRecoverable(lineItems) {
     jan_aushadhi_savings: Math.round(janSavings * 100) / 100,
     total: Math.round((overpricedTotal + janSavings) * 100) / 100,
     basis,
-    disclaimer:
-      "Amounts are estimates based on reference rates. Verify with the hospital before acting.",
+    disclaimer: `${POSSIBLE_ISSUE_NOTICE} Amounts are estimates based on reference rates.`,
   };
 }
 
@@ -189,8 +189,7 @@ function buildFallbackNarrative(report, actionItems, recoverable) {
         actionItems.length || "no"
       } clarification point${actionItems.length === 1 ? "" : "s"} in the documents from ${hospitalName}. ` +
       `The main points to verify are ${concernText}.${amountText} Use this as a factual summary for discussion; it is not a medical or legal conclusion.`,
-    disclaimer:
-      "This narrative is informational only. Verify facts and consult qualified professionals before acting.",
+    disclaimer: `${POSSIBLE_ISSUE_NOTICE} This narrative is informational only. Consult qualified professionals as needed.`,
   };
 }
 
@@ -238,8 +237,7 @@ export function buildFallbackActionPlan(report) {
           .map((q) => q.question),
       })),
     combined_narrative: buildFallbackNarrative(report, actionItems, recoverable),
-    disclaimer:
-      "Swaasth provides procedural assistance only. Not medical or legal advice.",
+    disclaimer: `${POSSIBLE_ISSUE_NOTICE} Swaasth provides procedural assistance only. Not medical or legal advice.`,
     guardrails: { banned_terms_filtered: true },
   };
 }

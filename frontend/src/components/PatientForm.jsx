@@ -9,7 +9,10 @@ import ClinicalHistoryFields from "./ClinicalHistoryFields";
 import {
   deriveAgeFromBirthYear,
   getCurrentYear,
+  isMinorBirthYear,
 } from "../utils/patientAge";
+import { normalizeParentalConsent } from "../utils/parentalConsent";
+import { guardianRelationshipLabel } from "../data/parentalConsent";
 
 export const GENDER_OPTIONS = [
   { id: "male", label: "Male" },
@@ -28,6 +31,7 @@ export const emptyPatientForm = () => ({
   city: "",
   savePastBills: true,
   clinicalHistory: emptyClinicalHistory(),
+  parentalConsent: null,
 });
 
 export function patientToFormFields(patient) {
@@ -45,6 +49,7 @@ export function patientToFormFields(patient) {
     state: patient?.state || "",
     city: patient?.city || "",
     savePastBills: Boolean(patient?.savePastBills),
+    parentalConsent: normalizeParentalConsent(patient?.parentalConsent),
     clinicalHistory: {
       conditions: (history.conditions || []).map((item) => ({
         name: item?.name || "",
@@ -207,6 +212,16 @@ export default function PatientForm({
         />
         <span>Do you want to save this patient&apos;s past bills?</span>
       </label>
+
+      {isMinorBirthYear(form.birthYear) && (
+        <p className="auth-info">
+          {form.parentalConsent
+            ? `Parental consent recorded — given by ${form.parentalConsent.guardianName} ` +
+              `(${guardianRelationshipLabel(form.parentalConsent.relationship)}) on ` +
+              `${new Date(form.parentalConsent.consentedAt).toLocaleDateString("en-IN")}.`
+            : "This patient is below 18 years of age. As required by the DPDP Act, you will be asked to verify your identity and give parental consent when you save."}
+        </p>
+      )}
 
       {info && <p className="auth-info">{info}</p>}
       {error && <p className="error-text">{error}</p>}

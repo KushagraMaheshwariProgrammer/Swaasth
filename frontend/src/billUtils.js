@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { POSSIBLE_OVERCHARGE_LABEL } from "./data/hedgingCopy";
 
 export const HOSPITAL_TYPE_OPTIONS = [
   { id: "general", label: "General hospital" },
@@ -19,7 +20,7 @@ export const formatCurrency = (value) => {
 export const getFlagMeta = (flag) => {
   if (flag === "overpriced") {
     return {
-      badgeLabel: "Overpriced",
+      badgeLabel: POSSIBLE_OVERCHARGE_LABEL,
       badgeClass: "status-pill status-red",
       cardClass: "result-card result-overpriced",
     };

@@ -38,11 +38,39 @@ service cloud.firestore {
         && boundedList(history.allergies, 50);
     }
 
+    // DPDP Act, 2023: a child is an individual below 18 years of age.
+    function isMinorBirthYear(birthYear) {
+      return birthYear is number && request.time.year() - birthYear < 18;
+    }
+
+    function parentalConsentValid(consent) {
+      return consent is map
+        && consent.keys().hasOnly([
+          'guardianName', 'relationship', 'guardianUid', 'guardianEmail',
+          'consentVersion', 'consentedAt', 'verificationMethod'
+        ])
+        && shortString(consent.guardianName, 200)
+        && shortString(consent.relationship, 40)
+        // Consent must be recorded by the authenticated account holder.
+        && consent.guardianUid == request.auth.uid
+        && optionalShortString(consent.guardianEmail, 320)
+        && shortString(consent.consentVersion, 40)
+        && isTimestampOrString(consent.consentedAt)
+        && shortString(consent.verificationMethod, 60);
+    }
+
+    function hasValidParentalConsent(data) {
+      return 'parentalConsent' in data
+        && data.parentalConsent != null
+        && parentalConsentValid(data.parentalConsent);
+    }
+
     function patientDataValid() {
       let data = request.resource.data;
       return data.keys().hasOnly([
           'name', 'birthYear', 'gender', 'state', 'city',
-          'savePastBills', 'clinicalHistory', 'createdAt', 'updatedAt'
+          'savePastBills', 'clinicalHistory', 'parentalConsent',
+          'createdAt', 'updatedAt'
         ])
         && shortString(data.name, 200)
         && isOptionalNumber(data.birthYear)
@@ -51,6 +79,14 @@ service cloud.firestore {
         && optionalShortString(data.city, 100)
         && data.savePastBills is bool
         && clinicalHistoryValid(data.clinicalHistory)
+        && (!('parentalConsent' in data)
+            || data.parentalConsent == null
+            || parentalConsentValid(data.parentalConsent))
+        // Minor patient profiles cannot be written without a verifiable
+        // parental consent record (DPDP Act, 2023 s.9).
+        && (!('birthYear' in data)
+            || !isMinorBirthYear(data.birthYear)
+            || hasValidParentalConsent(data))
         && (!('createdAt' in data) || isTimestampOrString(data.createdAt))
         && (!('updatedAt' in data) || isTimestampOrString(data.updatedAt));
     }
@@ -114,6 +150,8 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly([
         'termsAcceptedAt',
         'termsVersion',
+        'privacyPolicyAcceptedAt',
+        'privacyPolicyVersion',
         'medicalHistoryConsentAt',
         'medicalHistoryConsentDeclinedAt',
         'medicalHistoryConsentVersion'
@@ -124,6 +162,10 @@ service cloud.firestore {
       let data = request.resource.data;
       return userProfileKeysAllowed()
         && (!('termsVersion' in data) || shortString(data.termsVersion, 40))
+        && (!('privacyPolicyVersion' in data)
+            || shortString(data.privacyPolicyVersion, 40))
+        && (!('privacyPolicyAcceptedAt' in data)
+            || isTimestampOrString(data.privacyPolicyAcceptedAt))
         && (!('medicalHistoryConsentVersion' in data)
             || shortString(data.medicalHistoryConsentVersion, 40))
         && (!('termsAcceptedAt' in data)

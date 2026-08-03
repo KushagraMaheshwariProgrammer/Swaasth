@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.services.legal_guardrails import POSSIBLE_ISSUE_NOTICE
+
 _PATHWAYS: dict[str, dict[str, Any]] = {
     "billing": {
         "broader_concept": "Deficiency in service / unfair trade practice (billing)",
@@ -138,8 +140,9 @@ def build_legal_pathway_for_flag(flag: dict[str, Any]) -> dict[str, Any] | None:
         base["item_context"] = item
 
     base["disclaimer"] = (
-        "Educational summary only — not legal advice. An advocate must review "
-        "your records before any complaint, forum filing, or allegation."
+        f"{POSSIBLE_ISSUE_NOTICE} Educational summary only — not legal advice. "
+        "An advocate must review your records before any complaint, forum filing, "
+        "or allegation."
     )
     return base
 

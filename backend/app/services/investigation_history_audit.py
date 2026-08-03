@@ -70,13 +70,16 @@ def _parse_report_date(value: str | None) -> datetime | None:
         return None
     for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d"):
         try:
-            return datetime.strptime(text[:10], fmt)
+            return datetime.strptime(text[:10], fmt).replace(tzinfo=UTC)
         except ValueError:
             continue
     try:
-        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError:
         return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _collect_current_investigations(

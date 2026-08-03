@@ -889,6 +889,28 @@ body.capacitor-native *::-webkit-scrollbar {
   padding: 0.875rem 1rem calc(0.875rem + var(--safe-bottom));
   font-size: 0.8125rem;
   color: var(--landing-text);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.35rem 1.25rem;
+}
+
+.footer-legal {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem 1.25rem;
+}
+
+.footer-legal a {
+  color: var(--landing-text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.footer-legal a:hover {
+  text-decoration: underline;
 }
 
 .check-page {
@@ -2988,6 +3010,24 @@ a.analyze-btn:visited {
   font-size: 0.92rem;
 }
 
+.auth-legal-note {
+  margin: 1rem 0 0;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.auth-legal-note a {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-legal-note a:hover {
+  text-decoration: underline;
+}
+
 .auth-toggle-btn {
   border: none;
   background: none;
@@ -4106,6 +4146,19 @@ button.patient-list-card {
   color: var(--text-secondary);
 }
 
+.terms-modal-doc-title {
+  margin: 1.5rem 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid rgba(37, 99, 235, 0.15);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #000000;
+}
+
+.terms-modal-doc-title:first-of-type {
+  margin-top: 0;
+}
+
 .terms-modal-body .terms-section {
   margin-bottom: 1.25rem;
 }
@@ -4550,6 +4603,22 @@ button.patient-list-card {
 }
 
 .terms-section-stack .terms-section p:last-child {
+  margin-bottom: 0;
+}
+
+.terms-section-stack .terms-section ul {
+  margin: 0 0 0.65rem;
+  padding-left: 1.25rem;
+}
+
+.terms-section-stack .terms-section li {
+  margin-bottom: 0.4rem;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: #171717;
+}
+
+.terms-section-stack .terms-section ul:last-child {
   margin-bottom: 0;
 }
 

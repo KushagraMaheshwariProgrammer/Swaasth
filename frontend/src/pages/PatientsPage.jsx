@@ -7,6 +7,7 @@ import PatientForm, {
   genderLabel,
   patientToFormFields,
 } from "../components/PatientForm";
+import ParentalConsentModal from "../components/ParentalConsentModal";
 import PatientHospitalsSection from "../components/PatientHospitalsSection";
 import PatientMedicalHistorySection from "../components/PatientMedicalHistorySection";
 import PatientList from "../components/PatientList";
@@ -15,7 +16,14 @@ import {
   formatCurrency,
   getBillPatientName,
 } from "../billUtils";
-import { formatPatientAge } from "../utils/patientAge";
+import { formatPatientAge, isMinorPatient } from "../utils/patientAge";
+import {
+  hasParentalConsent,
+  normalizeParentalConsent,
+  requiresParentalConsent,
+} from "../utils/parentalConsent";
+import { guardianRelationshipLabel } from "../data/parentalConsent";
+import { POSSIBLE_OVERCHARGE_LABEL } from "../data/hedgingCopy";
 import { reportKindLabel } from "../data/reportExport";
 import { useAuth } from "../context/AuthContext";
 import UserNav from "../components/UserNav";
@@ -62,6 +70,7 @@ export default function PatientsPage() {
   const [deletingBillId, setDeletingBillId] = useState(null);
   const [deletingPatientId, setDeletingPatientId] = useState(null);
   const [historicalDocuments, setHistoricalDocuments] = useState([]);
+  const [consentRequest, setConsentRequest] = useState(null);
 
   const historyAllowed = canViewMedicalHistory(
     resolveAccountConsent(user?.uid, medicalHistoryConsentAccepted, {
@@ -193,22 +202,17 @@ export default function PatientsPage() {
     };
   }, [user, patientId, patientHistoryAllowed]);
 
-  const handleCreate = async (event) => {
-    event.preventDefault();
-    if (!user?.uid) {
-      setError("You must be signed in to save a patient.");
-      return;
-    }
+  const saveNewPatient = async (formData) => {
     setSaving(true);
     setError("");
     setSyncMessage("");
     try {
-      const result = await createPatient(user.uid, form);
+      const result = await createPatient(user.uid, formData);
       const list = await getPatients(user.uid);
       setPatients(list);
       setShowAddForm(false);
       setForm(emptyPatientForm());
-      const savedName = result.patient?.name || form.name;
+      const savedName = result.patient?.name || formData.name;
       setSyncMessage(`Patient "${savedName}" saved successfully.`);
     } catch (err) {
       setError(err.message || "Unable to add patient.");
@@ -217,26 +221,64 @@ export default function PatientsPage() {
     }
   };
 
-  const handleUpdate = async (event) => {
-    event.preventDefault();
-    if (!user || !patientId) {
-      return;
-    }
+  const saveExistingPatient = async (formData) => {
     setSaving(true);
     setError("");
     try {
-      const result = await updatePatient(user.uid, patientId, form);
+      const result = await updatePatient(user.uid, patientId, formData);
       if (result.warning) {
         setSyncMessage(result.warning);
       }
       const updated = await getPatient(user.uid, result.id);
       setSelectedPatient(updated);
+      setForm(patientToFormFields(updated));
       setEditing(false);
       await loadPatients();
     } catch (err) {
       setError(err.message || "Unable to update patient.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // DPDP Act: minors require a verifiable parental consent record before save.
+  const needsParentalConsent = (formData) =>
+    requiresParentalConsent(formData.birthYear) && !hasParentalConsent(formData);
+
+  const handleCreate = async (event) => {
+    event.preventDefault();
+    if (!user?.uid) {
+      setError("You must be signed in to save a patient.");
+      return;
+    }
+    if (needsParentalConsent(form)) {
+      setConsentRequest({ mode: "create" });
+      return;
+    }
+    await saveNewPatient(form);
+  };
+
+  const handleUpdate = async (event) => {
+    event.preventDefault();
+    if (!user || !patientId) {
+      return;
+    }
+    if (needsParentalConsent(form)) {
+      setConsentRequest({ mode: "update" });
+      return;
+    }
+    await saveExistingPatient(form);
+  };
+
+  const handleParentalConsent = async (consentRecord) => {
+    const mode = consentRequest?.mode;
+    const nextForm = { ...form, parentalConsent: consentRecord };
+    setForm(nextForm);
+    setConsentRequest(null);
+    if (mode === "create") {
+      await saveNewPatient(nextForm);
+    } else if (mode === "update") {
+      await saveExistingPatient(nextForm);
     }
   };
 
@@ -310,6 +352,13 @@ export default function PatientsPage() {
 
   return (
     <motion.div className="check-page" {...pageTransition}>
+      {consentRequest && (
+        <ParentalConsentModal
+          childName={form.name}
+          onConsent={handleParentalConsent}
+          onCancel={() => setConsentRequest(null)}
+        />
+      )}
       <main className="check-wrap patients-wrap">
         <div className="check-topbar">
           {patientId ? (
@@ -409,6 +458,27 @@ export default function PatientsPage() {
                     <p className="patient-history-summary">
                       {clinicalHistorySummary(selectedPatient.clinicalHistory)}
                     </p>
+                    {isMinorPatient(selectedPatient) &&
+                      (() => {
+                        const consent = normalizeParentalConsent(
+                          selectedPatient.parentalConsent
+                        );
+                        return consent ? (
+                          <p className="patient-history-summary">
+                            Parental consent: {consent.guardianName} (
+                            {guardianRelationshipLabel(consent.relationship)}
+                            ),{" "}
+                            {new Date(consent.consentedAt).toLocaleDateString(
+                              "en-IN"
+                            )}
+                          </p>
+                        ) : (
+                          <p className="error-text">
+                            Parental consent missing for this minor. Edit the
+                            profile and save to record consent.
+                          </p>
+                        );
+                      })()}
                   </div>
                   <div className="patient-detail-actions">
                     <Link
@@ -527,7 +597,8 @@ export default function PatientsPage() {
                                 </div>
                                 <div className="history-list-meta">
                                   <span className="history-overcharge">
-                                    {formatCurrency(summary.totalOvercharged)} over
+                                    {POSSIBLE_OVERCHARGE_LABEL}{" "}
+                                    {formatCurrency(summary.totalOvercharged)}
                                   </span>
                                 </div>
                               </Link>

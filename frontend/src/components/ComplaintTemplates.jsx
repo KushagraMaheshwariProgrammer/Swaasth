@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { confirmPhiExport } from "../utils/confirmPhiExport";
+import { POSSIBLE_ISSUE_NOTICE } from "../data/hedgingCopy";
 
 function TemplateCard({ template }) {
   const [body, setBody] = useState(template.body || "");
@@ -61,8 +62,8 @@ function TemplateCard({ template }) {
         I have verified these facts
       </label>
       <p className="treatment-audit-disclaimer">
-        Templates use neutral, factual language only. Swaasth does not make legal
-        findings. Review with an advocate before filing formal complaints.
+        {template.disclaimer ||
+          `Note: ${POSSIBLE_ISSUE_NOTICE} Templates use neutral, factual language only. Swaasth does not make legal findings. Review with an advocate before filing formal complaints.`}
       </p>
       <div className="complaint-template-actions">
         <button
@@ -96,8 +97,8 @@ export default function ComplaintTemplates({ complaintTemplates }) {
     <section className="audit-section complaint-templates-section">
       <h3>Complaint draft templates</h3>
       <p className="treatment-audit-disclaimer">
-        Fill-in drafts for hospital grievance or authority escalation. Confirm
-        facts before copying or downloading.
+        {POSSIBLE_ISSUE_NOTICE} Fill-in drafts for hospital grievance or authority
+        escalation. Confirm facts before copying or downloading.
       </p>
       {templates.map((template) => (
         <TemplateCard key={template.id} template={template} />

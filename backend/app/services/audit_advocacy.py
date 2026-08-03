@@ -71,7 +71,7 @@ FLAG_DISPLAY_LABELS: dict[str, str] = {
     "UNREALISTIC_REPETITION": "Unusually high repetition",
     "LAB_REPETITION": "Repeated lab or test charge",
     "PACKAGE_COMPONENT_CHARGED_SEPARATELY": "Package and component both billed",
-    "MEDICINE_PRICE_DISCREPANCY": "Medicine price above reference",
+    "MEDICINE_PRICE_DISCREPANCY": "Possible medicine overcharge",
     "BILLED_NOT_PRESCRIBED": "Billed without prescription match",
     "PREAUTH_AMOUNT_ABOVE_APPROVED": "Bill above pre-authorization amount",
     "PREAUTH_ITEM_OUTSIDE_AUTHORIZATION": "Item not clearly listed in pre-authorization",

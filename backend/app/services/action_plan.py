@@ -21,23 +21,31 @@ from app.services.audit_advocacy import (
     _recommendation_to_question,
     flag_display_label,
 )
-from app.services.legal_guardrails import sanitize_text
+from app.services.legal_guardrails import (
+    POSSIBLE_ISSUE_NOTICE,
+    sanitize_text,
+)
 
 # Disputed-amount threshold (INR) above which the "consider an advocate" step is
 # offered. Combined HIGH clinical + billing findings also unlock it.
 HIGH_DISPUTE_THRESHOLD = 25000.0
 
 _ACTION_PLAN_DISCLAIMER = (
-    "This action plan is assistance based on reference rates and government "
-    "treatment guidelines available in the app. It is not a final medical, "
-    "legal, or regulatory finding against any hospital or doctor. Verify every "
-    "detail before acting."
+    f"{POSSIBLE_ISSUE_NOTICE} This action plan is assistance based on reference "
+    "rates and government treatment guidelines available in the app. It is not a "
+    "final medical, legal, or regulatory finding against any hospital or doctor."
 )
 
 _RECOVERABLE_DISCLAIMER = (
-    "This is an estimate from billing math only (reference-rate differences and "
-    "subsidized-scheme prices). It is not a guaranteed refund; package terms, "
-    "exclusions, and item matches may require manual verification."
+    f"{POSSIBLE_ISSUE_NOTICE} This is an estimate from billing math only "
+    "(reference-rate differences and subsidized-scheme prices). It is not a "
+    "guaranteed refund; package terms, exclusions, and item matches may require "
+    "manual verification."
+)
+
+_COMPLAINT_DRAFT_NOTICE = (
+    f"Note: {POSSIBLE_ISSUE_NOTICE} This draft uses neutral, factual language "
+    "only and is not a legal finding."
 )
 
 _EMERGENCY_NOTE = (
@@ -376,8 +384,9 @@ def _build_escalation_ladder(
                 "what_to_attach": [sanitize_text(part) for part in step["what_to_attach"]],
                 "typical_timeline": sanitize_text(step["typical_timeline"]),
                 "disclaimer": (
-                    "This is general procedural guidance, not legal advice; "
-                    "steps and timelines vary by hospital, insurer, and state."
+                    f"{POSSIBLE_ISSUE_NOTICE} This is general procedural guidance, "
+                    "not legal advice; steps and timelines vary by hospital, "
+                    "insurer, and state."
                 ),
             }
         )
@@ -417,7 +426,8 @@ def _build_complaint_templates(
                 "Dear Sir/Madam,\n\n"
                 "I am writing about the bill for {patient} at {hospital} dated {date}. "
                 "On reviewing the itemized bill, I would like clarification on the "
-                "following items before I treat the amount of {amount} as final:\n\n"
+                "following possible issues before I treat the amount of {amount} as "
+                "final (please verify before acting on any adjustment):\n\n"
                 f"{flag_lines}\n\n"
                 "Please share the supporting prescriptions, package inclusions, and "
                 "the reference rates used for these items. I am happy to provide any "
@@ -433,8 +443,8 @@ def _build_complaint_templates(
                 "Dear Sir/Madam,\n\n"
                 "This concerns the claim for {patient} treated at {hospital} on {date}. "
                 "While reviewing the itemized bill totaling {amount}, I noticed the "
-                "following items that I would like verified against the applicable "
-                "rates and my policy or scheme terms:\n\n"
+                "following possible issues that I would like verified against the "
+                "applicable rates and my policy or scheme terms before any action:\n\n"
                 f"{flag_lines}\n\n"
                 "Kindly review these items during claim processing and let me know if "
                 "you require any further documents.\n\n"
@@ -447,10 +457,11 @@ def _build_complaint_templates(
             "subject": "Summary of unresolved hospital billing concerns",
             "body": (
                 "To the Honourable Commission,\n\n"
-                "I am submitting a summary of billing concerns regarding treatment of "
-                "{patient} at {hospital} on {date}, for a bill amount of {amount}, that "
-                "remained unresolved after I approached the hospital and, where "
-                "applicable, my insurer. The items I asked to be clarified are:\n\n"
+                "I am submitting a summary of possible billing issues regarding "
+                "treatment of {patient} at {hospital} on {date}, for a bill amount of "
+                "{amount}, that remained unresolved after I approached the hospital "
+                "and, where applicable, my insurer. The items I asked to be verified "
+                "before acting are:\n\n"
                 f"{flag_lines}\n\n"
                 "Supporting documents, correspondence, and the accompanying dispute "
                 "pack are enclosed for your consideration.\n\n"
@@ -469,6 +480,7 @@ def _build_complaint_templates(
                 "body": sanitize_text(template["body"]),
                 "included_flags": included_flags,
                 "requires_confirmation": True,
+                "disclaimer": sanitize_text(_COMPLAINT_DRAFT_NOTICE),
             }
         )
     return templates
@@ -568,8 +580,8 @@ def _build_combined_narrative(
     return {
         "summary": sanitize_text(summary),
         "disclaimer": (
-            "This narrative is a plain-language summary of app findings only. "
-            "Verify facts and consult qualified professionals before acting."
+            f"{POSSIBLE_ISSUE_NOTICE} This narrative is a plain-language summary "
+            "of app findings only. Consult qualified professionals as needed."
         ),
     }
 

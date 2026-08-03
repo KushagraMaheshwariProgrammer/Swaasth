@@ -21,6 +21,9 @@ import PatientsPage from "./pages/PatientsPage";
 import AccountSettingsPage from "./pages/AccountSettingsPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import TermsDevPreview from "./pages/TermsDevPreview";
+import TermsPage from "./pages/TermsPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import SourceCodePage from "./pages/SourceCodePage";
 import UserNav from "./components/UserNav";
 import PatientList from "./components/PatientList";
 import HospitalList from "./components/HospitalList";
@@ -335,14 +338,14 @@ function LandingPage() {
                   </div>
 
                   <div className="phone-summary">
-                    <p>Overcharged by</p>
+                    <p>Possible overcharge</p>
                     <h4>₹19,690</h4>
                   </div>
 
                   <div className="phone-card over">
                     <div className="phone-card-head">
                       <strong>Room Rent</strong>
-                      <span className="mini-pill red">Overpriced</span>
+                      <span className="mini-pill red">Possible overcharge</span>
                     </div>
                     <small>₹12,500 charged vs expected</small>
                   </div>
@@ -410,7 +413,14 @@ function LandingPage() {
             verification. Actual hospital pricing may vary.
           </p>
         </div>
-        <div className="footer-bottom">© {new Date().getFullYear()} BillCheck</div>
+        <div className="footer-bottom">
+          <span>© {new Date().getFullYear()} BillCheck</span>
+          <nav className="footer-legal" aria-label="Legal">
+            <Link to="/terms">Terms and Conditions</Link>
+            <Link to="/privacy">Privacy Policy</Link>
+            <Link to="/source">Open source</Link>
+          </nav>
+        </div>
       </footer>
     </motion.div>
   );
@@ -2384,6 +2394,9 @@ function AppRoutes() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/source" element={<SourceCodePage />} />
         {import.meta.env.DEV && (
           <Route path="/__dev/terms" element={<TermsDevPreview />} />
         )}

@@ -16,6 +16,7 @@ export const FLAG_DISPLAY_LABELS = {
   BROADER_SPECTRUM_ANTIBIOTIC: "Broader-spectrum antibiotic than typical",
   DRUG_INTERACTION: "Possible drug interaction",
   BRAND_WITHOUT_GENERIC_QUESTION: "Branded medicine with generic alternative",
+  MEDICINE_PRICE_DISCREPANCY: "Possible medicine overcharge",
 };
 
 export function flagDisplayLabel(flagType) {

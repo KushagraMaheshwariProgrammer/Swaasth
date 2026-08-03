@@ -1,3 +1,5 @@
+import { POSSIBLE_ISSUE_NOTICE } from "../data/hedgingCopy";
+
 export default function LegalPathwayModal({ pathway, flagLabel, onClose }) {
   if (!pathway) {
     return null;
@@ -31,7 +33,7 @@ export default function LegalPathwayModal({ pathway, flagLabel, onClose }) {
 
         <p className="treatment-audit-disclaimer legal-pathway-footer">
           {pathway.disclaimer ||
-            "Educational summary only — not legal advice. Consult a qualified advocate before alleging medical negligence or deficiency in service."}
+            `${POSSIBLE_ISSUE_NOTICE} Educational summary only — not legal advice. Consult a qualified advocate before alleging medical negligence or deficiency in service.`}
         </p>
       </div>
     </div>

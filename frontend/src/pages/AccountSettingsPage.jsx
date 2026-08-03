@@ -115,6 +115,25 @@ export default function AccountSettingsPage() {
         </header>
 
         <section className="account-section">
+          <h2>Legal</h2>
+          <p className="account-section-copy">
+            Review the agreements that govern your use of Swaasth and how your
+            data is handled.
+          </p>
+          <Link to="/terms" className="patients-manage-link">
+            Terms and Conditions →
+          </Link>
+          <br />
+          <Link to="/privacy" className="patients-manage-link">
+            Privacy Policy →
+          </Link>
+          <br />
+          <Link to="/source" className="patients-manage-link">
+            Open source / corresponding source →
+          </Link>
+        </section>
+
+        <section className="account-section">
           <h2>Medical history</h2>
           <p className="account-section-copy">
             {medicalHistoryConsentAccepted

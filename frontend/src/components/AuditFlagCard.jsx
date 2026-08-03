@@ -4,8 +4,15 @@ import {
   getAuditConfidenceMeta,
 } from "../auditAdvocacyUtils";
 import { getAuditSeverityMeta } from "../billUtils";
+import { POSSIBLE_ISSUE_NOTICE } from "../data/hedgingCopy";
 import LegalPathwayModal from "./LegalPathwayModal";
 import StgCitationModal from "./StgCitationModal";
+
+const OVERCHARGE_FLAG_TYPES = new Set([
+  "MEDICINE_PRICE_DISCREPANCY",
+  "PACKAGE_COMPONENT_CHARGED_SEPARATELY",
+  "PREAUTH_AMOUNT_ABOVE_APPROVED",
+]);
 
 const CLINICAL_CATEGORIES = new Set(["diagnosis", "investigation", "prescription"]);
 
@@ -60,6 +67,7 @@ export default function AuditFlagCard({ flag, index }) {
   const flagTitle = flag.item ? `${typeLabel}: ${flag.item}` : typeLabel;
   const hasStg = Boolean(flag?.stg_citation?.full_text);
   const hasLegal = Boolean(flag?.legal_pathway);
+  const isOverchargeRelated = OVERCHARGE_FLAG_TYPES.has(String(flag?.type || ""));
 
   return (
     <>
@@ -73,6 +81,9 @@ export default function AuditFlagCard({ flag, index }) {
         </div>
         <p className="audit-confidence-hint">{confidenceMeta.hint}</p>
         <p className="audit-flag-type">{typeLabel}</p>
+        {isOverchargeRelated && (
+          <p className="treatment-audit-disclaimer">{POSSIBLE_ISSUE_NOTICE}</p>
+        )}
         <p className="audit-flag-reason">{flag.reason}</p>
         {corpusLabel && (
           <p className="audit-flag-source-chip">
