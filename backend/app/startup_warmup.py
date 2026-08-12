@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from typing import Any
+
+from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +27,36 @@ def warmup_status() -> dict[str, Any]:
 
 def is_warmup_complete() -> bool:
     return _warmup_complete
+
+
+def wait_for_warmup(*, timeout_seconds: float = 120.0) -> None:
+    """Block until warmup finishes, or raise 503.
+
+    Used by sync analysis endpoints so clients (especially older app builds that
+    map every 503 to "backend unreachable") succeed across Container App
+    restarts instead of failing immediately.
+    """
+    deadline = time.monotonic() + max(timeout_seconds, 1.0)
+    while True:
+        if _warmup_complete:
+            return
+        if _warmup_error:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Backend warmup failed while loading guideline indexes. "
+                    "Please retry in a minute."
+                ),
+            )
+        if time.monotonic() >= deadline:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Backend is still warming up guideline indexes. "
+                    "Retry in about a minute."
+                ),
+            )
+        time.sleep(0.5)
 
 
 def _run_warmup() -> None:

@@ -75,7 +75,7 @@ Copy [`backend/.env.example`](../backend/.env.example) for local use. On Railway
 |----------|----------|-------------|
 | `AZURE_OPENAI_API_KEY` | **Yes** | Key for the Azure OpenAI resource |
 | `AZURE_OPENAI_ENDPOINT` | **Yes** | Resource endpoint, such as `https://RESOURCE.openai.azure.com/` |
-| `AZURE_OPENAI_DEPLOYMENT` | **Yes** | GPT-4o mini deployment name |
+| `AZURE_OPENAI_DEPLOYMENT` | **Yes** | Chat deployment name on `swaasthbot` (currently `gpt-4.1-mini`) |
 | `AZURE_OPENAI_API_VERSION` | Optional | Defaults to `2024-10-21` |
 | `ENV` | Recommended | Set to `production` |
 | `PORT` | Auto | Railway injects this; Dockerfile defaults to `8000` locally |

@@ -35,8 +35,21 @@ def _override_firebase_auth():
 @pytest.fixture(autouse=True)
 def _mark_warmup_complete(monkeypatch: pytest.MonkeyPatch) -> None:
     """Skip startup guideline-index warmup gate during tests."""
-    monkeypatch.setattr("app.prescription_routes.is_warmup_complete", lambda: True)
+    # Prefer flipping warmup state so the real wait_for_warmup() returns
+    # immediately; route modules still get an explicit no-op patch.
+    monkeypatch.setattr("app.startup_warmup._warmup_complete", True)
+    monkeypatch.setattr("app.startup_warmup._warmup_error", None)
     monkeypatch.setattr("app.startup_warmup.is_warmup_complete", lambda: True)
+    monkeypatch.setattr(
+        "app.prescription_routes.wait_for_warmup",
+        lambda **_kwargs: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "app.main.wait_for_warmup",
+        lambda **_kwargs: None,
+        raising=False,
+    )
 
 
 @pytest.fixture(autouse=True)

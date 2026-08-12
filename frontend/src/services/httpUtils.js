@@ -245,6 +245,8 @@ export async function parseJsonResponse(response) {
         if (response.status === 401) {
           throw new Error("Sign in required to continue.");
         }
+        // Empty/HTML 502-504 usually means ingress/proxy failure.
+        // Prefer a connection hint only when the body has no useful detail.
         if (response.status >= 502 && response.status <= 504) {
           throw new Error(backendUnreachableMessage());
         }
@@ -265,13 +267,47 @@ export async function parseJsonResponse(response) {
         )
       );
     }
-    if (response.status >= 502 && response.status <= 504) {
+    // JSON 502s from the API (e.g. Azure OpenAI upstream failure) should
+    // surface their detail — not the generic "could not reach backend" hint.
+    if (
+      response.status >= 502 &&
+      response.status <= 504 &&
+      !(payload && typeof payload === "object")
+    ) {
       throw new Error(backendUnreachableMessage());
     }
     throw new Error(extractApiErrorMessage(payload, text, response));
   }
 
   return payload ?? {};
+}
+
+function isWarmupUnavailableError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    message.includes("warming up") ||
+    message.includes("warmup") ||
+    message.includes("still starting")
+  );
+}
+
+/**
+ * Like fetchJson, but retries a few times when the API is still warming up
+ * (common right after a Container App restart).
+ */
+export async function fetchJsonWithWarmupRetry(url, options = {}, retries = 6) {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await fetchJson(url, options);
+    } catch (error) {
+      attempt += 1;
+      if (!isWarmupUnavailableError(error) || attempt > retries) {
+        throw error;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 2500));
+    }
+  }
 }
 
 export async function fetchJson(url, options = {}) {

@@ -27,7 +27,10 @@ Firebase **client** API keys in `google-services.json` are designed to be bundle
 |------|---------|
 | `backend/.env` | Azure OpenAI endpoint, deployment, API key, `GUIDELINE_CORPUS_SAS_URL` |
 | `frontend/.env` | Optional overrides only (usually empty) |
-| `backend/firebase-service-account.json` | Firebase Admin SDK (only if added later) |
+| `backend/firebase-service-account.json` | Local Firebase Admin SDK file (optional; prefer env) |
+| `~/Desktop/swaasth/firebase-adminsdk-swaasth-5bf90.json` | Firebase Admin key used by `scripts/deploy-azure-api.sh` → Container App secret `firebase-service-account-json` |
+
+Azure Container App `swaasth-api` must have env `FIREBASE_SERVICE_ACCOUNT_JSON=secretref:firebase-service-account-json`. Without it, signed-in extract/upload calls crash and the Android app shows “Could not reach the backend.”
 
 Share `AZURE_OPENAI_API_KEY` with teammates through a password manager or secure channel — not GitHub Issues, Slack channels, or commits.
 

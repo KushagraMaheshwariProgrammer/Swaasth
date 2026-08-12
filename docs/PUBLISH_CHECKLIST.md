@@ -36,6 +36,19 @@ Base: **https://swaasth-5bf90.web.app**
 API (not for store listing forms):  
 https://swaasth-api.redbay-ce8ac868.southindia.azurecontainerapps.io
 
+### API production guards (do not skip)
+
+`scripts/deploy-azure-api.sh` must keep all of these set on Container App `swaasth-api`:
+
+| Requirement | Why |
+|-------------|-----|
+| Secret `firebase-service-account-json` + env `FIREBASE_SERVICE_ACCOUNT_JSON` | Auth for upload/extract/analyze |
+| Secret `azure-openai-api-key` + env `AZURE_OPENAI_*` | OCR/LLM extraction |
+| Deployment name `AZURE_OPENAI_DEPLOYMENT` (currently `gpt-4.1-mini`) | Must exist on resource `swaasthbot` |
+| Generous liveness/readiness probes | Warmup must not restart the replica mid-request |
+
+If Firebase or OpenAI config is missing, the Android app often shows “Could not reach the backend” even though the host is up.
+
 ## You still need to do
 
 ### 1. Azure OpenAI modified abuse-monitoring (strongly recommended; not a Play blocker)

@@ -28,7 +28,7 @@ from app.services.action_plan import build_action_plan
 from app.services.patient_errors import document_mismatch_detail
 from app.services.patient_age import resolve_patient_age
 from app.services.patient_gender import gender_display_label
-from app.startup_warmup import is_warmup_complete
+from app.startup_warmup import wait_for_warmup
 from app.services.treatment_audit import analyze_treatment
 
 router = APIRouter()
@@ -388,11 +388,9 @@ def analyze_treatment_endpoint(
     body: AnalyzeTreatmentRequest,
     _user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
-    if not is_warmup_complete():
-        raise HTTPException(
-            status_code=503,
-            detail="Backend is still warming up guideline indexes. Retry in about a minute.",
-        )
+    # Wait instead of failing immediately — older app builds map 503 to
+    # "Could not reach the backend", and Container Apps can restart during warmup.
+    wait_for_warmup(timeout_seconds=120)
     prescription_items = _prescription_items_from_payload(
         body.medicines,
         body.tests,

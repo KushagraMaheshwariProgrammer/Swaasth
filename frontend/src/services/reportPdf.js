@@ -115,7 +115,11 @@ async function postRenderPdf(payload) {
         )
       );
     }
-    if (response.status >= 502 && response.status <= 504) {
+    if (
+      response.status >= 502 &&
+      response.status <= 504 &&
+      !(payload && typeof payload === "object")
+    ) {
       throw new Error(backendUnreachableMessage());
     }
     throw new Error(

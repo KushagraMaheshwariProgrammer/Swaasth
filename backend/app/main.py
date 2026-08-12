@@ -37,7 +37,8 @@ from app.services.patient_age import resolve_patient_age
 from app.services.patient_gender import gender_display_label
 from app.services.patient_errors import document_mismatch_detail
 from app.services.treatment_audit import analyze_treatment
-from app.startup_warmup import is_warmup_complete, start_background_warmup, warmup_status
+from app.startup_warmup import start_background_warmup, wait_for_warmup, warmup_status
+from app.services.runtime_config import log_critical_config_status
 
 
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent
@@ -88,6 +89,7 @@ app.include_router(prescription_router)
 
 @app.on_event("startup")
 def load_reference_data() -> None:
+    log_critical_config_status()
     try:
         locations = get_location_store()
         city_count = sum(
@@ -666,6 +668,10 @@ def compare_bill(
         resolve_hospital_type(body.hospital_type)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Treatment-audit path needs warmed guideline indexes; wait instead of 503.
+    if body.diagnosis and str(body.diagnosis).strip():
+        wait_for_warmup(timeout_seconds=120)
 
     line_items = [item.model_dump() for item in body.line_items]
     prescription_items = _prescription_items_from_request(

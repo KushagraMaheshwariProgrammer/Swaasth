@@ -1,5 +1,5 @@
 import { getApiBase } from "./apiBase";
-import { fetchJson, LONG_FETCH_TIMEOUT_MS } from "./httpUtils";
+import { fetchJson, fetchJsonWithWarmupRetry, LONG_FETCH_TIMEOUT_MS } from "./httpUtils";
 import { getPatientAge, getPatientBirthYear } from "../utils/patientAge";
 
 export function emptyClinicalContext() {
@@ -156,7 +156,7 @@ export async function analyzeTreatment({
   ocrText = "",
   clinicalHistory = null,
 }) {
-  return fetchJson(`${getApiBase()}/analyze-treatment`, {
+  return fetchJsonWithWarmupRetry(`${getApiBase()}/analyze-treatment`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     timeoutMs: LONG_FETCH_TIMEOUT_MS,
