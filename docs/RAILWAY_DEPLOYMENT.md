@@ -1,34 +1,43 @@
-# Railway Deployment Guide — Swaasth FastAPI Backend
+# Railway / Azure deployment — Swaasth FastAPI backend
 
-This guide covers deploying the MedBill/Swaasth backend from [`backend/`](../backend/) to [Railway](https://railway.app) as a public HTTPS API.
+Production API (as of August 2026) runs on **Azure Container Apps, South India**:
+
+`https://swaasth-api.redbay-ce8ac868.southindia.azurecontainerapps.io`
+
+`frontend/.env.production` sets `VITE_API_BASE` to that URL. Custom domain `api.swaasth.in` may CNAME to the same app. Railway remains an optional alternate; do not assume Railway is live unless you have provisioned it.
 
 ## Architecture overview
 
 ```
-React web (swaasth.in)  ──HTTPS──►  api.swaasth.in (Railway)
-Capacitor Android       ──HTTPS──►  api.swaasth.in (Railway)
+React web (swaasth.in)  ──HTTPS──►  Azure Container Apps (South India)
+Capacitor Android       ──HTTPS──►  same API
 ```
 
-The backend is a stateless FastAPI app. Reference CSVs and pre-built Chroma vector indexes are baked into the Docker image. Runtime report caches on disk are ephemeral (acceptable for small user counts).
+The backend is a stateless FastAPI app. NPPA / Jan Aushadhi CSVs are in the image. **Guideline PDFs and Chroma indexes are not in git**; the Docker build fetches them from a private Azure Blob via `GUIDELINE_CORPUS_SAS_URL` (`backend/scripts/fetch_guideline_corpus.py`).
 
 ---
 
 ## Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for local testing)
-- An Azure AI Foundry resource with a GPT-4o mini deployment
-- A [Railway account](https://railway.app) linked to GitHub
-- Pre-built vector indexes committed in Git:
-  - `backend/data/stg_index/`
-  - `backend/data/primary_guidelines_index/`
+- An Azure OpenAI resource **in an Indian region** with a GPT-4o mini deployment
+- Azure Container Apps (or Railway) linked to this repo
+- Private blob archive of guideline PDFs + prebuilt indexes, and a SAS URL
 
-If indexes are missing locally, build them once:
+If indexes are missing locally and you have the PDFs:
 
 ```bash
 cd backend
 pip install -r requirements.txt
 python scripts/build_primary_guidelines_index.py
 python scripts/build_stg_index.py
+```
+
+Or fetch a prebuilt archive:
+
+```bash
+export GUIDELINE_CORPUS_SAS_URL='https://…'
+python scripts/fetch_guideline_corpus.py --dest data --require
 ```
 
 ---
@@ -72,6 +81,7 @@ Copy [`backend/.env.example`](../backend/.env.example) for local use. On Railway
 | `PORT` | Auto | Railway injects this; Dockerfile defaults to `8000` locally |
 | `CORS_ORIGINS` | Optional | Comma-separated extra allowed origins |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Optional | Full service-account JSON (single line) for Firebase Admin |
+| `GUIDELINE_CORPUS_SAS_URL` | **Yes (production image)** | SAS URL of the private guideline archive |
 | `STG_INDEX_DIR` | Optional | Default `data/stg_index` |
 | `PRIMARY_GUIDELINES_INDEX_DIR` | Optional | Default `data/primary_guidelines_index` |
 

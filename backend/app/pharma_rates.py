@@ -291,6 +291,7 @@ class NppaPriceRow:
     ingredient_set: frozenset[str]
     form: str | None
     strength_mg: float
+    so_date: str = ""
 
 
 @dataclass(frozen=True)
@@ -360,6 +361,7 @@ class NppaRatesStore:
                     ingredient_set=frozenset(ing_keys),
                     form=_detect_form(dosage_form),
                     strength_mg=strengths[0] if strengths else 0.0,
+                    so_date=(raw.get("SO_Date") or raw.get("so_date") or "").strip(),
                 )
                 self.rows.append(row)
 
@@ -753,10 +755,28 @@ class CombinedPharmaRatesStore:
         enriched["pharma_price_basis"] = "unit"
         enriched["pharma_database"] = match.get("database", "nppa")
         enriched["resolved_generic_name"] = match.get("resolved_generic_name")
+        enriched["pharma_price_date"] = row.so_date or None
         return enriched
 
 
 _store: CombinedPharmaRatesStore | None = None
+
+_MONTHS = (
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+)
+
+
+def nppa_list_display_date(csv_path: Path | None = None) -> str:
+    """Human-readable NPPA list date from the filename (e.g. 03-06-2025 → 3 June 2025)."""
+    name = (csv_path or Path()).name
+    match = re.search(r"(\d{2})-(\d{2})-(\d{4})", name)
+    if not match:
+        return ""
+    day, month, year = int(match.group(1)), int(match.group(2)), match.group(3)
+    if 1 <= month <= 12:
+        return f"{day} {_MONTHS[month - 1]} {year}"
+    return f"{day:02d}-{month:02d}-{year}"
 
 
 def get_pharma_store() -> CombinedPharmaRatesStore:

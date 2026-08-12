@@ -25,7 +25,7 @@ Firebase **client** API keys in `google-services.json` are designed to be bundle
 
 | File | Purpose |
 |------|---------|
-| `backend/.env` | Azure OpenAI endpoint, deployment, and API key |
+| `backend/.env` | Azure OpenAI endpoint, deployment, API key, `GUIDELINE_CORPUS_SAS_URL` |
 | `frontend/.env` | Optional overrides only (usually empty) |
 | `backend/firebase-service-account.json` | Firebase Admin SDK (only if added later) |
 
@@ -57,26 +57,24 @@ The treatment audit uses a hybrid RAG pipeline over Indian Standard Treatment Gu
 
 ### Source files
 
-| Path | Purpose |
-|------|---------|
-| `backend/data/Standard Treatment Guidelines/STG.pdf` | CRC STG source PDF |
-| `backend/data/icmr_index/chunks_manifest.json` | Legacy ICMR parsed chunks |
-| `backend/data/Standard Treatment Guidelines/Clinical Estabilishments Act STG/` | CEA source PDFs (optional if manifest exists) |
-| `backend/data/icmr_document_curator.json` | ICMR title aliases and exclusion patterns |
+Guideline PDFs live in a **private blob**, not git. See [DATA_SOURCES.md](DATA_SOURCES.md).
 
-### Build indexes (required once per machine / after model changes)
+| Path (after fetch) | Purpose |
+|------|---------|
+| `backend/data/Standard Treatment Guidelines/` | ICMR, CEA, CRC PDFs |
+| `backend/data/icmr_document_curator.json` | ICMR title aliases (in git) |
+
+### Build or fetch indexes
 
 ```bash
 cd backend
 pip install -r requirements.txt
+# either rebuild from local PDFs:
 python scripts/build_primary_guidelines_index.py
 python scripts/build_stg_index.py
+# or fetch the private archive:
+python scripts/fetch_guideline_corpus.py --dest data --require
 ```
-
-This writes gitignored directories:
-
-- `backend/data/primary_guidelines_index/` — combined ICMR + CEA Chroma index
-- `backend/data/stg_index/` — CRC STG Chroma index
 
 Embeddings use `fastembed` locally (no extra API key). Default embedding model is `BAAI/bge-base-en-v1.5`.
 

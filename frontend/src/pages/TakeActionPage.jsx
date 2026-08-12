@@ -17,7 +17,7 @@ import { getBill } from "../services/bills";
 import { downloadDisputePackPdf } from "../services/reportPdf";
 import {
   hasActionConsent,
-  setActionConsentAccepted,
+  recordActionConsent,
 } from "../services/localActionConsentStore";
 import { POSSIBLE_ISSUE_NOTICE } from "../data/hedgingCopy";
 
@@ -87,7 +87,7 @@ export default function TakeActionPage() {
   const actionPlan = resolveActionPlan(report);
 
   const handleConsentAccept = () => {
-    setActionConsentAccepted();
+    void recordActionConsent(user?.uid);
     setConsentGranted(true);
   };
 

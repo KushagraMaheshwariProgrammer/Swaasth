@@ -4,7 +4,11 @@ import {
   getAuditConfidenceMeta,
 } from "../auditAdvocacyUtils";
 import { getAuditSeverityMeta } from "../billUtils";
-import { POSSIBLE_ISSUE_NOTICE } from "../data/hedgingCopy";
+import {
+  CLINICAL_FINDING_DISCLAIMER,
+  DISCUSS_WITH_DOCTOR,
+  POSSIBLE_ISSUE_NOTICE,
+} from "../data/hedgingCopy";
 import LegalPathwayModal from "./LegalPathwayModal";
 import StgCitationModal from "./StgCitationModal";
 
@@ -68,6 +72,9 @@ export default function AuditFlagCard({ flag, index }) {
   const hasStg = Boolean(flag?.stg_citation?.full_text);
   const hasLegal = Boolean(flag?.legal_pathway);
   const isOverchargeRelated = OVERCHARGE_FLAG_TYPES.has(String(flag?.type || ""));
+  const clinical = isClinicalFlag(flag);
+  const findingDisclaimer =
+    flag?.disclaimer || (clinical ? CLINICAL_FINDING_DISCLAIMER : null);
 
   return (
     <>
@@ -81,8 +88,10 @@ export default function AuditFlagCard({ flag, index }) {
         </div>
         <p className="audit-confidence-hint">{confidenceMeta.hint}</p>
         <p className="audit-flag-type">{typeLabel}</p>
-        {isOverchargeRelated && (
-          <p className="treatment-audit-disclaimer">{POSSIBLE_ISSUE_NOTICE}</p>
+        {(clinical || isOverchargeRelated) && (
+          <p className="treatment-audit-disclaimer">
+            {findingDisclaimer || POSSIBLE_ISSUE_NOTICE}
+          </p>
         )}
         <p className="audit-flag-reason">{flag.reason}</p>
         {corpusLabel && (
@@ -109,6 +118,9 @@ export default function AuditFlagCard({ flag, index }) {
         <p className="audit-flag-recommendation">
           <strong>Suggested question:</strong> {flag.recommendation}
         </p>
+        {clinical && (
+          <p className="treatment-audit-disclaimer">{DISCUSS_WITH_DOCTOR}</p>
+        )}
         {(hasStg || hasLegal) && (
           <div className="audit-flag-actions">
             {hasStg && (

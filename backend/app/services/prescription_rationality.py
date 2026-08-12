@@ -88,8 +88,8 @@ def _duplicate_class_flags(
                     f"therapeutic class ({drug_class.replace('_', ' ')})."
                 ),
                 "recommendation": (
-                    "Ask your doctor whether all of these medicines are needed, or if "
-                    "one medicine from this class would be sufficient."
+                    "Ask your treating doctor why multiple medicines from the same "
+                    "class appear on this bill or prescription."
                 ),
                 "guideline_basis": None,
                 "stg_reference": None,
@@ -131,8 +131,8 @@ def _interaction_flags(resolved: list[tuple[str, dict[str, Any]]]) -> list[dict[
                     f"{display_a} and {display_b} are a known interaction pair: {note}."
                 ),
                 "recommendation": (
-                    f"Ask your doctor or pharmacist whether taking {display_a} and "
-                    f"{display_b} together is appropriate for you."
+                    f"Ask your treating doctor or pharmacist to explain why "
+                    f"{display_a} and {display_b} appear together on this prescription."
                 ),
                 "guideline_basis": None,
                 "stg_reference": None,
@@ -170,11 +170,11 @@ def _broader_spectrum_flags(
                     "category": "prescription",
                     "reason": (
                         f"The prescribed antibiotic '{name}' is broader-spectrum than "
-                        f"typically recommended for {diagnosis}."
+                        f"typically listed for {diagnosis} in common first-line references."
                     ),
                     "recommendation": (
-                        "Ask your doctor whether a narrower or non-antibiotic treatment "
-                        "would be appropriate."
+                        "Ask your treating doctor why this broader-spectrum antibiotic "
+                        "appears on the bill or prescription for the documented diagnosis."
                     ),
                     "guideline_basis": None,
                     "stg_reference": None,
@@ -324,7 +324,8 @@ def _population_safety_flags(
                         + (f" {note}" if note else "")
                     ),
                     "recommendation": (
-                        f"Ask your doctor whether {name} is appropriate while breastfeeding."
+                        f"Ask your treating doctor why {name} appears on the prescription "
+                        "if you are breastfeeding."
                     ),
                     "guideline_basis": None,
                     "stg_reference": None,

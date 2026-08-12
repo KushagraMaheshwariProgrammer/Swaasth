@@ -12,9 +12,9 @@ from app.services.claim_audit import analyze_claim_items
 
 
 def test_flag_display_label_neutral_wording() -> None:
-    assert flag_display_label("UNNECESSARY_TEST") == "Not routinely recommended"
+    assert flag_display_label("UNNECESSARY_TEST") == "Clarify why this test was billed"
     assert flag_display_label("GUIDELINE_SUPPORT_NOT_IDENTIFIED") == (
-        "Guideline support not identified"
+        "Guideline match unclear — ask for clarification"
     )
 
 
@@ -51,7 +51,7 @@ def test_build_patient_questions_deduplicates() -> None:
 def test_finalize_audit_flags_adds_display_label_and_confidence() -> None:
     flags = [{"type": "UNNECESSARY_TEST", "severity": "HIGH", "item": "MRI"}]
     finalized = finalize_audit_flags(flags, chunks=[])
-    assert finalized[0]["display_label"] == "Not routinely recommended"
+    assert finalized[0]["display_label"] == "Clarify why this test was billed"
     assert finalized[0]["confidence"] in {"LOW", "MEDIUM", "HIGH"}
 
 

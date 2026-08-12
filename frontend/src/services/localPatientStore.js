@@ -109,3 +109,14 @@ export function removeLocalPatient(userId, patientId) {
   );
   writeStore(store);
 }
+
+export function clearLocalPatientsForUser(userId) {
+  if (!userId) {
+    return;
+  }
+  const store = readStore();
+  if (store.users[userId]) {
+    delete store.users[userId];
+    writeStore(store);
+  }
+}

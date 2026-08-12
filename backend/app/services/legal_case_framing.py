@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.services.legal_guardrails import POSSIBLE_ISSUE_NOTICE
+from app.services.legal_guardrails import POSSIBLE_ISSUE_NOTICE, sanitize_value
 
 _PATHWAYS: dict[str, dict[str, Any]] = {
     "billing": {
@@ -155,6 +155,6 @@ def attach_legal_pathways(flags: list[dict[str, Any]]) -> list[dict[str, Any]]:
         item = dict(flag)
         pathway = build_legal_pathway_for_flag(item)
         if pathway:
-            item["legal_pathway"] = pathway
+            item["legal_pathway"] = sanitize_value(pathway)
         enriched.append(item)
     return enriched

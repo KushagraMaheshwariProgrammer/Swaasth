@@ -1,11 +1,11 @@
-export const PRIVACY_POLICY_VERSION = "2026-08-03";
-export const PRIVACY_POLICY_LAST_UPDATED = "3 August 2026";
+export const PRIVACY_POLICY_VERSION = "2026-08-12";
+export const PRIVACY_POLICY_LAST_UPDATED = "12 August 2026";
 export const PRIVACY_POLICY_SECTIONS = [
   {
     title: "Introduction",
     paragraphs: [
       "This Privacy Policy explains how Swaasth (\"Swaasth\", \"we\", \"us\", or \"our\") collects, uses, stores, shares, protects, retains, and deletes your information when you use the Swaasth mobile application, website, and related services.",
-      "Swaasth helps users review hospital bills, prescriptions, and other healthcare documents for possible billing irregularities, and provides guidance on possible next steps. Because of the nature of this service, we may process sensitive personal information, including health-related information. We take this responsibility seriously.",
+      "Swaasth helps users review hospital bills, prescriptions, and other healthcare documents for possible billing irregularities, and may compare uploaded clinical details with published government treatment guidelines for informational questions to discuss with a doctor. Because of the nature of this service, we may process sensitive personal information, including health-related information. We take this responsibility seriously.",
       "This Privacy Policy should be read together with our Terms and Conditions. By creating an account, signing in, uploading documents, or using any feature of Swaasth, you consent to the practices described in this Privacy Policy. If you do not agree, please do not use Swaasth.",
     ],
     bullets: [],
@@ -53,10 +53,10 @@ export const PRIVACY_POLICY_SECTIONS = [
     ],
     bullets: [
       "Creating, maintaining, and securing your account.",
-      "Analysing your uploaded bills and healthcare documents to identify possible billing irregularities, overcharges, duplicates, or clinical mismatches.",
+      "Analysing your uploaded bills and healthcare documents to identify possible billing irregularities, overcharges, duplicates, or informational mismatches against published treatment guidelines (not medical diagnosis or treatment advice).",
       "Generating summaries, reports, alerts, recommendations, complaint drafts, and suggested next steps.",
       "Saving analysis reports and medical history to your account, only where you have given specific consent.",
-      "Providing legal guidance, advisory assistance, and procedural support features.",
+      "Assembling complaint drafts, checklists, and procedural next-step information (not legal advice).",
       "Responding to your support requests, complaints, grievances, or data-related requests.",
       "Maintaining the security, integrity, and reliability of the service, including preventing fraud, abuse, and unauthorized access.",
       "Improving the app's features, accuracy, and user experience.",
@@ -97,7 +97,7 @@ export const PRIVACY_POLICY_SECTIONS = [
       "Some of our service providers (such as Google and Microsoft) may store or process data on servers located outside India. Where personal data is transferred outside India, we take reasonable steps to ensure it receives an adequate level of protection consistent with applicable law.",
     ],
     bullets: [
-      "Cloud database: account details, consent records, patient details, and analysis reports (where consented) are stored in Google Firebase (Firestore), protected by authentication and access rules that restrict each user's data to that user alone.",
+      "Cloud database: account details, consent records, patient details, and analysis reports (where consented) are stored in Google Firebase (Firestore) in Mumbai, India (asia-south1), protected by authentication and access rules that restrict each user's data to that user alone.",
       "On your device: bills, patient details, and consent records may be cached in encrypted local storage on your own device so the app works quickly and offline. This data stays on your device and is protected by encryption.",
       "Transient processing: document content is processed in memory by our backend and AI/OCR providers to generate results and is not retained as stored files after processing.",
     ],
@@ -137,10 +137,10 @@ export const PRIVACY_POLICY_SECTIONS = [
     bullets: [
       "Access: request a summary of the personal data we hold about you and how it is processed.",
       "Correction: request correction of inaccurate or incomplete personal data, or update it directly in the app.",
-      "Erasure: request deletion of your personal data, including patient details and saved reports.",
+      "Erasure: delete your account and personal data from Account settings, or request deletion via the /delete-account web page or by contacting us.",
       "Withdrawal of consent: withdraw any consent you have given at any time, with effect for the future. Withdrawing consent may limit the features available to you.",
       "Grievance redressal: raise a complaint about how your data is handled and receive a timely response.",
-      "Nomination: nominate another individual to exercise your rights in the event of your death or incapacity, as provided under the DPDP Act.",
+      "Nomination: email app.swaasth@gmail.com to nominate another individual to exercise your rights in the event of your death or incapacity, as provided under the DPDP Act. We will record the nomination against your account after verifying your identity.",
     ],
   },
   {
@@ -148,7 +148,8 @@ export const PRIVACY_POLICY_SECTIONS = [
     paragraphs: [
       "You can delete individual patients, bills, and reports from within the app.",
       "You can revoke medical history consent from Account settings, which deletes previously saved reports and medical documents from your account and your device.",
-      "To request deletion of your entire account and associated data, contact us at the email address in Section 16. We will act on verified requests within a reasonable time, except where we are required or permitted by law to retain certain records.",
+      "You can permanently delete your entire Swaasth account and associated data from Account settings → Delete account. After you confirm your identity, we delete your Auth account, Firestore records (including patient profiles, hospitals, reports, and consent), and encrypted local copies of that data on the device where you complete deletion.",
+      "You can also request deletion without opening the app via the web page at /delete-account on the Swaasth website, or by emailing the address in Section 16 from the email linked to your account. We will verify your identity and complete deletion within a reasonable time (usually within 30 days), except where we are required or permitted by law to retain certain records.",
     ],
     bullets: [],
   },
@@ -187,11 +188,11 @@ export const PRIVACY_POLICY_SECTIONS = [
   {
     title: "16. Contact and Grievance Officer",
     paragraphs: [
-      "For questions about this Privacy Policy, to exercise your rights, or to raise a grievance about how your personal data is handled, you may contact:",
-      "We will acknowledge and respond to grievances within a reasonable time, and in any event within the timelines required under applicable law.",
+      "The data fiduciary for Swaasth is Kushagra Maheshwari, sole proprietor, Hyderabad, Telangana, India.",
+      "For questions about this Privacy Policy, to exercise your rights, or to raise a grievance about how your personal data is handled, contact the grievance officer. We will acknowledge and resolve grievances within one month of receipt, as required under Rule 5(9) of the SPDI Rules, 2011, and in any event within the timelines required under applicable law including the DPDP Act, 2023.",
     ],
     bullets: [
-      "Swaasth Support / Grievance Contact — Email: swaasth.app@gmail.com",
+      "Grievance Officer / Support: Kushagra Maheshwari — Email: app.swaasth@gmail.com",
     ],
   },
 ];

@@ -154,7 +154,11 @@ service cloud.firestore {
         'privacyPolicyVersion',
         'medicalHistoryConsentAt',
         'medicalHistoryConsentDeclinedAt',
-        'medicalHistoryConsentVersion'
+        'medicalHistoryConsentVersion',
+        'actionConsentAt',
+        'actionConsentVersion',
+        'adultAttestedAt',
+        'adultAttestedVersion'
       ]);
     }
 
@@ -173,7 +177,15 @@ service cloud.firestore {
         && (!('medicalHistoryConsentAt' in data)
             || isTimestampOrString(data.medicalHistoryConsentAt))
         && (!('medicalHistoryConsentDeclinedAt' in data)
-            || isTimestampOrString(data.medicalHistoryConsentDeclinedAt));
+            || isTimestampOrString(data.medicalHistoryConsentDeclinedAt))
+        && (!('actionConsentAt' in data)
+            || isTimestampOrString(data.actionConsentAt))
+        && (!('actionConsentVersion' in data)
+            || shortString(data.actionConsentVersion, 40))
+        && (!('adultAttestedAt' in data)
+            || isTimestampOrString(data.adultAttestedAt))
+        && (!('adultAttestedVersion' in data)
+            || shortString(data.adultAttestedVersion, 40));
     }
 
     match /users/{userId} {
@@ -204,6 +216,20 @@ service cloud.firestore {
           allow delete: if isOwner(userId);
         }
       }
+    }
+
+    match /deletionRequests/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'userId', 'email', 'requestedAt', 'status', 'note'
+        ])
+        && request.resource.data.userId == userId
+        && optionalShortString(request.resource.data.email, 320)
+        && isTimestampOrString(request.resource.data.requestedAt)
+        && shortString(request.resource.data.status, 40)
+        && optionalShortString(request.resource.data.note, 500);
+      allow delete: if isOwner(userId);
     }
   }
 }

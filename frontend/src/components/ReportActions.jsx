@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { canExportReport, buildReportFilename } from "../data/reportExport";
 import { collectPatientQuestions } from "../auditAdvocacyUtils";
 import { hasActionablePlan } from "../actionPlanUtils";
@@ -15,7 +16,7 @@ import ReportPdfViewer from "./ReportPdfViewer";
 import ActionConsentModal from "./ActionConsentModal";
 import {
   hasActionConsent,
-  setActionConsentAccepted,
+  recordActionConsent,
 } from "../services/localActionConsentStore";
 import { POSSIBLE_ISSUE_NOTICE } from "../data/hedgingCopy";
 
@@ -101,6 +102,7 @@ function actionErrorMessage(error, fallback) {
 
 export default function ReportActions({ report, className = "report-actions" }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [pdfMessage, setPdfMessage] = useState("");
   const [pdfMessageTone, setPdfMessageTone] = useState("error");
   const [busy, setBusy] = useState("");
@@ -143,7 +145,7 @@ export default function ReportActions({ report, className = "report-actions" }) 
   };
 
   const handleActionConsentAccept = () => {
-    setActionConsentAccepted();
+    void recordActionConsent(user?.uid);
     setShowActionConsent(false);
     navigateToAction();
   };

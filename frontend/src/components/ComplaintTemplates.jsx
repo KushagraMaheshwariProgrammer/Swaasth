@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { confirmPhiExport } from "../utils/confirmPhiExport";
-import { POSSIBLE_ISSUE_NOTICE } from "../data/hedgingCopy";
+import { POSSIBLE_ISSUE_NOTICE, AI_GENERATED_NOTICE } from "../data/hedgingCopy";
 
 function TemplateCard({ template }) {
   const [body, setBody] = useState(template.body || "");
@@ -17,7 +17,7 @@ function TemplateCard({ template }) {
     ) {
       return;
     }
-    const text = `Subject: ${template.subject}\n\n${body}`;
+    const text = `${AI_GENERATED_NOTICE}\n\nSubject: ${template.subject}\n\n${body}`;
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -29,9 +29,12 @@ function TemplateCard({ template }) {
     if (!confirmed) {
       return;
     }
-    const blob = new Blob([`Subject: ${template.subject}\n\n${body}`], {
-      type: "text/plain",
-    });
+    const blob = new Blob(
+      [`${AI_GENERATED_NOTICE}\n\nSubject: ${template.subject}\n\n${body}`],
+      {
+        type: "text/plain",
+      }
+    );
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;

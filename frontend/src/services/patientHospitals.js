@@ -297,6 +297,17 @@ export async function deleteHospitalsForPatientIds(userId, patientIds) {
   }
 }
 
+export function clearLocalHospitalsForUser(userId) {
+  if (!userId) {
+    return;
+  }
+  const store = readStore();
+  if (store.users[userId]) {
+    delete store.users[userId];
+    writeStore(store);
+  }
+}
+
 export function resolveHospitalLocation(hospital) {
   if (!hospital) {
     return { state: "", city: "", name: "" };

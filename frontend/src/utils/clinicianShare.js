@@ -1,6 +1,6 @@
 import { collectPatientQuestions } from "../auditAdvocacyUtils";
 import { flagDisplayLabel } from "../auditAdvocacyUtils";
-import { POSSIBLE_ISSUE_NOTICE } from "../data/hedgingCopy";
+import { POSSIBLE_ISSUE_NOTICE, AI_GENERATED_NOTICE } from "../data/hedgingCopy";
 import {
   buildFlagKey,
   collectAllFlags,
@@ -57,6 +57,7 @@ export function buildClinicianShareText(report, annotations = null) {
 
   const lines = [
     "Swaasth — summary for clinician review",
+    AI_GENERATED_NOTICE,
     "",
     `Report: ${meta.reportTitle}`,
     `Patient: ${patientName}`,

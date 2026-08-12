@@ -21,3 +21,6 @@ Users of the hosted service can obtain corresponding source from:
 PDF extraction and report PDF generation use PyMuPDF (MuPDF), which is AGPL-licensed.
 Swaasth complies by publishing complete corresponding source under AGPL-3.0 rather than
 using Artifex’s commercial license.
+
+Guideline PDFs and derived vector indexes are third-party data, not corresponding
+source of the program. They are fetched at deploy time; see `docs/DATA_SOURCES.md`.

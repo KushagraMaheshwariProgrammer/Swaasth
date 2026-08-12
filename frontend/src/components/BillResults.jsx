@@ -50,14 +50,9 @@ export default function BillResults({ result, toolbar = null, onReportUpdate }) 
             </span>
           </div>
           <p className="jan-aushadhi-intro">
-            The Government of India sells the following medicine
-            {janAushadhiMatches.length === 1 ? "" : "s"} from your bill at
-            subsidized rates under the{" "}
-            <strong>
-              {result.jan_aushadhi?.scheme_name ||
-                "Pradhan Mantri Bhartiya Janaushadhi Pariyojana (PMBJP)"}
-            </strong>{" "}
-            (Jan Aushadhi).
+            The following billed medicines also appear in the Jan Aushadhi
+            catalogue. This is information to discuss with your prescriber — not
+            a recommendation to substitute a prescribed brand.
           </p>
           <ul className="jan-aushadhi-match-list">
             {janAushadhiMatches.map((match, index) => (
@@ -79,9 +74,16 @@ export default function BillResults({ result, toolbar = null, onReportUpdate }) 
           </ul>
           <p className="jan-aushadhi-advisory">
             {result.jan_aushadhi?.advisory ||
-              "Visit your nearest Jan Aushadhi Kendra (medical store) to purchase these medicines at the subsidized MRP."}
+              "Ask your prescriber or pharmacist whether a Jan Aushadhi generic equivalent is appropriate before changing any medicine."}
           </p>
         </section>
+      )}
+
+      {hasLineItems && result?.rates_source?.nppa_list_date && (
+        <p className="comparison-context">
+          Medicine ceiling-price comparisons are as per the NPPA ceiling price
+          list dated <strong>{result.rates_source.nppa_list_date}</strong>.
+        </p>
       )}
 
       {hasLineItems && result?.hospital?.name_from_bill && (

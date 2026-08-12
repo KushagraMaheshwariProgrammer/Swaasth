@@ -288,7 +288,7 @@ export default function HistoryPage() {
                       {bill.report_kind === "prescription" ||
                       bill.report_kind === "clinical" ? (
                         <span>
-                          {bill.treatment_audit_flags?.flags_count ?? 0} STG flag
+                          {bill.treatment_audit_flags?.flags_count ?? 0} clarification
                           {(bill.treatment_audit_flags?.flags_count ?? 0) === 1
                             ? ""
                             : "s"}

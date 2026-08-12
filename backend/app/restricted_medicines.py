@@ -11,6 +11,8 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
+from app.services.legal_guardrails import sanitize_text, sanitize_value
+
 logger = logging.getLogger(__name__)
 
 MIN_MATCH_LEN = 4
@@ -430,10 +432,10 @@ def build_restricted_medicine_flags(
     detected = bool(flags)
     return {
         "detected": detected,
-        "flags": flags,
-        "advisory": ADVISORY if detected else "",
-        "disclaimer": DISCLAIMER,
-        "manual_verification_note": MANUAL_VERIFICATION_NOTE if detected else "",
+        "flags": sanitize_value(flags),
+        "advisory": sanitize_text(ADVISORY) if detected else "",
+        "disclaimer": sanitize_text(DISCLAIMER),
+        "manual_verification_note": sanitize_text(MANUAL_VERIFICATION_NOTE) if detected else "",
     }
 
 

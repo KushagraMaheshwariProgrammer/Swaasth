@@ -554,11 +554,12 @@ def _build_comparison_response(
 
     rates_source: dict[str, Any] = {}
     try:
-        from app.pharma_rates import get_pharma_store
+        from app.pharma_rates import get_pharma_store, nppa_list_display_date
 
         pharma_store = get_pharma_store()
         rates_source["nppa_file"] = str(pharma_store.nppa.csv_path.name)
         rates_source["total_nppa_entries"] = len(pharma_store.nppa.rows)
+        rates_source["nppa_list_date"] = nppa_list_display_date(pharma_store.nppa.csv_path)
         if pharma_store.az:
             rates_source["az_brand_file"] = str(pharma_store.az.csv_path.name)
             rates_source["az_brand_index_size"] = len(pharma_store.az.rows)
@@ -568,6 +569,7 @@ def _build_comparison_response(
     except Exception:
         rates_source["nppa_file"] = None
         rates_source["total_nppa_entries"] = 0
+        rates_source["nppa_list_date"] = None
         rates_source["az_brand_file"] = None
         rates_source["az_brand_index_size"] = 0
     try:

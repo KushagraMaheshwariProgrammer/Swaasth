@@ -3,6 +3,7 @@ import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 import {
   EmailAuthProvider,
   GoogleAuthProvider,
+  deleteUser,
   reauthenticateWithCredential,
   reauthenticateWithPopup,
   updatePassword,
@@ -10,6 +11,11 @@ import {
 } from "firebase/auth";
 import { auth } from "../firebase";
 import { getAccountActionCodeSettings } from "./emailVerification";
+import { deleteAllUserData } from "../services/accountDeletion";
+import {
+  markDeletionRequestDataDeleted,
+  recordDeletionRequest,
+} from "../services/dataExport";
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "login" });
@@ -84,4 +90,33 @@ export async function changeUserEmail(currentPassword, newEmail) {
     newEmail.trim(),
     getAccountActionCodeSettings()
   );
+}
+
+/**
+ * Re-authenticate, wipe all user data, then delete the Firebase Auth account.
+ * @param {string} [password] Required for email/password accounts.
+ */
+export async function deleteCurrentUserAccount(password) {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("You must be signed in.");
+  }
+  const userId = user.uid;
+
+  await reauthenticateCurrentUser(
+    usesPasswordProvider(user) ? password : undefined
+  );
+
+  await recordDeletionRequest(userId, user.email || "");
+  await deleteAllUserData(userId);
+  await markDeletionRequestDataDeleted(userId);
+  await deleteUser(auth.currentUser || user);
+
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await FirebaseAuthentication.signOut();
+    } catch {
+      // Web Auth user is already deleted; native session cleanup is best-effort.
+    }
+  }
 }

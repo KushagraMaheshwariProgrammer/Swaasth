@@ -29,7 +29,11 @@ def test_build_chunks_from_clinical_establishments_pdf() -> None:
     assert chunks[0].source_file == files[0].name
 
 
-def test_build_primary_guideline_corpus_combines_icmr_and_cea(monkeypatch) -> None:
+def test_build_primary_guideline_corpus_combines_icmr_and_cea(monkeypatch, tmp_path) -> None:
+    dummy_cea = tmp_path / "cea"
+    dummy_cea.mkdir()
+    (dummy_cea / "sample.pdf").write_bytes(b"%PDF-1.4")
+    monkeypatch.setattr("app.services.guideline_corpus_parser.CEA_DIR", dummy_cea)
     monkeypatch.setattr(
         "app.services.guideline_corpus_parser.build_chunks_from_directory",
         lambda directory, corpus, use_ocr_fallback=True, max_files=None: [

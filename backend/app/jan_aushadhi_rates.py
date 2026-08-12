@@ -304,9 +304,10 @@ def build_jan_aushadhi_summary(line_items: list[dict[str, Any]]) -> dict[str, An
         "matches": matches,
         "scheme_name": "Pradhan Mantri Bhartiya Janaushadhi Pariyojana (PMBJP)",
         "advisory": (
-            "The Government of India supplies these medicines at subsidized rates "
-            "under the Jan Aushadhi scheme. Visit your nearest Jan Aushadhi Kendra "
-            "(medical store) to purchase them at the listed MRP."
+            "These Jan Aushadhi catalogue prices are listed for discussion with "
+            "your prescriber or pharmacist. They are not a recommendation to "
+            "substitute a prescribed brand. Ask whether a generic equivalent is "
+            "appropriate for your case before changing any medicine."
         ),
     }
 

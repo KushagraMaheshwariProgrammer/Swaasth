@@ -117,7 +117,7 @@ export default function VerifyEmailPage() {
               </p>
             ) : (
               <p>
-                Your email address has been verified. Sign in to continue using BillCheck.
+                Your email address has been verified. Sign in to continue using Swaasth.
               </p>
             )}
           </header>

@@ -1,4 +1,11 @@
-"""STG-grounded treatment appropriateness audit with clinical triangle checks."""
+"""STG-grounded informational clarifications (not clinical conclusions).
+
+Compares uploaded documents — billed/prescribed items and documented case
+details — against published government guideline excerpts to surface questions
+for the treating doctor or hospital. Outputs are documentation, billing-
+relevance, and guideline-listing findings only — not diagnosis, treatment
+advice, or determinations of medical appropriateness.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +22,11 @@ from app.services.clinical_history_relevance import filter_relevant_clinical_his
 from app.services.investigation_audit import analyze_investigations
 from app.services.investigation_history_audit import analyze_repeat_investigations
 from app.services.lab_interpretation import analyze_lab_results
+from app.services.legal_guardrails import (
+    CLINICAL_FINDING_DISCLAIMER,
+    CLINICAL_SECTION_DISCLAIMER,
+    DISCUSS_WITH_DOCTOR,
+)
 from app.services.prescription_rationality import analyze_prescription_rationality
 from app.services.rag_pipeline import (
     _find_supporting_chunk,
@@ -230,12 +242,13 @@ def _rule_based_clinical_flags(
                         "item": diagnosis,
                         "category": "diagnosis",
                         "reason": (
-                            f"Diagnosis is '{diagnosis}' but "
-                            f"{result.get('test_name')} is reported negative."
+                            f"Uploaded records list diagnosis '{diagnosis}' while "
+                            f"{result.get('test_name')} is reported negative. Ask your "
+                            "treating doctor how these were reconciled."
                         ),
                         "recommendation": (
-                            "Ask the clinician to reconcile the diagnosis with the "
-                            "negative malaria test result using standard diagnostic criteria."
+                            "Ask your treating doctor how the malaria diagnosis was "
+                            "documented given the negative malaria test on file."
                         ),
                         "stg_reference": None,
                     }
@@ -256,12 +269,13 @@ def _rule_based_clinical_flags(
                         "item": diagnosis,
                         "category": "diagnosis",
                         "reason": (
-                            f"Diagnosis is '{diagnosis}' but "
-                            f"{result.get('test_name')} is reported negative."
+                            f"Uploaded records list diagnosis '{diagnosis}' while "
+                            f"{result.get('test_name')} is reported negative. Ask your "
+                            "treating doctor how these were reconciled."
                         ),
                         "recommendation": (
-                            "Ask the clinician to reconcile the typhoid diagnosis "
-                            "with the negative serological or culture result."
+                            "Ask your treating doctor how the typhoid diagnosis was "
+                            "documented given the negative serological or culture result."
                         ),
                         "stg_reference": None,
                     }
@@ -291,13 +305,14 @@ def _rule_based_clinical_flags(
                         "item": rx_name,
                         "category": "prescription",
                         "reason": (
-                            f"'{rx_name}' is prescribed for '{diagnosis}' without "
-                            "documented bacterial coinfection evidence."
+                            f"'{rx_name}' appears for '{diagnosis}' without documented "
+                            "bacterial coinfection in the uploaded records — worth "
+                            "confirming for billing and documentation clarity."
                         ),
                         "recommendation": (
-                            "Ask your doctor whether antibiotics are needed. For dengue, "
-                            "antibiotics are usually not given unless there is clear "
-                            "evidence of a bacterial infection."
+                            "Ask your treating doctor why this antibiotic was prescribed "
+                            "for this dengue case and whether a bacterial coinfection "
+                            "was documented."
                         ),
                         "stg_reference": None,
                     }
@@ -316,13 +331,14 @@ def _rule_based_clinical_flags(
                     "item": item_name,
                     "category": "investigation",
                     "reason": (
-                        f"'{item_name}' is listed for '{diagnosis}', but advanced imaging "
-                        "is usually a clarification point unless complicated UTI features "
-                        "are documented."
+                        f"'{item_name}' is listed for '{diagnosis}'. Advanced imaging "
+                        "is often a billing-clarification point unless complicated UTI "
+                        "features are documented on the records."
                     ),
                     "recommendation": (
-                        "Ask whether complicated UTI features, obstruction, stone, recurrent "
-                        "infection, or another reason makes this imaging necessary."
+                        "Ask your treating doctor what documented reason required this "
+                        "imaging for the billed UTI case (for example obstruction, stone, "
+                        "or recurrent infection)."
                     ),
                     "stg_reference": None,
                 }
@@ -351,8 +367,8 @@ def _rule_based_clinical_flags(
                                 f"'{rx_name}' appears in the current medicines."
                             ),
                             "recommendation": (
-                                "Ask the clinician or pharmacist to verify the allergy history "
-                                "before using this medicine."
+                                "Ask your treating doctor or pharmacist to confirm the allergy "
+                                "history against this billed or prescribed medicine."
                             ),
                             "stg_reference": None,
                         }
@@ -387,8 +403,8 @@ def _rule_based_clinical_flags(
                                 "patient's recent history."
                             ),
                             "recommendation": (
-                                "Ask your doctor whether repeating the same antibiotic "
-                                "class is appropriate for this visit."
+                                "Ask your treating doctor why the same antibiotic class "
+                                "appears again on this visit's bill or prescription."
                             ),
                             "stg_reference": None,
                         }
@@ -431,8 +447,9 @@ def _rule_based_clinical_flags(
                             "visible in the uploaded data."
                         ),
                         "recommendation": (
-                            "Ask whether blood glucose monitoring is needed during this infection "
-                            "or acute illness episode."
+                            "Ask your treating doctor whether a blood glucose review was "
+                            "done or billed during this infection episode, given the "
+                            "documented diabetes history."
                         ),
                         "stg_reference": None,
                     }
@@ -455,6 +472,35 @@ def _compute_risk_level(flags: list[dict[str, Any]]) -> str:
     return "MEDIUM"
 
 
+def _normalize_clinical_alignment(alignment: dict[str, Any] | None) -> dict[str, Any]:
+    """Map model/legacy alignment into a neutral tri-state plus a compatibility alias."""
+    payload = dict(alignment or {})
+    raw = payload.get("documents_consistent")
+    if raw is None:
+        raw = payload.get("diagnosis_supported")
+    if isinstance(raw, str):
+        value = raw.strip().lower()
+        if value in {"true", "yes", "consistent"}:
+            value = "yes"
+        elif value in {"false", "no", "inconsistent", "unsupported"}:
+            value = "unclear"
+        elif value not in {"yes", "unclear", "not_assessable"}:
+            value = "not_assessable"
+    elif raw is True:
+        value = "yes"
+    elif raw is False:
+        value = "unclear"
+    else:
+        value = "not_assessable"
+    payload["documents_consistent"] = value
+    payload["diagnosis_supported"] = (
+        True if value == "yes" else False if value == "unclear" else None
+    )
+    payload.setdefault("supporting_evidence", [])
+    payload.setdefault("missing_evidence", [])
+    return payload
+
+
 _USER_FACING_REPLACEMENTS: tuple[tuple[re.Pattern[str], str], ...] = (
     (
         re.compile(
@@ -462,8 +508,8 @@ _USER_FACING_REPLACEMENTS: tuple[tuple[re.Pattern[str], str], ...] = (
             re.IGNORECASE,
         ),
         (
-            "Ask your doctor whether this medicine is necessary for your condition "
-            "and whether a simpler or standard alternative is available."
+            "Ask your treating doctor why this medicine appears on the bill or "
+            "prescription for your documented condition."
         ),
     ),
     (
@@ -472,8 +518,8 @@ _USER_FACING_REPLACEMENTS: tuple[tuple[re.Pattern[str], str], ...] = (
             re.IGNORECASE,
         ),
         (
-            "Ask your doctor which tests are needed to confirm the diagnosis "
-            "before starting or continuing treatment."
+            "Ask your treating doctor which tests were ordered for this billed case "
+            "and how they relate to the documented diagnosis."
         ),
     ),
     (re.compile(r"\bper stg\b", re.IGNORECASE), "per government treatment guidelines"),
@@ -495,17 +541,37 @@ def _polish_user_facing_text(text: str) -> str:
     return cleaned.strip()
 
 
+def _ensure_discuss_with_doctor(text: str) -> str:
+    cleaned = str(text or "").strip()
+    if not cleaned:
+        return DISCUSS_WITH_DOCTOR
+    lower = cleaned.lower()
+    if ("discuss" in lower and "doctor" in lower) or "ask your doctor" in lower:
+        return cleaned
+    if "treating doctor" in lower or "ask the hospital" in lower:
+        return cleaned
+    if cleaned.endswith("."):
+        return f"{cleaned} {DISCUSS_WITH_DOCTOR}"
+    return f"{cleaned}. {DISCUSS_WITH_DOCTOR}"
+
+
 def _polish_flags_for_users(
     flags: list[dict[str, Any]],
     chunks: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
+    clinical_categories = {"diagnosis", "investigation", "prescription"}
     polished: list[dict[str, Any]] = []
     for flag in flags:
         if not isinstance(flag, dict):
             continue
         item = dict(flag)
         item["reason"] = _polish_user_facing_text(item.get("reason") or "")
-        item["recommendation"] = _polish_user_facing_text(item.get("recommendation") or "")
+        recommendation = _polish_user_facing_text(item.get("recommendation") or "")
+        category = str(item.get("category") or "").lower()
+        if category in clinical_categories:
+            recommendation = _ensure_discuss_with_doctor(recommendation)
+            item["disclaimer"] = CLINICAL_FINDING_DISCLAIMER
+        item["recommendation"] = recommendation
         basis = sanitize_display_text(str(item.get("guideline_basis") or ""))
         if basis:
             item["guideline_basis"] = _polish_user_facing_text(basis)
@@ -518,16 +584,27 @@ def _polish_flags_for_users(
 
 
 _TRIANGLE_AUDIT_SYSTEM = """
-You are reviewing a clinical case against India's government treatment guidelines
-(ICMR, Clinical Establishments Act STG, and CRC Standard Treatment Guidelines fallback).
+You help a patient or caregiver prepare INFORMATIONAL clarifications and
+QUESTIONS TO DISCUSS WITH THE TREATING DOCTOR (and, where relevant, the hospital
+for billing documentation).
 
-The reader is a patient or caregiver who does NOT have access to guideline documents.
-Write reasons and recommendations they can act on immediately.
+You compare uploaded documents — stated diagnosis, symptoms/test results on file,
+and prescription or bill items — against India's published government treatment
+guideline excerpts (ICMR, Clinical Establishments Act STG, and CRC Standard
+Treatment Guidelines fallback).
+
+You do NOT diagnose, treat, prescribe, decide medical necessity, or judge whether
+care was clinically appropriate. Never write clinical conclusions. Frame every
+output as a possible question or documentation/billing clarification point.
+
+The reader does NOT have access to guideline documents.
+Write reasons as plain-language gaps. Write recommendations ONLY as questions or
+requests to raise with the treating doctor (or hospital for bill documentation).
 
 Return ONLY valid JSON with this shape:
 {
-  "clinical_alignment": {
-    "diagnosis_supported": true or false or null,
+    "clinical_alignment": {
+    "documents_consistent": "yes or unclear or not_assessable",
     "supporting_evidence": ["string"],
     "missing_evidence": ["string"]
   },
@@ -550,36 +627,49 @@ Return ONLY valid JSON with this shape:
 }
 
 Rules:
-- Evaluate the TRIANGLE: diagnosis vs symptoms/test results vs prescription/bill items.
-- When patient age is provided, consider whether the diagnosis, investigations, and
-  medicines are appropriate for that age group per the guideline excerpts (for example
-  pediatric vs adult conditions, or age-specific first-line treatments).
-- When patient sex is provided, apply sex-specific guideline sections only when they
-  match the patient (for example pregnancy/obstetric guidance for female patients,
-  prostate/testicular guidance for male patients). Do not flag against excerpts that
-  apply only to the opposite sex.
-- When prescription items include dose, frequency, or duration, compare strength and
-  dosing against age-appropriate recommendations in the excerpts when available.
+- Compare the TRIANGLE of uploaded documents: stated diagnosis vs symptoms/test
+  results on file vs prescription/bill items, using only the supplied guideline
+  excerpts. Prefer billing/documentation relevance when a bill is present; when
+  only clinical documents are present, still frame findings as questions for the
+  treating doctor — never as care instructions.
+- When patient age or sex is provided, use matching guideline excerpts only to
+  flag clarification points (for example pediatric vs adult first-line listings).
+  Do not decide what treatment the patient should receive.
+- When prescription items include dose, frequency, or duration, note mismatches
+  with guideline listings as questions for the treating doctor — never as dosing advice.
 - Base every flag on the supplied guideline excerpts only.
-- Reasons must explain the clinical concern in plain language.
-- Recommendations must be concrete actions for the patient, for example:
-  "Ask your doctor whether antibiotics are needed for a viral URTI" or
-  "Request a malaria RDT before starting antimalarial treatment".
+- Reasons must describe a documentation, billing-relevance, or guideline-listing
+  gap in plain language. Prefer phrasing like "not clearly documented", "not
+  routinely listed in the guideline excerpts for this scenario", or "worth
+  confirming with your doctor".
+- Recommendations MUST be questions or requests for the treating doctor/hospital,
+  for example:
+  "Ask your treating doctor why this antibiotic appears on the bill for a viral URTI case"
+  or "Ask the hospital for the clinical note that ordered this malaria medicine."
+  Every recommendation must tell the reader to discuss the point with their doctor
+  before changing any treatment, test, or medicine.
+- Never tell the patient to start, stop, change, or avoid a medicine or test.
 - Use neutral, guideline-based phrasing in reasons. Examples:
-  "For uncomplicated dengue, the following tests are not routinely recommended under the guideline."
-  "Guideline support for MRI in this clinical scenario was not identified."
-- Do not write that the doctor ordered unnecessary tests or that the prescription is wrong.
+  "For uncomplicated dengue, the following tests are not routinely listed under the guideline excerpts."
+  "Guideline support for MRI in this documented scenario was not identified in the excerpts."
+- Do not write that the doctor ordered unnecessary tests, that the prescription is
+  wrong, that treatment was inappropriate, or that a diagnosis is incorrect.
+- clinical_alignment.documents_consistent is a clarification label only:
+  "yes" if uploaded documents appear consistent with the stated diagnosis under
+  the retrieved guideline excerpts; "unclear" if they do not clearly line up;
+  "not_assessable" if there is not enough clinical documentation. It is not a
+  medical diagnosis or finding. Never output a boolean.
 - Every flag MUST include guideline_basis: one short plain-language sentence
-  explaining what the government guidelines say about this issue. Write at an
-  8th-grade reading level. No section numbers, no symbols, no jargon, no quotes
-  from the document, and no instruction to read guideline documents.
+  explaining what the government guideline excerpts say about this point. Write
+  at an 8th-grade reading level. No section numbers, no symbols, no jargon, no
+  quotes from the document, and no instruction to read guideline documents.
   Example: "Most colds and throat infections are caused by viruses, so
-  antibiotics are usually not needed."
+  antibiotics are usually not listed as routine care in the guideline excerpts."
 - NEVER tell the user to read, review, or consult STG documents.
 - NEVER use vague recommendations like "revise per STG" or "follow STG guidelines".
 - Every flag MUST include stg_reference when citing a guideline excerpt.
-- Do not claim fraud; use guideline-based language.
-- If clinical data is empty, set diagnosis_supported=null and avoid diagnosis-specific flags.
+- Do not claim fraud, negligence, or clinical error.
+- If clinical data is empty, set documents_consistent="not_assessable" and avoid diagnosis-specific flags.
 - Do not emit INSUFFICIENT_STG_EVIDENCE unless truly unable to decide.
 """.strip()
 
@@ -766,6 +856,7 @@ def analyze_treatment(
     )
 
     clinical_alignment: dict[str, Any] = {
+        "documents_consistent": "not_assessable",
         "diagnosis_supported": None,
         "supporting_evidence": [],
         "missing_evidence": [],
@@ -779,11 +870,13 @@ def analyze_treatment(
                 "item": diagnosis,
                 "category": "diagnosis",
                 "reason": (
-                    "No symptoms or test results were provided, so diagnosis support "
-                    "could not be fully assessed against government treatment guidelines."
+                    "No symptoms or test results were provided, so this bill or "
+                    "prescription could not be fully compared with government "
+                    "guideline excerpts for clarification questions."
                 ),
                 "recommendation": (
-                    "Add symptoms and lab results for a stronger clinical triangle check."
+                    "Add symptoms and lab results from your records so we can "
+                    "prepare clearer questions for your treating doctor or hospital."
                 ),
                 "stg_reference": None,
             }
@@ -805,7 +898,9 @@ def analyze_treatment(
             patient_birth_year=patient_birth_year,
             patient_gender=patient_gender,
         )
-        clinical_alignment = audit_result.get("clinical_alignment") or clinical_alignment
+        clinical_alignment = _normalize_clinical_alignment(
+            audit_result.get("clinical_alignment") or clinical_alignment
+        )
         for flag in audit_result.get("flags") or []:
             if not isinstance(flag, dict):
                 continue
@@ -820,7 +915,6 @@ def analyze_treatment(
                 else:
                     flag["category"] = "prescription"
             flags.append(flag)
-        flags = _polish_flags_for_users(flags, retrieval_chunks)
     elif not matched_conditions:
         flags.append(
             {
@@ -833,12 +927,14 @@ def analyze_treatment(
                     "government treatment guidelines index."
                 ),
                 "recommendation": (
-                    "Confirm the diagnosis spelling or choose a closer condition name."
+                    "Confirm the diagnosis spelling with your doctor, or choose a "
+                    "closer condition name."
                 ),
                 "stg_reference": None,
             }
         )
 
+    flags = _polish_flags_for_users(flags, retrieval_chunks)
     flags = finalize_audit_flags(flags, chunks=retrieval_chunks)
 
     if str(diagnosis_confidence or "").lower() in {"low", "missing"}:
@@ -852,12 +948,13 @@ def analyze_treatment(
         "flags_count": advocacy["flags_count"],
         "risk_level": _compute_risk_level(advocacy["flags"]),
         "matched_stg_conditions": matched_conditions,
-        "clinical_alignment": clinical_alignment,
+        "clinical_alignment": _normalize_clinical_alignment(clinical_alignment),
         "guideline_sources": retrieval.get("guideline_sources") or [],
         "used_fallback": bool(retrieval.get("used_fallback")),
         "flags": advocacy["flags"],
         "patient_questions": advocacy["patient_questions"],
         "advocacy_scope": advocacy["advocacy_scope"],
+        "disclaimer": CLINICAL_SECTION_DISCLAIMER,
         "diagnosis_confidence": diagnosis_confidence,
         "clinical_history_used": filtered_history,
     }

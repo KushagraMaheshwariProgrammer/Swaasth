@@ -14,7 +14,14 @@ from typing import Any
 
 from app.restricted_medicines import render_restricted_medicine_flags_html
 from app.services.audit_advocacy import ADVOCACY_SCOPE_CHECKED, ADVOCACY_SCOPE_NOT_CHECKED, flag_display_label
-from app.services.legal_guardrails import POSSIBLE_ISSUE_NOTICE, POSSIBLE_OVERCHARGE_LABEL
+from app.services.legal_guardrails import (
+    AI_GENERATED_NOTICE,
+    CLINICAL_SECTION_DISCLAIMER,
+    DISCUSS_WITH_DOCTOR,
+    POSSIBLE_ISSUE_NOTICE,
+    POSSIBLE_OVERCHARGE_LABEL,
+    sanitize_value,
+)
 
 RenderHtmlFn = Callable[[dict[str, Any]], str]
 
@@ -31,7 +38,7 @@ _REPORT_TITLES: dict[str, str] = {
     "general": "Bill Review Report",
     "bill": "Bill Review Report",
     "combined": "Bill and Prescription Review Report",
-    "prescription": "Prescription Treatment Appropriateness Report",
+    "prescription": "Prescription Guideline Comparison Report",
     "dispute_pack": "Dispute Pack — Factual Summary",
     "medical_history": "Medical History Summary",
 }
@@ -40,6 +47,21 @@ _HOSPITAL_TYPE_LABELS: dict[str, str] = {
     "general": "General hospital",
     "speciality": "Speciality hospital",
 }
+
+
+def _ai_notice_html() -> str:
+    return f"<p class='disclaimer'><b>{escape(AI_GENERATED_NOTICE)}</b></p>"
+
+
+def _nppa_date_html(report: dict[str, Any]) -> str:
+    rates = report.get("rates_source") or {}
+    date_label = rates.get("nppa_list_date") or report.get("nppa_list_date")
+    if not date_label:
+        return ""
+    return (
+        f"<p class='disclaimer'>Medicine ceiling-price comparisons are as per the "
+        f"NPPA ceiling price list dated {escape(str(date_label))}.</p>"
+    )
 
 
 def _render_patient_questions_html(report: dict[str, Any]) -> str:
@@ -241,17 +263,40 @@ def _render_clinical_evidence_html(report: dict[str, Any]) -> str:
         test_rows.append(f"<li>{escape(' · '.join(parts))}</li>")
 
     alignment_bits = []
-    supported = alignment.get("diagnosis_supported")
-    if supported is True:
-        alignment_bits.append("<p><b>Diagnosis supported:</b> Yes</p>")
-    elif supported is False:
-        alignment_bits.append("<p><b>Diagnosis supported:</b> No</p>")
-    elif supported is None and alignment:
-        alignment_bits.append("<p><b>Diagnosis supported:</b> Insufficient data</p>")
+    consistent = alignment.get("documents_consistent")
+    if consistent is None:
+        supported = alignment.get("diagnosis_supported")
+        if supported is True:
+            consistent = "yes"
+        elif supported is False:
+            consistent = "unclear"
+        elif alignment:
+            consistent = "not_assessable"
+    if consistent == "yes":
+        alignment_bits.append(
+            "<p><b>Stated diagnosis vs uploaded documents:</b> Documents appear "
+            "consistent with the stated diagnosis under retrieved guideline excerpts "
+            "(clarification only — not a diagnosis).</p>"
+        )
+    elif consistent == "unclear":
+        alignment_bits.append(
+            "<p><b>Stated diagnosis vs uploaded documents:</b> Consistency with the "
+            "stated diagnosis is unclear from the uploaded documents. Ask your treating "
+            "doctor to reconcile the records.</p>"
+        )
+    elif consistent == "not_assessable" or (consistent is None and alignment):
+        alignment_bits.append(
+            "<p><b>Stated diagnosis vs uploaded documents:</b> Not enough clinical "
+            "documentation on file to compare.</p>"
+        )
+    if alignment_bits:
+        alignment_bits.append(
+            f"<p class='disclaimer'>{escape(CLINICAL_SECTION_DISCLAIMER)}</p>"
+        )
 
     for label, key in (
-        ("Supporting evidence", "supporting_evidence"),
-        ("Missing or conflicting evidence", "missing_evidence"),
+        ("Supporting evidence on file", "supporting_evidence"),
+        ("Missing or conflicting evidence on file", "missing_evidence"),
     ):
         items = alignment.get(key) or []
         if items:
@@ -262,7 +307,7 @@ def _render_clinical_evidence_html(report: dict[str, Any]) -> str:
             alignment_bits.append("</ul>")
 
     return f"""
-  <h2>Clinical Evidence</h2>
+  <h2>Clinical Evidence (uploaded documents)</h2>
   {"<p><b>Symptoms</b></p><ul>" + ''.join(symptom_rows) + "</ul>" if symptom_rows else ""}
   {"<p><b>Test results</b></p><ul>" + ''.join(test_rows) + "</ul>" if test_rows else ""}
   {''.join(alignment_bits)}
@@ -352,6 +397,7 @@ def _report_title(report_kind: str) -> str:
 
 
 def render_bill_comparison_html(report: dict[str, Any]) -> str:
+    report = sanitize_value(report)
     settings = report.get("comparison_settings") or {}
     report_kind = report.get("report_kind") or "general"
     title = _report_title(report_kind)
@@ -491,6 +537,8 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
 </style></head>
 <body>
   <h1>{escape(title)}</h1>
+  {_ai_notice_html()}
+  {_nppa_date_html(report)}
 
   <h2>Patient &amp; Hospital Information</h2>
   <div class='meta'>
@@ -534,14 +582,15 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
   <h2>Items worth clarifying (billing)</h2>
   {"<table><tr><th>Item</th><th>Finding</th><th>Confidence</th><th>Reason</th><th>Suggested question</th></tr>" + ''.join(audit_rows) + "</table>" if audit_rows else "<p>No billing patterns flagged for clarification.</p>"}
 
-  <h2>Treatment appropriateness (details)</h2>
+  <h2>Guideline comparison (treatment documents)</h2>
   {clinical_evidence_html}
   {"<p><b>Matched conditions:</b> " + escape(', '.join(treatment_audit.get('matched_stg_conditions') or [])) + "</p>" if treatment_audit.get('matched_stg_conditions') else ""}
   {"<table><tr><th>Item</th><th>Finding</th><th>Confidence</th><th>Reason</th><th>Suggested question</th><th>Government guideline basis</th></tr>" + ''.join(treatment_rows) + "</table>" if treatment_rows else "<p>No treatment items flagged for clarification based on retrieved guidelines.</p>"}
   {guideline_sources_html}
   {legal_pathways_html}
   {stg_excerpts_html}
-  <p class='disclaimer'>{escape(POSSIBLE_ISSUE_NOTICE)} Recommendations use ICMR and CRC Standard Treatment Guidelines where available. Not a substitute for clinical judgment.</p>
+  <p class='disclaimer'>{escape(str(treatment_audit.get('disclaimer') or CLINICAL_SECTION_DISCLAIMER))}</p>
+  <p class='disclaimer'>{escape(DISCUSS_WITH_DOCTOR)}</p>
 
   <p class='disclaimer'>{escape(BILL_DISCLAIMER)}</p>
 </body>
@@ -550,6 +599,7 @@ def render_bill_comparison_html(report: dict[str, Any]) -> str:
 
 
 def render_prescription_report_html(report: dict[str, Any]) -> str:
+    report = sanitize_value(report)
     patient = report.get("patient") or {}
     prescription = report.get("prescription") or {}
     treatment_audit = report.get("treatment_audit_flags") or {}
@@ -606,7 +656,8 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
   ul {{ margin: 4px 0; padding-left: 16px; }}
 </style></head>
 <body>
-  <h1>Prescription Treatment Appropriateness Report</h1>
+  <h1>Prescription Guideline Comparison Report</h1>
+  {_ai_notice_html()}
   <p><b>Patient:</b> {escape(str(patient.get('name', '—')))}</p>
   <p><b>Diagnosis:</b> {escape(str(report.get('diagnosis') or prescription.get('diagnosis') or '—'))}</p>
   <p><b>Source file:</b> {escape(str(report.get('filename', '—')))}</p>
@@ -621,7 +672,7 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
 
   {restricted_medicine_html}
 
-  <h2>Treatment appropriateness (details)</h2>
+  <h2>Guideline comparison (treatment documents)</h2>
   {clinical_evidence_html}
   {"<p><b>Matched conditions:</b> " + escape(', '.join(treatment_audit.get('matched_stg_conditions') or [])) + "</p>" if treatment_audit.get('matched_stg_conditions') else ""}
   {"<table><tr><th>Item</th><th>Finding</th><th>Confidence</th><th>Reason</th><th>Suggested question</th><th>Government guideline basis</th></tr>" + ''.join(treatment_rows) + "</table>" if treatment_rows else "<p>No treatment items flagged for clarification based on retrieved guidelines.</p>"}
@@ -629,13 +680,15 @@ def render_prescription_report_html(report: dict[str, Any]) -> str:
   {legal_pathways_html}
   {stg_excerpts_html}
 
-  <p class='disclaimer'>{escape(POSSIBLE_ISSUE_NOTICE)} Recommendations use ICMR and CRC Standard Treatment Guidelines where available. Not a substitute for clinical judgment.</p>
+  <p class='disclaimer'>{escape(str(treatment_audit.get('disclaimer') or CLINICAL_SECTION_DISCLAIMER))}</p>
+  <p class='disclaimer'>{escape(DISCUSS_WITH_DOCTOR)}</p>
 </body>
 </html>
 """
 
 
 def render_dispute_pack_html(report: dict[str, Any]) -> str:
+    report = sanitize_value(report)
     """Render a dispute / evidence pack PDF from action_plan data."""
     action_plan = report.get("action_plan") or {}
     patient = report.get("patient") or {}
@@ -694,6 +747,7 @@ def render_dispute_pack_html(report: dict[str, Any]) -> str:
 </style></head>
 <body>
   <h1>Dispute Pack — Factual Summary</h1>
+  {_ai_notice_html()}
   <p><b>Patient:</b> {escape(str(patient.get('name', '—')))}</p>
   <p><b>Hospital:</b> {escape(str(hospital.get('name_from_bill', '—')))}</p>
 
@@ -756,13 +810,15 @@ def html_to_pdf(html: str) -> bytes:
 
 
 def render_report_pdf(report: dict[str, Any]) -> bytes:
-    report_kind = resolve_report_kind(report)
-    validate_report(report, report_kind)
+    sanitized = sanitize_value(report) if isinstance(report, dict) else report
+    report_kind = resolve_report_kind(sanitized)
+    validate_report(sanitized, report_kind)
     render_html = _REPORT_RENDERERS[report_kind]
-    return html_to_pdf(render_html(report))
+    return html_to_pdf(render_html(sanitized))
 
 
 def render_medical_history_html(report: dict[str, Any]) -> str:
+    report = sanitize_value(report)
     patient = report.get("patient") or {}
     profile = report.get("profile") or {}
     timeline = report.get("timeline") or []
@@ -845,6 +901,7 @@ def render_medical_history_html(report: dict[str, Any]) -> str:
 <head><meta charset="utf-8"/><title>Medical History Summary</title></head>
 <body>
   <h1>Medical History Summary</h1>
+  {_ai_notice_html()}
   <p><b>Patient:</b> {escape(str(patient.get('name') or 'Patient'))}</p>
   <p><b>Age:</b> {escape(str(patient.get('age_label') or patient.get('age') or '—'))}</p>
   <p><b>Gender:</b> {escape(str(patient.get('gender_label') or patient.get('gender') or '—'))}</p>

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import BackLink from "../components/BackLink";
 import { useAuth, needsEmailVerification as userNeedsEmailVerification } from "../context/AuthContext";
+import { recordAdultAttestation } from "../services/userProfile";
 
 const pageTransition = {
   initial: { opacity: 0, y: 12 },
@@ -60,8 +61,10 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [adultConfirmed, setAdultConfirmed] = useState(false);
 
   const redirectTo = location.state?.from?.pathname || "/check";
+  const accountDeleted = Boolean(location.state?.accountDeleted);
 
   if (user && needsEmailVerification) {
     return <Navigate to="/verify-email" replace state={{ from: location.state?.from }} />;
@@ -88,10 +91,16 @@ export default function LoginPage() {
       return;
     }
 
+    if (mode === "signup" && !adultConfirmed) {
+      setError("Confirm that you are 18 years of age or older to create an account.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       if (mode === "signup") {
-        await signUpWithEmail(email.trim(), password);
+        const credential = await signUpWithEmail(email.trim(), password);
+        await recordAdultAttestation(credential.user.uid);
         navigate("/verify-email", {
           replace: true,
           state: { from: location.state?.from, email: email.trim() },
@@ -118,9 +127,16 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     setError("");
     setInfo("");
+    if (mode === "signup" && !adultConfirmed) {
+      setError("Confirm that you are 18 years of age or older to create an account.");
+      return;
+    }
     setIsSubmitting(true);
     try {
-      await signInWithGoogle();
+      const credential = await signInWithGoogle();
+      if (mode === "signup" && credential?.user?.uid) {
+        await recordAdultAttestation(credential.user.uid);
+      }
       navigate(redirectTo, { replace: true });
     } catch (err) {
       setError(getAuthErrorMessage(err));
@@ -143,6 +159,12 @@ export default function LoginPage() {
                 : "Save your bill analyses and revisit them anytime from your history."}
             </p>
           </header>
+
+          {accountDeleted && (
+            <p className="auth-info">
+              Your account and associated data have been permanently deleted.
+            </p>
+          )}
 
           <button
             type="button"
@@ -180,17 +202,30 @@ export default function LoginPage() {
               />
             </label>
             {mode === "signup" && (
-              <label className="setting-field setting-field-full">
-                <span>Confirm password</span>
-                <input
-                  type="password"
-                  autoComplete="new-password"
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  minLength={6}
-                  required
-                />
-              </label>
+              <>
+                <label className="setting-field setting-field-full">
+                  <span>Confirm password</span>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    minLength={6}
+                    required
+                  />
+                </label>
+                <label className="complaint-confirm-label">
+                  <input
+                    type="checkbox"
+                    checked={adultConfirmed}
+                    onChange={(event) => setAdultConfirmed(event.target.checked)}
+                    required
+                  />
+                  I confirm that I am 18 years of age or older. Swaasth accounts
+                  are for adults. A parent or guardian may later add a minor
+                  patient profile with parental consent.
+                </label>
+              </>
             )}
 
             <button
@@ -218,7 +253,7 @@ export default function LoginPage() {
           </p>
 
           <p className="auth-toggle">
-            {mode === "signup" ? "Already have an account?" : "New to BillCheck?"}{" "}
+            {mode === "signup" ? "Already have an account?" : "New to Swaasth?"}{" "}
             <button
               type="button"
               className="auth-toggle-btn"

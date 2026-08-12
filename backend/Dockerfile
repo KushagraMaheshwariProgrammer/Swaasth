@@ -13,6 +13,17 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Prefetch FastEmbed models so first /analyze-treatment request is fast
 RUN python -c "from fastembed import TextEmbedding; from fastembed.rerank.cross_encoder import TextCrossEncoder; TextEmbedding('BAAI/bge-base-en-v1.5'); TextCrossEncoder('BAAI/bge-reranker-base')"
 
+# Private guideline PDFs + prebuilt indexes (not in the public repo).
+# Pass the SAS as base64 via GUIDELINE_CORPUS_SAS_URL_B64 — ACR shell-expands
+# raw URLs and breaks on '&' query separators.
+COPY scripts/fetch_guideline_corpus.py /tmp/fetch_guideline_corpus.py
+ARG GUIDELINE_CORPUS_SAS_URL_B64=
+RUN if [ -n "$GUIDELINE_CORPUS_SAS_URL_B64" ]; then \
+      export GUIDELINE_CORPUS_SAS_URL="$(printf '%s' "$GUIDELINE_CORPUS_SAS_URL_B64" | base64 -d)"; \
+    fi \
+ && python /tmp/fetch_guideline_corpus.py --dest /app/data --allow-missing \
+ && unset GUIDELINE_CORPUS_SAS_URL
+
 COPY . .
 
 ENV PYTHONUNBUFFERED=1

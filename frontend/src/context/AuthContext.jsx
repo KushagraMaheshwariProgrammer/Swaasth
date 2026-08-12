@@ -19,6 +19,7 @@ import {
 import {
   changeUserEmail,
   changeUserPassword,
+  deleteCurrentUserAccount,
   usesPasswordProvider,
 } from "../auth/accountSecurity";
 import { signInWithGoogle as performGoogleSignIn } from "../auth/googleSignIn";
@@ -276,6 +277,13 @@ export function AuthProvider({ children }) {
     await changeUserEmail(currentPassword, newEmail);
   }, []);
 
+  const deleteAccount = useCallback(async (password) => {
+    await deleteCurrentUserAccount(password);
+    setTermsAccepted(null);
+    setMedicalHistoryConsentAccepted(false);
+    setMedicalHistoryConsentResolved(false);
+  }, []);
+
   const resendVerificationEmail = useCallback(async () => {
     if (!auth.currentUser) {
       throw new Error("You must be signed in to resend the verification email.");
@@ -354,6 +362,7 @@ export function AuthProvider({ children }) {
       logOut,
       changePassword,
       changeEmail,
+      deleteAccount,
       emailLinkVerification,
       resetEmailLinkVerification,
     }),
@@ -378,6 +387,7 @@ export function AuthProvider({ children }) {
       logOut,
       changePassword,
       changeEmail,
+      deleteAccount,
       emailLinkVerification,
       resetEmailLinkVerification,
     ]

@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from app.services.rag_pipeline import _find_supporting_chunk
+from app.services.legal_guardrails import sanitize_text
 
 LOW_CONFIDENCE_TYPES = frozenset(
     {
@@ -53,19 +54,19 @@ BILLING_HEURISTIC_TYPES = frozenset(
 )
 
 FLAG_DISPLAY_LABELS: dict[str, str] = {
-    "UNNECESSARY_TEST": "Not routinely recommended",
-    "UNNECESSARY_PROCEDURE": "Not routinely recommended",
-    "INVESTIGATION_NOT_ROUTINELY_RECOMMENDED": "Not routinely recommended",
-    "NOT_INDICATED_MEDICINE": "Not in guideline for this scenario",
-    "PRESCRIBED_NOT_IN_STG": "Not listed in guideline",
-    "INSUFFICIENT_STG_EVIDENCE": "Guideline support not identified",
-    "GUIDELINE_SUPPORT_NOT_IDENTIFIED": "Guideline support not identified",
-    "INSUFFICIENT_CLINICAL_DATA": "Needs more clinical information",
-    "DIAGNOSIS_UNSUPPORTED": "Diagnosis not supported by reported evidence",
-    "DIAGNOSIS_TEST_MISMATCH": "Diagnosis conflicts with test results",
-    "MISSING_REQUIRED_INVESTIGATION": "Recommended test may be missing",
-    "PRESCRIPTION_CLINICAL_MISMATCH": "Treatment may not match clinical picture",
-    "EXCESSIVE_WORKUP": "Workup may be more than typically needed",
+    "UNNECESSARY_TEST": "Clarify why this test was billed",
+    "UNNECESSARY_PROCEDURE": "Clarify why this procedure was billed",
+    "INVESTIGATION_NOT_ROUTINELY_RECOMMENDED": "Clarify why this investigation was ordered",
+    "NOT_INDICATED_MEDICINE": "Ask treating doctor about this medicine",
+    "PRESCRIBED_NOT_IN_STG": "Ask treating doctor about this prescription",
+    "INSUFFICIENT_STG_EVIDENCE": "Guideline match unclear — ask for clarification",
+    "GUIDELINE_SUPPORT_NOT_IDENTIFIED": "Guideline match unclear — ask for clarification",
+    "INSUFFICIENT_CLINICAL_DATA": "More documentation needed for billing review",
+    "DIAGNOSIS_UNSUPPORTED": "Ask how diagnosis was documented",
+    "DIAGNOSIS_TEST_MISMATCH": "Ask doctor to reconcile diagnosis and test results",
+    "MISSING_REQUIRED_INVESTIGATION": "Ask whether an expected test was done or billed",
+    "PRESCRIPTION_CLINICAL_MISMATCH": "Ask treating doctor about this prescription choice",
+    "EXCESSIVE_WORKUP": "Ask why this workup appears on the billed case",
     "DUPLICATE_ITEM": "Repeated bill item",
     "NEAR_DUPLICATE_ITEM": "Possibly duplicate bill item",
     "UNREALISTIC_REPETITION": "Unusually high repetition",
@@ -75,28 +76,28 @@ FLAG_DISPLAY_LABELS: dict[str, str] = {
     "BILLED_NOT_PRESCRIBED": "Billed without prescription match",
     "PREAUTH_AMOUNT_ABOVE_APPROVED": "Bill above pre-authorization amount",
     "PREAUTH_ITEM_OUTSIDE_AUTHORIZATION": "Item not clearly listed in pre-authorization",
-    "DUPLICATE_THERAPEUTIC_CLASS": "Duplicate therapeutic class",
-    "BROADER_SPECTRUM_ANTIBIOTIC": "Broader-spectrum antibiotic than typical",
-    "DRUG_INTERACTION": "Possible drug interaction",
+    "DUPLICATE_THERAPEUTIC_CLASS": "Ask about duplicate medicine class on bill",
+    "BROADER_SPECTRUM_ANTIBIOTIC": "Ask treating doctor about this antibiotic choice",
+    "DRUG_INTERACTION": "Ask treating doctor or pharmacist about these medicines together",
     "BRAND_WITHOUT_GENERIC_QUESTION": "Branded medicine with generic alternative",
-    "ABNORMAL_LAB_VALUE": "Lab result outside expected range",
-    "REPEAT_INVESTIGATION": "Repeat test from recent visit",
-    "PREGNANCY_CONTRAINDICATION": "Medicine commonly avoided in pregnancy",
-    "PREGNANCY_CAUTION": "Medicine needs pregnancy review",
-    "LACTATION_CAUTION": "Medicine needs breastfeeding review",
-    "PEDIATRIC_DOSING_CAUTION": "Medicine needs age-appropriate review",
+    "ABNORMAL_LAB_VALUE": "Ask doctor about this lab result on file",
+    "REPEAT_INVESTIGATION": "Ask why this test was repeated",
+    "PREGNANCY_CONTRAINDICATION": "Ask treating doctor about this medicine in pregnancy",
+    "PREGNANCY_CAUTION": "Ask treating doctor about this medicine in pregnancy",
+    "LACTATION_CAUTION": "Ask treating doctor about this medicine while breastfeeding",
+    "PEDIATRIC_DOSING_CAUTION": "Ask treating doctor about age-related dosing on this bill",
 }
 
 ADVOCACY_SCOPE_CHECKED = [
-    "Government treatment guideline retrieval and comparison",
+    "Government treatment guideline excerpts compared for billing clarifications",
     "Billing pattern checks (repetition, package components)",
-    "Prescription rationality checks where data is available",
+    "Prescription documentation checks where data is available",
     "Restricted medicine list screening",
 ]
 
 ADVOCACY_SCOPE_NOT_CHECKED = [
-    "Final medical diagnosis or emergency exceptions",
-    "Individual clinician judgment",
+    "Medical diagnosis, treatment decisions, or clinical appropriateness",
+    "Individual clinician judgment or emergency exceptions",
     "Definitive legal or regulatory findings against any provider",
 ]
 
@@ -226,12 +227,14 @@ def build_patient_questions(
         seen.add(dedupe_key)
         questions.append(
             {
-                "question": question,
-                "item": item or None,
+                "question": sanitize_text(question),
+                "item": sanitize_text(item) or None,
                 "confidence": flag.get("confidence") or "LOW",
-                "guideline_basis": flag.get("guideline_basis") or None,
+                "guideline_basis": sanitize_text(str(flag.get("guideline_basis") or "")) or None,
                 "flag_type": flag.get("type"),
-                "display_label": flag_display_label(str(flag.get("type") or "")),
+                "display_label": sanitize_text(
+                    flag_display_label(str(flag.get("type") or ""))
+                ),
                 "category": flag.get("category"),
             }
         )
@@ -260,6 +263,9 @@ def finalize_audit_flags(
         ):
             item["confidence"] = "LOW"
         item["display_label"] = flag_display_label(str(item.get("type") or ""))
+        for key in ("reason", "recommendation", "guideline_basis", "display_label", "item"):
+            if item.get(key) is not None:
+                item[key] = sanitize_text(str(item[key]))
         finalized.append(item)
     return finalized
 

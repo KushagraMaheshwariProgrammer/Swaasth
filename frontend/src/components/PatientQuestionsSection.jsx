@@ -62,7 +62,9 @@ export default function PatientQuestionsSection({
       </div>
       <p className="comparison-settings-hint">
         These are suggested clarification questions based on government guidelines and
-        billing patterns. They are not accusations against your hospital or doctor.
+        billing patterns. They are not medical advice, diagnoses, or accusations against
+        your hospital or doctor. Discuss clinical points with your doctor before changing
+        any treatment, test, or medicine.
       </p>
       <ol className="patient-questions-list">
         {questions.map((entry, index) => {

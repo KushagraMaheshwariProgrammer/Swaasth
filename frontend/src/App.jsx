@@ -19,11 +19,14 @@ import HistoryPage from "./pages/HistoryPage";
 import TakeActionPage from "./pages/TakeActionPage";
 import PatientsPage from "./pages/PatientsPage";
 import AccountSettingsPage from "./pages/AccountSettingsPage";
+import DeleteAccountPage from "./pages/DeleteAccountPage";
+import AccountDeletionRequestPage from "./pages/AccountDeletionRequestPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import TermsDevPreview from "./pages/TermsDevPreview";
 import TermsPage from "./pages/TermsPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import SourceCodePage from "./pages/SourceCodePage";
+import ThirdPartyLicensesPage from "./pages/ThirdPartyLicensesPage";
 import UserNav from "./components/UserNav";
 import PatientList from "./components/PatientList";
 import HospitalList from "./components/HospitalList";
@@ -179,13 +182,13 @@ const LOADING_MESSAGES = [
 const PRESCRIPTION_LOADING_MESSAGES = [
   "Reading your prescription...",
   "Extracting medicines and tests...",
-  "Checking against treatment guidelines...",
+  "Comparing documents with treatment guidelines...",
   "Preparing your report...",
 ];
 const CLINICAL_LOADING_MESSAGES = [
   "Reading your clinical documents...",
   "Reviewing symptoms and test results...",
-  "Checking diagnosis support against guidelines...",
+  "Comparing diagnosis details with guideline excerpts...",
   "Preparing your report...",
 ];
 const pageTransition = {
@@ -212,7 +215,7 @@ const HOW_IT_WORKS_STEPS = [
     id: "extract",
     step: "Step 2",
     title: "OCR reads every line",
-    desc: "BillCheck extracts room charges, medicines, tests, and other billed items.",
+    desc: "Swaasth extracts room charges, medicines, tests, and other billed items.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
         <rect x="3" y="4" width="18" height="16" rx="2" />
@@ -224,7 +227,7 @@ const HOW_IT_WORKS_STEPS = [
     id: "compare",
     step: "Step 3",
     title: "See what's fair",
-    desc: "Each item is reviewed for suspicious charges and medicine price references where available.",
+    desc: "Each item is reviewed for suspicious charges, and documents may be compared with published treatment guidelines for questions to discuss with your doctor.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
         <path d="M4 19V5M4 19h16M8 15l3-3 3 2 4-5" strokeLinecap="round" strokeLinejoin="round" />
@@ -240,9 +243,9 @@ const TRUST_BADGES = [
 ];
 
 const TRUST_STATS = [
-  { value: "Pan-India", label: "Used by patients nationwide" },
+  { value: "India-focused", label: "Built for Indian hospital bills" },
   { value: "Smart OCR", label: "Reads every line item" },
-  { value: "Secure", label: "Account storage for your bills" },
+  { value: "Secure", label: "Encrypted account storage" },
 ];
 
 function LandingPage() {
@@ -259,7 +262,7 @@ function LandingPage() {
     <motion.div className="landing-page" {...pageTransition}>
       <header className="landing-navbar">
         <Link to="/" className="landing-brand">
-          BillCheck
+          Swaasth
         </Link>
         <UserNav className="landing-user-nav" />
       </header>
@@ -272,12 +275,12 @@ function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <p className="hero-kicker">Trusted by Indian patients</p>
+            <p className="hero-kicker">Hospital bill review for Indian patients</p>
 
             <div className="hero-content">
               <h1>Your hospital bill, clearly explained.</h1>
               <p className="hero-lead">
-                BillCheck reads every line of your hospital bill and highlights
+                Swaasth reads every line of your hospital bill and highlights
                 charges that may need verification — before you pay.
               </p>
             </div>
@@ -333,7 +336,7 @@ function LandingPage() {
                 </div>
                 <div className="android-screen">
                   <div className="phone-top">
-                    <strong>BillCheck</strong>
+                    <strong>Swaasth</strong>
                     <span className="phone-dot" />
                   </div>
 
@@ -366,7 +369,7 @@ function LandingPage() {
         <section className="how-it-works">
           <div className="section-heading">
             <p className="section-eyebrow">Simple process</p>
-            <h2>How BillCheck works</h2>
+            <h2>How Swaasth works</h2>
             <p className="section-lead">
               Three steps from upload to a clear, item-by-item fairness report.
             </p>
@@ -405,20 +408,24 @@ function LandingPage() {
       <footer className="site-footer">
         <div className="footer-top">
           <div className="footer-brand">
-            <strong>BillCheck</strong>
+            <strong>Swaasth</strong>
             <p className="footer-tagline">Know before you pay.</p>
           </div>
           <p className="footer-disclaimer">
-            For informational purposes only. Review results may require manual
-            verification. Actual hospital pricing may vary.
+            For informational purposes only. Bill and guideline comparisons are
+            not medical diagnosis, treatment, or prescription advice. Discuss
+            clinical findings with your doctor. Review results may require
+            manual verification. Actual hospital pricing may vary.
           </p>
         </div>
         <div className="footer-bottom">
-          <span>© {new Date().getFullYear()} BillCheck</span>
+          <span>© {new Date().getFullYear()} Swaasth</span>
           <nav className="footer-legal" aria-label="Legal">
             <Link to="/terms">Terms and Conditions</Link>
             <Link to="/privacy">Privacy Policy</Link>
+            <Link to="/delete-account">Delete account</Link>
             <Link to="/source">Open source</Link>
+            <Link to="/licenses">Licenses</Link>
           </nav>
         </div>
       </footer>
@@ -459,7 +466,9 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  if (!termsAccepted) {
+  const isDeletionRoute = location.pathname === "/account/delete";
+
+  if (!termsAccepted && !isDeletionRoute) {
     return (
       <div className="auth-loading">
         <div className="spinner-conic" aria-hidden="true" />
@@ -481,10 +490,16 @@ function TermsGate({ children }) {
     acceptTerms,
     logOut,
   } = useAuth();
+  const location = useLocation();
   const [isAccepting, setIsAccepting] = useState(false);
   const [acceptError, setAcceptError] = useState("");
 
+  const isDeletionRoute =
+    location.pathname === "/delete-account" ||
+    location.pathname === "/account/delete";
+
   const showTerms =
+    !isDeletionRoute &&
     user &&
     !pendingVerification &&
     !loading &&
@@ -542,10 +557,16 @@ function MedicalHistoryConsentGate({ children }) {
     acceptMedicalHistoryConsent,
     declineMedicalHistoryConsent,
   } = useAuth();
+  const location = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
+  const isDeletionRoute =
+    location.pathname === "/delete-account" ||
+    location.pathname === "/account/delete";
+
   const showConsent =
+    !isDeletionRoute &&
     user &&
     !pendingVerification &&
     !loading &&
@@ -1927,9 +1948,9 @@ function CheckPage() {
                 onContinue={handleClinicalContinue}
                 continueLabel={
                   showPrescriptionFlow
-                    ? "Check treatment appropriateness"
+                    ? "Review for clarifications"
                     : showClinicalOnlyFlow || diagnosis.trim()
-                    ? "Check diagnosis support"
+                    ? "Review documentation"
                     : "Continue"
                 }
                 onDiagnosisExtracted={(value) => {
@@ -1982,9 +2003,9 @@ function CheckPage() {
               <p className="loading-message">
                 {uiState === "comparing"
                   ? showClinicalOnlyFlow
-                    ? "Checking clinical evidence against guidelines..."
+                    ? "Comparing clinical documents with guideline excerpts..."
                     : showPrescriptionFlow
-                    ? "Checking against treatment guidelines..."
+                    ? "Comparing documents with treatment guidelines..."
                     : comparisonCopy.loading
                   : activeLoadingMessages[loadingMessageIndex]}
               </p>
@@ -2189,7 +2210,7 @@ function CheckPage() {
                   onClick={handleCompare}
                 >
                   {hasPrescriptionItems
-                    ? "Compare bill & check treatment"
+                    ? "Compare bill & guideline notes"
                     : comparisonCopy.compareButton}
                 </button>
               </div>
@@ -2297,7 +2318,7 @@ function CheckPage() {
                     runPrescriptionAnalysis(diagnosis.trim(), diagnosisUserProvided);
                   }}
                 >
-                  Check treatment appropriateness
+                  Review for clarifications
                 </button>
               </div>
               {error && <p className="error-text">{error}</p>}
@@ -2396,7 +2417,9 @@ function AppRoutes() {
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/delete-account" element={<AccountDeletionRequestPage />} />
         <Route path="/source" element={<SourceCodePage />} />
+        <Route path="/licenses" element={<ThirdPartyLicensesPage />} />
         {import.meta.env.DEV && (
           <Route path="/__dev/terms" element={<TermsDevPreview />} />
         )}
@@ -2405,6 +2428,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <AccountSettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/account/delete"
+          element={
+            <ProtectedRoute>
+              <DeleteAccountPage />
             </ProtectedRoute>
           }
         />

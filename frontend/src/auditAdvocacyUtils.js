@@ -1,20 +1,25 @@
 export const FLAG_DISPLAY_LABELS = {
-  UNNECESSARY_TEST: "Not routinely recommended",
-  UNNECESSARY_PROCEDURE: "Not routinely recommended",
-  INVESTIGATION_NOT_ROUTINELY_RECOMMENDED: "Not routinely recommended",
-  NOT_INDICATED_MEDICINE: "Not in guideline for this scenario",
-  PRESCRIBED_NOT_IN_STG: "Not listed in guideline",
-  INSUFFICIENT_STG_EVIDENCE: "Guideline support not identified",
-  GUIDELINE_SUPPORT_NOT_IDENTIFIED: "Guideline support not identified",
-  INSUFFICIENT_CLINICAL_DATA: "Needs more clinical information",
+  UNNECESSARY_TEST: "Clarify why this test was billed",
+  UNNECESSARY_PROCEDURE: "Clarify why this procedure was billed",
+  INVESTIGATION_NOT_ROUTINELY_RECOMMENDED: "Clarify why this investigation was ordered",
+  NOT_INDICATED_MEDICINE: "Ask treating doctor about this medicine",
+  PRESCRIBED_NOT_IN_STG: "Ask treating doctor about this prescription",
+  INSUFFICIENT_STG_EVIDENCE: "Guideline match unclear — ask for clarification",
+  GUIDELINE_SUPPORT_NOT_IDENTIFIED: "Guideline match unclear — ask for clarification",
+  INSUFFICIENT_CLINICAL_DATA: "More documentation needed for billing review",
+  DIAGNOSIS_UNSUPPORTED: "Ask how diagnosis was documented",
+  DIAGNOSIS_TEST_MISMATCH: "Ask doctor to reconcile diagnosis and test results",
+  MISSING_REQUIRED_INVESTIGATION: "Ask whether an expected test was done or billed",
+  PRESCRIPTION_CLINICAL_MISMATCH: "Ask treating doctor about this prescription choice",
+  EXCESSIVE_WORKUP: "Ask why this workup appears on the billed case",
   DUPLICATE_ITEM: "Repeated bill item",
   NEAR_DUPLICATE_ITEM: "Possibly duplicate bill item",
   PACKAGE_COMPONENT_CHARGED_SEPARATELY: "Package and component both billed",
   PREAUTH_AMOUNT_ABOVE_APPROVED: "Bill above pre-authorization amount",
   PREAUTH_ITEM_OUTSIDE_AUTHORIZATION: "Item not clearly listed in pre-authorization",
-  DUPLICATE_THERAPEUTIC_CLASS: "Duplicate therapeutic class",
-  BROADER_SPECTRUM_ANTIBIOTIC: "Broader-spectrum antibiotic than typical",
-  DRUG_INTERACTION: "Possible drug interaction",
+  DUPLICATE_THERAPEUTIC_CLASS: "Ask about duplicate medicine class on bill",
+  BROADER_SPECTRUM_ANTIBIOTIC: "Ask treating doctor about this antibiotic choice",
+  DRUG_INTERACTION: "Ask treating doctor or pharmacist about these medicines together",
   BRAND_WITHOUT_GENERIC_QUESTION: "Branded medicine with generic alternative",
   MEDICINE_PRICE_DISCREPANCY: "Possible medicine overcharge",
 };
@@ -31,14 +36,14 @@ export function getAuditConfidenceMeta(confidence) {
     return {
       label: "High confidence",
       badgeClass: "status-pill status-red",
-      hint: "Strong guideline basis for this question.",
+      hint: "Strong guideline basis for this clarification question.",
     };
   }
   if (confidence === "MEDIUM") {
     return {
       label: "Medium confidence",
       badgeClass: "status-pill status-amber",
-      hint: "Unusual compared with typical practice; worth clarifying.",
+      hint: "Unusual compared with typical practice; worth clarifying with your doctor.",
     };
   }
   return {

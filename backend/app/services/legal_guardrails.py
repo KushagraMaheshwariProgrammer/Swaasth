@@ -10,10 +10,30 @@ banned terms with neutral, factual phrasing rather than emitting them.
 from __future__ import annotations
 
 import re
+from typing import Any
 
 # Shared hedging copy for reports, complaint drafts, and overcharge flags.
 POSSIBLE_ISSUE_NOTICE = "Possible issue — verify before acting."
 POSSIBLE_OVERCHARGE_LABEL = "Possible overcharge"
+
+# Clinical / guideline-comparison findings — keep in sync with frontend hedgingCopy.
+CLINICAL_FINDING_DISCLAIMER = (
+    "Possible finding for discussion with your doctor — not a diagnosis, "
+    "treatment plan, or prescription advice."
+)
+DISCUSS_WITH_DOCTOR = (
+    "Discuss this with your doctor before changing any treatment, test, or medicine."
+)
+CLINICAL_SECTION_DISCLAIMER = (
+    f"{CLINICAL_FINDING_DISCLAIMER} Swaasth compares uploaded documents against "
+    "published ICMR, MoHFW Clinical Establishments Act STGs, and CRC Standard "
+    "Treatment Guidelines where available. It does not diagnose, treat, or "
+    "prescribe. Every clinical finding should be reviewed with a qualified doctor."
+)
+AI_GENERATED_NOTICE = (
+    "Generated with AI assistance — verify before relying. "
+    "This is not a medical diagnosis, treatment advice, or legal finding."
+)
 
 # Banned term -> neutral replacement. Whole-word, case-insensitive matching.
 _REPLACEMENTS: dict[str, str] = {
@@ -99,3 +119,29 @@ def assert_safe(text: str | None) -> None:
     found = find_banned_terms(text)
     if found:
         raise ValueError(f"Text contains banned legal terms: {found}")
+
+
+def sanitize_value(value: Any) -> Any:
+    """Recursively sanitize strings inside dicts and lists."""
+    if isinstance(value, str):
+        return sanitize_text(value)
+    if isinstance(value, list):
+        return [sanitize_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: sanitize_value(item) for key, item in value.items()}
+    return value
+
+
+def assert_payload_safe(value: Any) -> None:
+    """Raise ``ValueError`` if any string in ``value`` still contains a banned term."""
+    if isinstance(value, str):
+        assert_safe(value)
+        return
+    if isinstance(value, list):
+        for item in value:
+            assert_payload_safe(item)
+        return
+    if isinstance(value, dict):
+        for item in value.values():
+            assert_payload_safe(item)
+

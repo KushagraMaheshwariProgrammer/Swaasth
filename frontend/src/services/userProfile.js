@@ -3,6 +3,7 @@ import { awaitFirestoreReady, db } from "../firebase";
 import { TERMS_VERSION } from "../data/termsAndConditions";
 import { PRIVACY_POLICY_VERSION } from "../data/privacyPolicy";
 import { MEDICAL_HISTORY_CONSENT_VERSION } from "../data/medicalHistoryConsent";
+import { ACTION_CONSENT_VERSION } from "../data/actionConsent";
 import {
   getLocalMedicalHistoryConsent,
   setLocalMedicalHistoryConsentAccepted,
@@ -72,6 +73,8 @@ export async function acceptTerms(userId) {
           termsVersion: TERMS_VERSION,
           privacyPolicyAcceptedAt: serverTimestamp(),
           privacyPolicyVersion: PRIVACY_POLICY_VERSION,
+          adultAttestedAt: serverTimestamp(),
+          adultAttestedVersion: "18plus-2026-08-12",
         },
         { merge: true }
       )
@@ -193,5 +196,50 @@ export async function revokeMedicalHistoryConsent(userId) {
     );
   } catch (error) {
     console.warn("Could not revoke medical history consent in Firestore:", error);
+  }
+}
+
+export async function acceptActionConsent(userId) {
+  try {
+    await withTimeout(
+      setDoc(
+        userProfileRef(userId),
+        {
+          actionConsentAt: serverTimestamp(),
+          actionConsentVersion: ACTION_CONSENT_VERSION,
+        },
+        { merge: true }
+      )
+    );
+  } catch (error) {
+    console.warn("Could not sync action consent to Firestore:", error);
+  }
+}
+
+export async function recordAdultAttestation(userId) {
+  try {
+    await withTimeout(
+      setDoc(
+        userProfileRef(userId),
+        {
+          adultAttestedAt: serverTimestamp(),
+          adultAttestedVersion: "18plus-2026-08-12",
+        },
+        { merge: true }
+      )
+    );
+  } catch (error) {
+    console.warn("Could not record adult attestation in Firestore:", error);
+  }
+}
+
+export async function getUserProfileData(userId) {
+  try {
+    await awaitFirestoreReady();
+    const snapshot = await withTimeout(getDoc(userProfileRef(userId)));
+    return snapshot.exists() ? snapshot.data() : null;
+  } catch (error) {
+    console.warn("Could not load user profile:", error);
+    return null;
   }
 }

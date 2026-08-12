@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { getAccountErrorMessage } from "../auth/accountSecurity";
 import BackLink from "../components/BackLink";
 import { useAuth } from "../context/AuthContext";
+import { downloadJsonFile, exportUserData } from "../services/dataExport";
 
 const pageTransition = {
   initial: { opacity: 0, y: 12 },
@@ -54,6 +55,9 @@ export default function AccountSettingsPage() {
 
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
   const [emailSubmitting, setEmailSubmitting] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportMessage, setExportMessage] = useState("");
+  const [exportError, setExportError] = useState("");
 
   const handlePasswordChange = async (event) => {
     event.preventDefault();
@@ -96,6 +100,24 @@ export default function AccountSettingsPage() {
     }
   };
 
+  const handleDownloadMyData = async () => {
+    if (!user?.uid) {
+      return;
+    }
+    setExportBusy(true);
+    setExportMessage("");
+    setExportError("");
+    try {
+      const payload = await exportUserData(user.uid);
+      downloadJsonFile(`swaasth-data-export-${user.uid.slice(0, 8)}.json`, payload);
+      setExportMessage("Your data export downloaded. Keep this file private.");
+    } catch (error) {
+      setExportError(error?.message || "Could not export your data.");
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
   const identityLabel = usesPasswordProvider
     ? "Email and password"
     : "Google sign-in";
@@ -131,6 +153,30 @@ export default function AccountSettingsPage() {
           <Link to="/source" className="patients-manage-link">
             Open source / corresponding source →
           </Link>
+          <br />
+          <Link to="/licenses" className="patients-manage-link">
+            Third-party licenses →
+          </Link>
+        </section>
+
+        <section className="account-section">
+          <h2>Your data</h2>
+          <p className="account-section-copy">
+            Download a copy of the personal data Swaasth holds for this account
+            (profile, consents, patients, hospitals, and saved reports). To
+            nominate someone to exercise your rights if you die or become
+            incapacitated, email app.swaasth@gmail.com from this account.
+          </p>
+          <button
+            type="button"
+            className="bill-editor-secondary"
+            onClick={handleDownloadMyData}
+            disabled={exportBusy}
+          >
+            {exportBusy ? "Preparing export…" : "Download my data"}
+          </button>
+          {exportMessage && <p className="auth-info">{exportMessage}</p>}
+          {exportError && <p className="error-text">{exportError}</p>}
         </section>
 
         <section className="account-section">
@@ -231,6 +277,21 @@ export default function AccountSettingsPage() {
             </p>
           </section>
         )}
+
+        <section className="account-section account-section-danger">
+          <h2>Delete account</h2>
+          <p className="account-section-copy">
+            Permanently delete your Swaasth account, patient profiles, saved
+            reports, and local encrypted copies. This cannot be undone.
+          </p>
+          <Link to="/account/delete" className="patients-manage-link">
+            Delete my account →
+          </Link>
+          <br />
+          <Link to="/delete-account" className="patients-manage-link">
+            Web deletion request page →
+          </Link>
+        </section>
       </main>
     </motion.div>
   );

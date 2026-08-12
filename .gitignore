@@ -6,6 +6,20 @@ backend/.env
 frontend/.env
 frontend/.env.production.local
 backend/firebase-service-account.json
+scripts/firestore-*-backup-*.jsonl
+scripts/firestore-us-backup-*.jsonl
+
+# Third-party guideline corpora and derived indexes are hosted privately
+# and fetched at deploy time (backend/scripts/fetch_guideline_corpus.py).
+# Do not commit PDFs, Chroma indexes, or verbatim guideline text.
+backend/data/Standard Treatment Guidelines/
+backend/data/primary_guidelines_index/
+backend/data/stg_index/
+drugs_dataset_DONOTOPEN.zip
+medicines_dataset_DONOTOPEN.zip
+NPPA-UPDATED-PRICE-LIST-AS-ON-03-06-2025.pdf
+terms and conditions.docx
+
 node_modules/
 frontend/node_modules/
 backend/.venv/

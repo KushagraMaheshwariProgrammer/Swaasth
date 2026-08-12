@@ -2,23 +2,39 @@ import AdvocacyScopeSection from "./AdvocacyScopeSection";
 import AuditFlagCard from "./AuditFlagCard";
 import { collectPatientQuestions } from "../auditAdvocacyUtils";
 import { getAuditRiskMeta } from "../billUtils";
-import { POSSIBLE_ISSUE_NOTICE } from "../data/hedgingCopy";
+import { CLINICAL_SECTION_DISCLAIMER } from "../data/hedgingCopy";
 
 const CATEGORY_LABELS = {
-  diagnosis: "Diagnosis",
-  investigation: "Investigations",
-  prescription: "Prescription",
+  diagnosis: "Diagnosis (for discussion)",
+  investigation: "Investigations (for discussion)",
+  prescription: "Prescription (for discussion)",
   billing: "Billing",
 };
 
-function alignmentLabel(supported) {
-  if (supported === true) {
-    return { text: "Supported by reported clinical evidence", className: "clinical-align-yes" };
+function alignmentLabel(alignment) {
+  const consistent =
+    alignment?.documents_consistent ||
+    (alignment?.diagnosis_supported === true
+      ? "yes"
+      : alignment?.diagnosis_supported === false
+        ? "unclear"
+        : "not_assessable");
+  if (consistent === "yes") {
+    return {
+      text: "Documents appear consistent with the stated diagnosis under retrieved guideline excerpts (clarification only — not a diagnosis)",
+      className: "clinical-align-yes",
+    };
   }
-  if (supported === false) {
-    return { text: "Not supported by reported clinical evidence", className: "clinical-align-no" };
+  if (consistent === "unclear") {
+    return {
+      text: "Consistency is unclear from the uploaded documents — ask your treating doctor to reconcile the records",
+      className: "clinical-align-no",
+    };
   }
-  return { text: "Insufficient clinical data to assess", className: "clinical-align-unknown" };
+  return {
+    text: "Not enough clinical documentation on file to compare",
+    className: "clinical-align-unknown",
+  };
 }
 
 function groupFlags(flags) {
@@ -52,6 +68,8 @@ export default function TreatmentAuditSection({ treatmentAuditFlags, report = nu
   const advocacyScope =
     treatmentAuditFlags?.advocacy_scope || report?.advocacy_scope || null;
   const isClinicalReview = report?.report_kind === "clinical";
+  const sectionDisclaimer =
+    treatmentAuditFlags?.disclaimer || CLINICAL_SECTION_DISCLAIMER;
 
   return (
     <>
@@ -59,8 +77,8 @@ export default function TreatmentAuditSection({ treatmentAuditFlags, report = nu
         <div className="audit-section-header">
           <h3>
             {isClinicalReview
-              ? "Diagnosis support check"
-              : "Treatment appropriateness check"}
+              ? "Guideline comparison (documents)"
+              : "Guideline comparison (treatment documents)"}
           </h3>
           {treatmentAuditFlags && (
             <div className="audit-summary-badges">
@@ -96,14 +114,19 @@ export default function TreatmentAuditSection({ treatmentAuditFlags, report = nu
 
         {alignment && (
           <div className="clinical-alignment-panel">
-            <h4>Clinical alignment</h4>
-            <p className={alignmentLabel(alignment.diagnosis_supported).className}>
-              Diagnosis supported?{" "}
-              <strong>{alignmentLabel(alignment.diagnosis_supported).text}</strong>
+            <h4>Guideline alignment with reported evidence</h4>
+            <p className={alignmentLabel(alignment).className}>
+              Stated diagnosis vs uploaded documents:{" "}
+              <strong>{alignmentLabel(alignment).text}</strong>
+            </p>
+            <p className="treatment-audit-disclaimer">
+              This panel compares uploaded documents to guideline excerpts. It is
+              not a medical diagnosis or confirmation of disease. Discuss with your
+              doctor.
             </p>
             {(alignment.supporting_evidence || []).length > 0 && (
               <div>
-                <p className="clinical-alignment-label">Supporting evidence</p>
+                <p className="clinical-alignment-label">Supporting evidence on file</p>
                 <ul className="clinical-alignment-list">
                   {alignment.supporting_evidence.map((item, index) => (
                     <li key={`support-${index}`}>{item}</li>
@@ -113,7 +136,9 @@ export default function TreatmentAuditSection({ treatmentAuditFlags, report = nu
             )}
             {(alignment.missing_evidence || []).length > 0 && (
               <div>
-                <p className="clinical-alignment-label">Missing or conflicting evidence</p>
+                <p className="clinical-alignment-label">
+                  Missing or conflicting evidence on file
+                </p>
                 <ul className="clinical-alignment-list">
                   {alignment.missing_evidence.map((item, index) => (
                     <li key={`missing-${index}`}>{item}</li>
@@ -124,11 +149,7 @@ export default function TreatmentAuditSection({ treatmentAuditFlags, report = nu
           </div>
         )}
 
-        <p className="treatment-audit-disclaimer">
-          {POSSIBLE_ISSUE_NOTICE} Recommendations use ICMR, MoHFW Clinical
-          Establishments Act STGs, and CRC Standard Treatment Guidelines where
-          available. This is not a substitute for clinical judgment or legal advice.
-        </p>
+        <p className="treatment-audit-disclaimer">{sectionDisclaimer}</p>
 
         {flags.length ? (
           Object.entries(grouped).map(([category, categoryFlags]) => {
@@ -139,7 +160,7 @@ export default function TreatmentAuditSection({ treatmentAuditFlags, report = nu
               category === "other" ? "Other" : CATEGORY_LABELS[category] || category;
             return (
               <div key={category} className="treatment-audit-group">
-                <h4>{label} (details)</h4>
+                <h4>{label}</h4>
                 <div className="audit-flags-grid">
                   {categoryFlags.map((flag, index) => (
                     <AuditFlagCard key={`${category}-${index}`} flag={flag} index={index} />

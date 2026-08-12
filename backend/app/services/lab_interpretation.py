@@ -94,8 +94,8 @@ def _plain_interpretation(test_name: str, status: str, value_text: str, range_te
             + (f"; reference range is {range_text}." if range_text else ".")
         )
         recommendation = (
-            f"Ask your doctor what the elevated {label} means for your diagnosis "
-            "and whether any follow-up tests or treatment changes are needed."
+            f"Ask your treating doctor what the elevated {label} on file means "
+            "for the documented diagnosis and billed care."
         )
         return reason, recommendation
 
@@ -106,8 +106,8 @@ def _plain_interpretation(test_name: str, status: str, value_text: str, range_te
             + (f"; reference range is {range_text}." if range_text else ".")
         )
         recommendation = (
-            f"Ask your doctor whether the low {label} is expected for your condition "
-            "or needs further evaluation."
+            f"Ask your treating doctor to explain the low {label} result on file "
+            "and how it relates to the documented diagnosis."
         )
         return reason, recommendation
 
@@ -116,8 +116,8 @@ def _plain_interpretation(test_name: str, status: str, value_text: str, range_te
         + (f" ({value_text})" if value_text else ".")
     )
     recommendation = (
-        f"Ask your doctor to explain the {label} result and whether it supports "
-        "the current diagnosis or treatment plan."
+        f"Ask your treating doctor to explain the {label} result on file and "
+        "how it relates to the documented diagnosis or billed items."
     )
     return reason, recommendation
 

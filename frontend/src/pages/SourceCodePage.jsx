@@ -69,6 +69,10 @@ export default function SourceCodePage() {
           <Link to="/privacy" className="patients-manage-link">
             Privacy Policy →
           </Link>
+          <br />
+          <Link to="/licenses" className="patients-manage-link">
+            Third-party licenses →
+          </Link>
         </section>
       </main>
     </motion.div>

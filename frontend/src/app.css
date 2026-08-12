@@ -4588,6 +4588,29 @@ button.patient-list-card {
   margin-top: 1rem;
 }
 
+.account-delete-list {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+  color: #171717;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.account-delete-list li {
+  margin-bottom: 0.4rem;
+}
+
+.account-delete-submit {
+  margin-top: 1rem;
+  width: 100%;
+  min-height: 2.75rem;
+  font-size: 0.95rem;
+}
+
+.account-section-danger h2 {
+  color: #991b1b;
+}
+
 .terms-section-stack .terms-section h2 {
   margin: 0 0 0.5rem;
   font-size: 1rem;

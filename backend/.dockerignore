@@ -9,3 +9,7 @@ firebase-service-account.json
 tests/
 scripts/eval_*
 .git/
+data/Standard Treatment Guidelines/
+data/primary_guidelines_index/
+data/stg_index/
+data/icmr_index/
